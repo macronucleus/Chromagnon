@@ -13,7 +13,7 @@ import wx, threading#, exceptions
 from PriCommon import guiFuncs as G, imgfileIO, commonfuncs as C
 from PriCommon.ndviewer import main as aui
 from Priithon.all import U, N, Mrc
-import aligner, listbox, cutoutAlign, alignfuncs as af, threadSafe, chromeditor
+import aligner, listbox, cutoutAlign, alignfuncs as af, threads, chromeditor
 #import stopit
 
 #----------- Global constants
@@ -337,7 +337,7 @@ class BatchPanel(wx.Panel):
         """
         run or cancel the alignment program
 
-        The actual sequence of processes is written in threadSafe.ThreadWithExc.run()
+        The actual sequence of processes is written in threads.ThreadWithExc.run()
         """
         if self.goButton.GetValue():
             if not self.listRef.columnkeys:
@@ -378,15 +378,15 @@ class BatchPanel(wx.Panel):
 
             C.saveConfig(cutout=parms[0], local=parms[2], forceZmag=parms[3], maxShift=parms[4])
 
-            gui = threadSafe.GUImanager(self, __name__)
+            gui = threads.GUImanager(self, __name__)
             
-            self.th = threadSafe.ThreadWithExc(gui, self.localChoice, fns, targets, parms, extrainfo)
+            self.th = threads.ThreadWithExc(gui, self.localChoice, fns, targets, parms, extrainfo)
             self.th.start()
 
         else:
             tid = self.th._get_my_tid()
-            #stopit.async_raise(tid, threadSafe.MyError)
-            async_raise(tid, threadSafe.MyError)
+            #stopit.async_raise(tid, threads.MyError)
+            async_raise(tid, threads.MyError)
 
 
     old='''
