@@ -1,4 +1,4 @@
-# chromagnon
+# Chromagnon
 Image correction software for chromatic shifts in fluorescence microscopic images
 
 
