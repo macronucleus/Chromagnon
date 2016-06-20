@@ -1,6 +1,6 @@
 # Chromagnon
 Image correction software for chromatic shifts in fluorescence microscopic images
-
+Acceptable image file formats are multipage-tiff (.tif) and DeltaVision (.dv).
 
 How it works
 ------------
