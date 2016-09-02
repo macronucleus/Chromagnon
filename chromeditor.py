@@ -83,7 +83,7 @@ class ChromagnonPanel(wx.Panel):
         # \n
         box = G.newSpaceV(sizer)
 
-        self.saveButton = G.makeButton(self, box, self.onSave, title='Save as...', tip='Save editted parameter into a chromagnon file', enable=False)
+        self.saveButton = G.makeButton(self, box, self.onSave, title='Save as...', tip='Save editted parameter into a chromagnon file')#, enable=False)
 
         self.exportButton = G.makeButton(self, box, self.onExport, title='Export as .csv', tip='Save editted parameter into a comma separated file')
 
@@ -202,7 +202,10 @@ class ChromagnonPanel(wx.Panel):
             hdr.NumTimes = self.clist.nt
             hdr.wave[:self.clist.nw] = self.clist.waves[:]
             hdr.d = self.clist.pxlsiz
-            hdr.n1 = list(self.clist.waves).index(self.clist.refwave)
+            if self.clist.refwave in self.clist.waves:
+                hdr.n1 = list(self.clist.waves).index(self.clist.refwave)
+            else:
+                hdr.n1 = 0
             hdr.type = aligner.IDTYPE
 
             if self.clist.map_str == 'None':
@@ -371,8 +374,9 @@ class ChromagnonList(wx.ListCtrl,
             parm = arr.Mrc.extFloats[:arr.Mrc.hdr.NumTimes * arr.Mrc.hdr.NumWaves,:arr.Mrc.hdr.NumFloats]
             nentry = arr.Mrc.hdr.NumFloats
             self.nz = arr.Mrc.hdr.Num[-1] / (arr.Mrc.hdr.NumTimes * arr.Mrc.hdr.NumWaves * 2)
+            maxval = arr.max()
             if self.nz == 1:
-                self.map_str = 'Projection'
+                self.map_str = 'Projection (max shift %.3f pixel)' % maxval
             else:
                 self.map_str = 'Section-wise'
         parm = parm.reshape((arr.Mrc.hdr.NumTimes, arr.Mrc.hdr.NumWaves, nentry))
@@ -536,12 +540,12 @@ class TestViewPanel(wx.Panel):
         elif len(somewaves) >= 1: # the reference wavelength was not found but some found
             self.doc.refwave = somewaves[0]
             from PriCommon import guiFuncs as G
-            message = 'The original reference wavelength %i was not found in the target %s' % (refwave, os.path.basename(fn))
+            message = 'The original reference wavelength %i was not found in the target %s' % (refwave, self.doc.file)
             G.openMsg(msg=message, title='WARNING')
 
         else:
             from PriCommon import guiFuncs as G
-            message = 'No common wavelength was found in %s and %s' % (os.path.basename(cpanel.fn), os.path.basename(fn))
+            message = 'No common wavelength was found in %s and %s' % (os.path.basename(cpanel.fn), self.doc.file)
             G.openMsg(msg=message, title='WARNING')
             return
 

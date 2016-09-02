@@ -64,7 +64,15 @@ def load(fns):
         raise ValueError, 'cannot determine img type'
     return img
     
-
+def getWriter(out, hdr):
+    if out.lower().endswith(tuple(IMGEXTS_MULTITIFF)):
+        img = MultiTiffWriter(out)
+        img.setDimFromMrcHdr(hdr)
+    else:
+        img = mrcIO.MrcWriter(out, hdr)
+        
+    return img
+        
 ###---------- multipage tif -----------####
 
 IMGEXTS_MULTITIFF=('tif', 'tiff')

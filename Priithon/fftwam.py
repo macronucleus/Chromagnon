@@ -52,38 +52,38 @@ if FFTW:
     except ImportError:
         ncpu = 1
 
-    def rfft(a):
+    def rfft(a, nthreads=ncpu):
         if a.shape[-1] % 2:
             a = N.ascontiguousarray(a[...,:-1])
         shape = list(a.shape)
         shape[-1] = shape[-1] // 2 + 1
         b = N.empty(shape, RTYPES[a.dtype.type])
 
-        return _fft(a, b, direction='forward', realtypes='halfcomplex r2c')
+        return _fft(a, b, nthreads=nthreads, direction='forward', realtypes='halfcomplex r2c')
 
-    def irfft(a):
+    def irfft(a, nthreads=ncpu):
         a = a.copy() # irfft of fftw3 mess up the input
         shape = list(a.shape)
         shape[-1] = (shape[-1] - 1) * 2
         b = N.empty(shape, CTYPES[a.dtype.type])
-        return _fft(a, b, direction='backward', realtypes='halfcomplex r2c')
+        return _fft(a, b, nthreads=nthreads, direction='backward', realtypes='halfcomplex r2c')
 
-    def _fft(a, b, **kwds):
+    def _fft(a, b, nthreads=ncpu, **kwds):
         if 0 in a.shape:
             raise ValueError, 'This array cannot be transformed, shape: %s' % str(a.shape)
         modul = MODULS.get(a.dtype.type, fftw3)
-        plan = modul.Plan(a, b, nthreads=ncpu, **kwds)
+        plan = modul.Plan(a, b, nthreads=nthreads, **kwds)
         plan()
         return b
 
-    def fft(a):
+    def fft(a, nthreads=ncpu):
         b = N.empty_like(a) # assuming complex type
-        return _fft(a, b, direction='forward')
+        return _fft(a, b, nthreads=nthreads, direction='forward')
 
-    def ifft(a):
+    def ifft(a, nthreads=ncpu):
         a = a.copy() # irfft of fftw3 mess up the input
         b = N.empty_like(a) # assuming complex type
-        return _fft(a, b, direction='backward')
+        return _fft(a, b, nthreads=nthreads, direction='backward')
 
 
 else:
@@ -94,14 +94,14 @@ else:
     CTYPE = N.complex64
     CTYPES = (N.complex64, N.complex128)
 
-    def rfft(a):
+    def rfft(a, nthreads=ncpu):
         return fftw.rfftn(a)
 
-    def irfft(a): # not required to normalize
+    def irfft(a, nthreads=ncpu): # not required to normalize
         return fftw.irfftn(a)
 
-    def fft(a):
+    def fft(a, nthreads=ncpu):
         return fftw.fftn(a)
 
-    def ifft(a):
+    def ifft(a, nthreads=ncpu):
         return fftw.ifftn(a)

@@ -96,7 +96,7 @@ def prepImg4Affine(fn, w=None, phaseContrast=True):
         
 def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
     """
-    return arr, ref, an
+    return (arr, ref), an
     """
     an = aligner.Chromagnon(fn)
     an.findBestChannel()
@@ -110,7 +110,11 @@ def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
     if z is None:
         ref = an.refyx
     else:
-        ref = an.img.getArr(w=an.refwave, z=z)
+        try:
+            len(z)
+            ref = N.max(an.get3DArr(w=an.refwave, zs=z), axis=0)
+        except TypeError:
+            ref = an.img.getArr(w=an.refwave, z=z)
 
     if w is None:
         waves = range(an.img.nw)
@@ -123,13 +127,21 @@ def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
             arr = alignfuncs.prep2D(arr3D, zs=an.refzs)
         else:
             arr = arr3D[z]
+            if arr.ndim == 3:
+                arr = N.max(arr, axis=0)
     elif z is None:
         arr3D = an.get3DArr(w=w)
         zs = N.round_(an.refzs-an.alignParms[0,w,0]).astype(N.int)
         arr = alignfuncs.prep2D(arr3D, zs=zs)
     else:
-        z0 = int(round(z - an.alignParms[0,w,0]))
-        arr = an.img.getArr(w=w, z=z0)
+        #z0 = int(round(z - an.alignParms[0,w,0]))
+        try:
+            len(z)
+            z0 = N.round_(N.array(z) - an.alignParms[0,w,0])
+            arr = N.max(an.get3DArr(w=w, zs=z0.astype(N.int)), axis=0)
+        except TypeError:
+            z0 = int(round(z - an.alignParms[0,w,0]))
+            arr = an.img.getArr(w=w, z=z0)
         
     an.setRegionCutOut()
     arr = arr[an.cropSlice[-2:]]#[Ellipsis]+an._yxSlice]
@@ -139,12 +151,15 @@ def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
     return N.array((arr, ref)), an
 
 
-def testNonlinear(arr, ref, npxls=32, phaseContrast=True):
+def testNonlinear(arr, ref, npxls=32, phaseContrast=True, centerDot=True):
     try:
         if len(npxls) != len(arr.shape):
             raise ValueError, 'length of the list of npxls must be the same as len(shape)'
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
+
+    arr = arr.astype(N.float32)
+    ref = ref.astype(N.float32)
         
     tslcs, arrs = alignfuncs.chopImage2D(arr, npxls)
     rslcs, refs = alignfuncs.chopImage2D(ref, npxls)
@@ -169,13 +184,13 @@ def testNonlinear(arr, ref, npxls=32, phaseContrast=True):
         bgrid[(yslc[0][0].start-1):(yslc[0][0].start+1),:] = bme
     agrid[(yslc[0][0].stop-1):(yslc[0][0].stop+1),:] = ame
     bgrid[(yslc[0][0].stop-1):(yslc[0][0].stop+1),:] = bme
-    
+
     for x, slc in enumerate(yslc):
         agrid[:,(slc[1].start-1):(slc[1].start+1)] = ame
         bgrid[:,(slc[1].start-1):(slc[1].start+1)] = bme
     agrid[:,(slc[1].stop-1):(slc[1].stop+1)] = ame
     bgrid[:,(slc[1].stop-1):(slc[1].stop+1)] = bme  
-    
+
     for y, ay in enumerate(arrs):
         for x, a in enumerate(ay):
             b = refs[y][x]
@@ -195,7 +210,20 @@ def testNonlinear(arr, ref, npxls=32, phaseContrast=True):
     agrid = normalize(agrid) * 0.3
     bgrid = normalize(bgrid) * 0.3
     #cs = normalize(cs)
+    
+    cme = cs.max() / 2.
+    for y, yslc in enumerate(tslcs):
+        cs[(yslc[0][0].start-1):(yslc[0][0].start+1),:] = cme
+        if centerDot:
+            cs[(yslc[0][0].start-1+npxls[0]//2):(yslc[0][0].start+1+npxls[0]//2),::10] = cme
+    cs[(yslc[0][0].stop-1):(yslc[0][0].stop+1),:] = cme
 
+    for x, slc in enumerate(yslc):
+        cs[:,(slc[1].start-1):(slc[1].start+1)] = cme
+        if centerDot:
+            cs[::10,(slc[1].start-1+npxls[1]//2):(slc[1].start+1+npxls[1]//2)] = cme
+    cs[:,(slc[1].stop-1):(slc[1].stop+1)] = cme
+    
     v = N.where(quality[0] > 0.1, 1, 0)
     q = N.where(quality[2] > 0.065, 1, 0)
     yxq = yxs * v * q
@@ -222,39 +250,182 @@ def testCorrelation(arr, win=64):
     cme = c[:c.shape[0]//4].mean()
     return c.max() - cme
 
-def beads_analyzeBeads(fn, thre_sigma=1., refwave=2, nbeads=30, win=5, maxdist=0.6):
+def beads_analyzeBeads(fn, thre_sigma=1., refwave=2, nbeads=60, win=5, maxdist=600, maxrefdist=5):#0.6, maxrefdist=0.005):
+    """
+    maxdist: nm
+    maxrefdist: nm
+
+    return dic
+    """
     from PriCommon import mrcIO, imgFilters, imgFit, imgGeo, microscope
+    from Priithon.all import Y
     h = mrcIO.MrcReader(fn)
-    shape = list(h.hdr.Num[::-1])
+    if refwave >= h.nw:
+        raise ValueError, 'reference wave does not exists'
+    shape = h.hdr.Num[::-1].copy()
     shape[0] /= (h.hdr.NumTimes * h.hdr.NumWaves)
     pzyx = h.hdr.d[::-1]
 
     NA = 1.35
     difflimitYX = microscope.resolution(NA, h.hdr.wave[refwave])/1000.
     difflimit = N.array([difflimitYX*2, difflimitYX, difflimitYX]) / pzyx
+    print 'diffraction limit (px) is:', difflimit
+    simres = difflimit / 1.5#2.
 
     arr = h.get3DArr(w=refwave).copy()
+    ndim = arr.ndim
     me = arr.mean()
     sd = arr.std()
     thre = me + sd * thre_sigma
-    sigma = 0.5
-        
+    sigma = 1.5
+
     zyxs = []
+    #found = []
+    sigmas = []
     i = 0
+    pmax = 0
+    failed = 0
     while i < nbeads:
-    #for i in range(nbeads):#100):
-        if arr.max() > thre:
-            v, zyx, sigma = imgFilters.findMaxWithGFit(arr, sigma=sigma, win=win)
-            if len(zyxs) and imgGeo.closeEnough(zyx, zyxs, difflimit*2):
-                print 'too close', zyx
-                imgFilters.mask_gaussianND(arr, zyx, v, sigma)
+        Y.refresh()
+        amax,z,y,x = U.findMax(arr)
+        zyx = N.array((z,y,x), N.float32)
+        #found.append(zyx)
+        zyx0 = N.where(zyx > simres, zyx - simres, 0).astype(N.int)
+        zyx1 = N.where(zyx + simres < shape, zyx + simres, shape).astype(N.int)
+        rmslice = [slice(*zyx) for zyx in zip(zyx0, zyx1)]
+
+        if failed > 10:
+            raise RuntimeError
+            break
+        elif amax == pmax:
+            arr[rmslice] = me
+        elif amax > thre:
+            # Gaussian fitting
+            try:
+                ret, check = imgFit.fitGaussianND(arr, [z,y,x][-ndim:], sigma, win)
+            except IndexError: # too close to the edge
+                arr[rmslice] = me
+                print 'Index Error, too close to the edge', z,y,x
+                failed += 1
                 continue
-            zyxs.append(zyx)
+            if check == 5:
+                arr[rmslice] = me
+                print 'fit failed', z,y,x
+                failed += 1
+                continue
+
+            # retreive results
+            v = ret[1]
+            zyx = ret[2:2+ndim]
+            sigma = ret[2+ndim:2+ndim*2]
+            if any(sigma) < 1:
+                sigma = N.where(sigma < 1, 1, sigma)
+
+            # check if the result is inside the image
+            if N.any(zyx < 0) or N.any(zyx > (shape)):
+                print 'fitting results outside the image', zyx, z,y,x, rmslice
+                arr[rmslice] = me
+                failed += 1
+                continue # too close to the edge
+
+            # remove the point
             imgFilters.mask_gaussianND(arr, zyx, v, sigma)
+
+            # check if the bead is too close to the exisisting ones
+            skipped= """
+            if len(found):#zyxs):
+                close = imgGeo.closeEnough(zyx, found, difflimit*2)#zyxs, difflimit*2)
+                if N.any(close):
+                    if len(zyxs):
+                        close = imgGeo.closeEnough(zyx, zyxs, difflimit*2)
+                        if N.any(close):
+                            idx = close.argmax()
+                            already = zyxs.pop(idx)
+                            #print 'too close', zyx, already
+                    print 'found in the previous list'
+                    continue"""
+
+            # remove beads too close to the edge
+            if N.any(zyx < 2) or N.any(zyx > (shape-2)):
+                print 'too close to the edge', zyx
+                if N.any(arr[rmslice] > thre):
+                    arr[rmslice] = me
+                failed += 1
+                continue # too close to the edge
+
+            # remove beads with bad shape
+            elif N.any(sigma < 0.5) or N.any(sigma > 3):
+                print 'sigma too different from expected', sigma, zyx
+                if N.any(arr[rmslice] > thre):
+                    arr[rmslice] = me
+                sigma = 1.5
+                failed += 1
+                continue
+
+            old="""
+            # remove beads too elliptic
+            elif sigma[1] / sigma[2] > 1.5 or sigma[2] / sigma[1] > 1.5:
+                print 'too elliptic', sigma[2] / sigma[1]
+                if N.any(arr[rmslice] > thre):
+                    arr[rmslice] = me
+                    #if (sigma[2] / sigma[1]) > 20:
+                    #raise ValueError
+                sigma = 1.5
+                failed += 1
+                continue
+
+            elif N.any(sigma[-2:] > 3.0):
+                print 'sigma too large', sigma, zyx
+                if N.any(arr[rmslice] > thre):
+                    arr[rmslice] = me
+                sigma = 1.5
+                failed += 1
+                continue
+
+            elif sigma[0] < 0.5 or sigma[0] > 3:
+                print 'sigma z too different from expected', sigma, zyx
+                if N.any(arr[rmslice] > thre):
+                    arr[rmslice] = me
+                sigma = 1.5
+                failed += 1
+                continue
+
+
+            #elif imgGeo.closeEnough(zyx, N.array((17,719,810), N.float32), 4):
+            #    raise RuntimeError"""
+
+            # add results
+            zyxs.append(zyx)
+            sigmas.append(sigma)
             i += 1
+            pmax = amax
+            failed = 0
+            #print i
+            
+        # maximum is below threshold
         else:
             break
     del arr
+
+    sigmas = N.array(sigmas)
+    sigmaYX = N.mean(sigmas[:,1:], axis=1)
+    sigmaZ = sigmas[:,0]
+    idxyx = sigmaYX.argmax()
+    idxz = sigmaZ.argmax()
+    print 'sigmaYX', round(sigmaYX.mean(), 3), round(sigmaYX.min(), 3), round(sigmaYX.std(), 3), round(sigmaYX.max(), 3), zyxs[idxyx]
+    print 'sigmaZ', round(sigmaZ.mean(), 3), round(sigmaZ.min(), 3), round(sigmaZ.std(), 3), round(sigmaZ.max(), 3), zyxs[idxz]
+
+    
+    # remove overlaps
+    zyxs2 = []
+    zyxs = N.array(zyxs)
+    for i, zyx in enumerate(zyxs):
+        close = imgGeo.closeEnough(zyx, zyxs, difflimit*4)
+        if not N.any(close[:i]) and not N.any(close[i+1:]):
+            #idx = close.argmax()
+            #already = zyxs.pop(idx)
+            zyxs2.append(zyx)
+    zyxs = zyxs2
     
     waves = range(h.nw)
     #waves.remove(refwave)
@@ -265,32 +436,40 @@ def beads_analyzeBeads(fn, thre_sigma=1., refwave=2, nbeads=30, win=5, maxdist=0
     checks = 0
     zeros = 0
     toofars = 0
+
+    pzyx *= 1000
     
     for w in waves:
+        if w == refwave:
+            continue
         arr = h.get3DArr(w=w)
-        me = arr.mean()
-        sd = arr.std()
-        thre = me + sd * thre_sigma
+        #me = arr.mean()
+        #sd = arr.std()
+        #thre = me + sd * thre_sigma
 
         for zyx in zyxs:
-            key = tuple(zyx)
+            key = tuple(zyx * pzyx)
             if key in removes:
                 continue
 
-            win0 = win
-            while win0 >= 3:
-                try:
-                    ret, check = imgFit.fitGaussianND(arr, zyx, sigma=sigma, window=win0)
-                    break
-                except IndexError:
-                    win0 -= 2
+            #win0 = win
+            #while win0 >= 3:
+            try:
+                ret, check = imgFit.fitGaussianND(arr, zyx, sigma=sigma, window=win)#0)
+                #break
+            except (IndexError, ValueError):
+                ret = zyx
+                check = 5
+                    #win0 -= 2
                     #ret, check = imgFit.fitGaussianND(arr, zyx, sigma=sigma, window=3)
 
             dif = (zyx - ret[2:5]) * pzyx
-            if check == 5 or (w != refwave and (N.all(dif == 0) or N.any(N.abs(dif) > maxdist))):
+            if check == 5 or (w != refwave and  N.any(N.abs(dif) > maxdist)) or (w == refwave and N.any(N.abs(dif) > maxrefdist)):#(N.all(dif == 0) or N.any(N.abs(dif) > maxdist))):
                 if check == 5:
                     checks += 1
-                elif N.all(dif == 0):
+                    #elif N.all(dif == 0):
+                    #zeros += 1
+                elif w == refwave and N.any(N.abs(dif) > maxrefdist):
                     zeros += 1
                 elif N.any(N.abs(dif) > maxdist):
                     toofars += 1
@@ -314,22 +493,58 @@ def beads_analyzeBeads(fn, thre_sigma=1., refwave=2, nbeads=30, win=5, maxdist=0
 
     print 'check:', checks, 'zeros:', zeros, 'toofars', toofars
 
-    P.figure(0)
+    # subtracting the center
+    newdic = {}
+    keys = difdic.keys()
+    newkeys = N.array(keys)
+    zmin = N.min(newkeys[:,0])
+    center = (shape * pzyx) / 2.
+    #yx0 = (N.max(newkeys[:,1:], axis=0) - N.min(newkeys[:,1:], axis=0)) / 2.
+    newkeys[:,0] -= zmin
+    newkeys[:,1:] -= center[1:] #yx0
+    newkeys = [tuple(key) for key in newkeys]
+
+    items = [difdic[key] for key in keys]
+    newdic = dict(zip(newkeys, items))
+    difdic = newdic
+
+    # plot
+    P.figure(0, figsize=(8,8))
     keys = N.array(difdic.keys())
     P.hold(0)
     P.scatter(keys[:,2], keys[:,1], alpha=0.5)
-    P.xlabel('X (pixel)')
-    P.ylabel('Y (pixel)')
+    P.xlabel('X (nm)')
+    P.ylabel('Y (nm)')
     P.savefig(fn+'_fig0.png')
 
-    return difdic, shape
+    return difdic#, shape
 
 
-def beads_plotdic(dic, shape, out=None, overwrite=False):
-    colors = ['g', 'b', 'r', 'y']#(0,255,0), (0,0,255), (255,255,0), (255,255,255)]
-    center = N.divide(shape, 2)
+def beads_plotdic(dic, out=None, overwrite=False, colors = ['g', 'm'], depth=None):
+    """
+    depth: nm, None means all, (min, max) or max
+    
+    return zes, yes, xes, mes, zss, yss, xss, sds, pears
+    """
+    
+    # ['#005900', '#ff7400']
+    #'b', 'r', 'y']#(0,255,0), (0,0,255), (255,255,0), (255,255,255)]
+
     keys = dic.keys()
 
+    # depth screen
+    if depth:
+        try:
+            if len(depth) == 2:
+                keys = [key for key in keys if key[0] > depth[0] and key[0] < depth[1]]
+            else:
+                raise ValueError, 'depth should be (min, max) or just max'
+        except TypeError:
+            keys = [key for key in keys if key[0] < depth]
+            
+        print 'number of beads', len(keys)
+        
+    # constants and arrays to store data
     ns = len(keys)            # samples
     nw = len(dic[keys[0]])    # waves
     nd = len(dic[keys[0]][0]) # dimensions
@@ -337,32 +552,91 @@ def beads_plotdic(dic, shape, out=None, overwrite=False):
     dists = N.empty((ns,nd), N.float32)
     error = N.empty((nw,ns,nd), N.float32)
     pears = N.empty((nw,nd), N.float32)
-    
-    for i, kd in enumerate(dic.iteritems()):
-        pos, wzyx = kd
-        dists[i] = pos - center
+
+    # dists, diffs, and error
+    #for i, kd in enumerate(dic.iteritems()):
+    for i, pos in enumerate(keys):
+        wzyx = dic[pos]
+        #pos, wzyx = kd
+        dists[i] = pos# - center
         
         for w, zyx in enumerate(wzyx):
             diffs[w,i] = N.sqrt(N.sum(N.power(zyx, 2)))
-            #for axis in range(nd):
             error[w,i] = zyx
 
-    
-
+    # plot 1-3, distance vs. deviation
     axes = ['Z', 'Y', 'X']
     for d in range(nd):
         for w in range(nw):
             P.figure(d+1)
             P.hold(bool(w))
             P.scatter(dists[:,d], error[w,:,d], color=colors[w], alpha=0.5)
-            P.xlabel('Distance (pixel) from the center %s' % axes[d])
-            P.ylabel('Distance (um) from the red channel')
-            pears[w,d] = alignfuncs.calcPearson(N.abs(dists[:,d]), error[w,:,d])
+            P.xlabel('Distance (nm) from the center %s' % axes[d])
+            P.ylabel('Deviation (um) from the reference channel in the %s axis' % axes[d])
+            if d:
+                pears[w,d] = alignfuncs.calcPearson(N.abs(dists[:,d]), N.abs(error[w,:,d]))
+            else:
+                pears[w,d] = alignfuncs.calcPearson(dists[:,d], error[w,:,d])
             
         if out:
-            P.figure(d+1)
+            P.figure(d+1, figsize=(8,8))
             P.savefig(out+'_fig%i.png' % (d+1))
 
+    # plot4 scattered plot XY
+    nplot = nd
+    nplot += 1
+    P.figure(nplot, figsize=(8,8))
+    keys = N.array(keys)
+    for w in range(nw):
+        P.hold(bool(w))
+        er = N.mean(N.abs(error[w,:,1:]), axis=-1)
+        P.scatter(keys[:,2], keys[:,1], 3*er, color=colors[w], alpha=0.5)
+    P.xlabel('X (nm)')
+    P.ylabel('Y (nm)')
+    if out:
+        P.savefig(out+'_fig0.png')
+
+    # plot5 scattered plot Z
+    nplot += 1
+    P.figure(nplot, figsize=(8,8))
+    for w in range(nw):
+        P.hold(bool(w))
+        #er = N.abs(error[w,:,2])
+        #P.scatter(keys[:,0], error[w,:,1], 3*er, color=colors[w], alpha=0.5)
+        P.scatter(keys[:,0], N.abs(error[w,:,1]), color=colors[w], alpha=0.5)
+    P.xlabel('Depth from the surface of the cover slip (nm)')
+    P.ylabel('Deviation (nm) from the reference channel in the Y axis')
+    if out:
+        P.savefig(out+'_fig0.png')
+
+    # plot6 scattered plot Z
+    nplot += 1
+    P.figure(nplot, figsize=(8,8))
+    for w in range(nw):
+        P.hold(bool(w))
+        #er = N.abs(error[w,:,2])
+        #P.scatter(keys[:,0], error[w,:,1], 3*er, color=colors[w], alpha=0.5)
+        P.scatter(keys[:,0], N.abs(error[w,:,2]), color=colors[w], alpha=0.5)
+    P.xlabel('Depth from the surface of the cover slip (nm)')
+    P.ylabel('Deviation  (nm) from the reference channel in the X axis')
+    if out:
+        P.savefig(out+'_fig0.png')
+
+    # plot7 scattered plot XY
+    nplot += 1
+    P.figure(nplot, figsize=(8,8))
+    keys = N.array(keys)
+    for w in range(nw):
+        P.hold(bool(w))
+        er = N.abs(error[w,:,0])
+        P.scatter(keys[:,2], keys[:,1], 3*er, color=colors[w], alpha=0.5)
+    P.xlabel('X (nm)')
+    P.ylabel('Y (nm)')
+    if out:
+        P.savefig(out+'_fig0.png')
+        
+    # stats
+    error = N.abs(error)
     mes = [d.mean() for d in diffs]
     sds = [d.std() for d in diffs]
 
@@ -374,30 +648,37 @@ def beads_plotdic(dic, shape, out=None, overwrite=False):
     yss = [error[w,:,1].std() for w in xrange(nw)]
     xss = [error[w,:,2].std() for w in xrange(nw)]
 
+    # file output
     if out:
         if not overwrite and os.path.isfile(out):
             yn = raw_input('overwrite? %s (y/n)' % os.path.basename(out))
             if yn.startswith('n'):
                 return
         import csv
-        ncolumns = nw + 1
         with open(out, 'w') as h:
             cw = csv.writer(h)
 
-            cw.writerow(['# mean', len(dic)] + ['']*(nd-1))
-            cw.writerow(['# z', 'y', 'x', 'zyx'])
+            cw.writerow(['# wavelength', 'n', len(dic)] + ['']*(nd-1))
+            cw.writerow(['#mean', 'z', 'y', 'x', 'zyx'])
             for w in xrange(nw):
-                cw.writerow([round(error[w,:,d].mean(), 4) for d in xrange(nd)] + [round(mes[w], 4)])
+                cw.writerow([w]+[round(error[w,:,d].mean(), 1) for d in xrange(nd)] + [round(mes[w], 3)])
                 
-            cw.writerow(['#std']+[]*nd)
+            cw.writerow(['#std']+[]*(nd+1))
             for w in xrange(nw):
-                cw.writerow([round(error[w,:,d].std(), 4) for d in xrange(nd)] + [round(mes[w], 4)])
+                cw.writerow([w]+[round(error[w,:,d].std(), 1) for d in xrange(nd)] + [round(sds[w], 3)])
 
-            cw.writerow(['#pearson']+[]*nd)
+            cw.writerow(['#pearson']+[]*(nd+1))
             for w in xrange(nw):
-                cw.writerow(pears[w])
+                cw.writerow([w]+list(pears[w]))
+
+            cw.writerow(['#row data'] + []*(nd+1))
+            for w, err in enumerate(error):
+                cw.writerow(['#wave%i' % w] + []*(nd+1))
+                for i, e in enumerate(err):
+                    cw.writerow([i]+list(e))
+                    
     
-    return zes, yes, xes, mes, zss, yss, xss, sds, pears
+    return zes, yes, xes, mes, zss, yss, xss, sds, pears#, error
 
 def beads_pearson(fns, chroms=None, refwave=None):
     from PriCommon import mrcIO
@@ -435,6 +716,9 @@ def beads_pearson(fns, chroms=None, refwave=None):
     return ps
             
 def chrom_stats(fns, nw=3):
+    """
+    return deviation in um
+    """
     t = 0
     refwave = 0
 
@@ -443,8 +727,8 @@ def chrom_stats(fns, nw=3):
     for i, fn in enumerate(fns):
         data = AlignDataHolder(fn)
 
-        rpos = N.array((0,256), N.float32) * data.pxlsiz[:2][::-1]
-        mpos = N.array((65,256,256), N.float32) * data.pxlsiz[::-1]
+        rpos = N.array((0,data.mid), N.float32) * data.pxlsiz[:2][::-1]
+        mpos = N.array((65,data.mid,data.mid), N.float32) * data.pxlsiz[::-1]
 
         for w in xrange(1, data.nw):
             shift = data.getShift(w=w,t=t,refwave=refwave)
@@ -470,7 +754,11 @@ class AlignDataHolder(object):
         self.nw = len(self.waves)
         self.t = 0
         self.dtype = arr.dtype.type
-
+        if 'SIR' in fn:
+            self.mid = 512
+        else:
+            self.mid = 256
+            
         if arr.Mrc.hdr.n2 == 1:
             parm = arr
             nentry = aligner.NUM_ENTRY
@@ -493,7 +781,8 @@ class AlignDataHolder(object):
         return shift at the specified wavelength and time frame
         """
         if refwave is None:
-            refwave = self.refwave
+            waves = list(self.waves)
+            refwave = waves.index(self.refwave)
 
         ret = self.alignParms[t,w].copy()
         ref = self.alignParms[t,refwave]
@@ -502,3 +791,56 @@ class AlignDataHolder(object):
         if len(ref) >= 5:
             ret[4:] /= ref[4:len(ret)]
         return ret
+
+    def estimateError(self, dif=N.zeros((aligner.NUM_ENTRY,), N.float32), nz=65):
+        """
+        return shift_in_nm, vector_sum
+        
+        >>> d = AlignDataHolder(fn)
+        >>> s = d.getShift()
+        >>> dif = s - [2,10,-8,0.5,1.01,1.0005,0.9995]
+        >>> d.estimateError(dif)
+        """
+        shift = N.copy(dif)
+        shift[4:] += 1
+        
+        rpos = N.array((0,self.mid), N.float32) * self.pxlsiz[:2][::-1]
+        mpos = N.array((nz/4.,self.mid,self.mid), N.float32) * self.pxlsiz[::-1]
+
+        shift[:3] *= self.pxlsiz[::-1]
+        shift[3] = imgGeo.euclideanDist(imgGeo.rotate(rpos, shift[3]), rpos) * N.sign(shift[3])
+        for j in xrange(3):
+            shift[4+j] = imgGeo.zoom(mpos[j], shift[4+j]) - mpos[j]
+            
+        return shift, N.sqrt(N.sum(N.power(shift, 2)))#N.sum(N.sqrt(N.power(shift, 2)))
+
+def chrom_stat_write(fns, out=None, nw=3, refwave=1):
+    import csv
+    common = os.path.commonprefix(fns)
+    if not out and common:
+        out = common + '.csv'
+    elif not out:
+        raise ValueError, 'please supply the output filename'
+
+    with open(out, 'w') as h:
+        o = csv.writer(h)
+
+        # header
+        o.writerow(['name', 'wave'] + aligner.ZYXRM_ENTRY)
+
+        # now write rows
+        for w in range(nw):
+            if w == refwave:
+                continue
+            for fn in fns:
+                name = fn.replace(common, '')
+                an = AlignDataHolder(fn)
+                if len(an.waves) <= w:
+                    o.writerow([name, w] + [0]*aligner.NUM_ENTRY)
+                    continue
+                shift = an.getShift(w, refwave=refwave)
+                shift[4:] -= 1
+                shift, _ = an.estimateError(shift)
+                o.writerow([name, w] + list(shift))
+
+    return out

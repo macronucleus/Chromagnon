@@ -34,6 +34,7 @@ class MrcReader(generalIO.GeneralReader):
         self.setDim(nx, ny, nz, nt, nw, dtype, wave, imgseq)
 
         self.fp.setByteOrder()
+        self.pxlsiz = self.fp.hdr.d[::-1]
 
         self.hdr = self.fp.hdr
 
@@ -208,6 +209,9 @@ def _slimShape(shape): # N.squeeze does it
 
 
 def getWaveFromHdr(hdr, wave):
+    """
+    return wavelength
+    """
     wave = int(wave)
     nw = hdr.NumWaves
     if wave in hdr.wave[:nw]:
@@ -218,6 +222,9 @@ def getWaveFromHdr(hdr, wave):
         raise ValueError, 'no such wave exists %s' % wave
 
 def getWaveIdxFromHdr(hdr, wave):
+    """
+    return index
+    """
     wave = int(wave)
     nw = hdr.NumWaves
     if wave in hdr.wave[:nw]:
@@ -227,6 +234,41 @@ def getWaveIdxFromHdr(hdr, wave):
         return wave
     else:
         raise ValueError, 'no such wave exists %s' % wave
+
+
+def recalcMinMax(fn):
+    """
+    update scale in the header
+    """
+    h = MrcReader(fn)
+    hdr = makeHdr_like(h.hdr)
+
+    o = Mrc3(fn, 'r+')
+
+    for w in xrange(h.nw):
+        mi, ma = None, None
+        su = 0
+        for t in xrange(h.nt):
+            a = h.get3DArr(t=t, w=w)
+            mi0 = a.min()
+            if mi is None or mi0 < mi:
+                mi = mi0
+            ma0 = a.max()
+            if ma is None or ma0 > ma:
+                ma = ma0
+            su += a.sum()
+        if w == 0:
+            me = su / (h.nt * h.nz)
+            o.hdr.mmm1 = mi, ma, me
+        else:
+            exec('o.hdr.mm%i = %f, %f' % (w+1, mi, ma))
+
+    h.close()
+
+    o.writeHeader()
+    
+    o.close()
+    
 #####
 
 

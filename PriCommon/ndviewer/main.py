@@ -1,5 +1,6 @@
 #!/usr/bin/env priithon
 
+import os, sys
 import wx, wx.aui
 from Priithon import histogram, useful as U
 
@@ -32,7 +33,7 @@ _rgbList_menuIDs = [wx.NewId() for i in range(len(_rgbList))]
 
 def initglut():
     global GLUTINITED
-    if not GLUTINITED:
+    if not GLUTINITED and sys.platform in ('linux2', 'win32'):
         from OpenGL import GLUT
         GLUT.glutInit([])  ## in order to call Y.glutText()
         GLUTINITED = True
@@ -183,6 +184,12 @@ class ImagePanel(wx.Panel):
 
             topSizer.Add(self.zSlider, 6, wx.ALL|wx.ALIGN_LEFT, 2)
             wx.EVT_SLIDER(self, self.zSlider.GetId(), self.OnZSlider)
+            #wx.EVT_KEY_DOWN(self, self.zSlider.GetId(), self.OnKeyZSlider)
+            #self.zSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyZSlider)
+            if self.doc.nt == 1:
+                self.sliderPanel.Bind(wx.EVT_KEY_DOWN, self.OnKeyZSlider)
+            self.zSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyZSlider)
+            #self.Bind(wx.EVT_CHAR, self.OnKeyZSlider)
 
             #/n
             box = G.newSpaceV(sizer)
@@ -207,7 +214,10 @@ class ImagePanel(wx.Panel):
             box.Add(self.tSlider, 6, wx.ALL|wx.ALIGN_LEFT, 2)
             wx.EVT_SLIDER(self, self.tSlider.GetId(), self.OnTSlider)
 
-
+            if self.doc.nz == 1:
+                self.sliderPanel.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
+            self.tSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
+                
     def onOrthogonal(self, evt=None):
         """
         transform to the orthogonal viewer
@@ -546,8 +556,10 @@ class ImagePanel(wx.Panel):
         z = int(self.zSliderBox.GetValue())
         if z >= self.doc.nz:
             z = self.doc.nz - 1
-        while z < 0:
-            z = self.doc.nz + z
+        elif z < 0:
+            z = 0
+            #while z < 0:
+            #z = self.doc.nz + z
         self.set_zSlice(z)
         self.zSlider.SetValue(z)
      
@@ -556,8 +568,45 @@ class ImagePanel(wx.Panel):
         self.set_zSlice(z)
         self.zSliderBox.SetValue(str(z))
 
+    def OnKeyZSlider(self, evnt):
+        keycode = evnt.GetKeyCode()
+        if keycode == wx.WXK_RIGHT:
+            self.doc.z += 1
+            if self.doc.z >= self.doc.nz:
+                self.doc.z = self.doc.nz - 1
+        elif keycode == wx.WXK_LEFT:
+            self.doc.z -= 1
+            if self.doc.z < 0:
+                self.doc.z = 0
+
+        self.zSliderBox.SetValue(str(self.doc.z))
+        self.set_zSlice(self.doc.z)
+        self.zSlider.SetValue(self.doc.z)
+
+        evnt.Skip()
+
+    def OnKeyTSlider(self, evnt):
+        keycode = evnt.GetKeyCode()
+        if keycode == wx.WXK_RIGHT:
+            self.doc.t += 1
+            if self.doc.t >= self.doc.nt:
+                self.doc.t = self.doc.nt - 1
+        elif keycode == wx.WXK_LEFT:
+            self.doc.t -= 1
+            if self.doc.t < 0:
+                self.doc.t = 0
+        self.tSliderBox.SetValue(str(self.doc.t))
+        self.set_tSlice(self.doc.t)
+        self.tSlider.SetValue(self.doc.t)
+
+        evnt.Skip()
+        
     def set_zSlice(self, z):
         self.doc.z = int(z)
+        if self.doc.z >= self.doc.nz:
+            self.doc.z = self.doc.nz
+        elif self.doc.z < 0:
+            self.doc.z = 0
         self.updateGLGraphics(range(len(self.viewers)))
         self.recalcHistL(False)
         for i in range( self.doc.nw ):
@@ -723,9 +772,11 @@ class MyFrame(wx.Frame):
     def __init__(self, title='Chromagnon viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):
         wx.Frame.__init__(self, parent, id, title, style=wx.DEFAULT_FRAME_STYLE | wx.BORDER_SUNKEN, size=wx.Size(size[0], size[1]))
 
+        
         # constants
         self.dir = ''
         self.parent = parent
+        self.title = self.GetTitle()
 
         # some attributes
         self.auiManager = wx.aui.AuiManager()
@@ -733,18 +784,45 @@ class MyFrame(wx.Frame):
 
         # Notebook
         self.auiManager.AddPane(self.CreateNotebook(), wx.aui.AuiPaneInfo().CloseButton(False).CenterPane())
+        wx.aui.EVT_AUINOTEBOOK_PAGE_CHANGED(self, -1, self.OnNotebookPageChange)
 
         self.auiManager.Update()
 
     def CreateNotebook(self):
         
-        self.imEditWindows = wx.aui.AuiNotebook(self, wx.ID_ANY, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_WINDOWLIST_BUTTON | wx.aui.AUI_NB_TAB_FIXED_WIDTH)
+        #self.imEditWindows = wx.aui.AuiNotebook(self, wx.ID_ANY, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_WINDOWLIST_BUTTON | wx.aui.AUI_NB_TAB_FIXED_WIDTH)
+        self.imEditWindows = ImEditWindow(self, wx.ID_ANY, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_WINDOWLIST_BUTTON | wx.aui.AUI_NB_TAB_FIXED_WIDTH)
 
         self.imEditWindows.SetNormalFont(wx.NORMAL_FONT)
         self.imEditWindows.SetSelectedFont(wx.NORMAL_FONT)  # do not use bold for selected tab
         self.imEditWindows.SetMeasuringFont(wx.NORMAL_FONT)
         return self.imEditWindows
 
+    def OnNotebookPageChange(self, event):
+        new_page = event.GetSelection()
+        page = self.imEditWindows.GetPage(new_page)
+        if page.doc:
+            self.SetTitle('   '.join((self.title, page.doc.file)))
+
+class ImEditWindow(wx.aui.AuiNotebook):
+    def __init__(self, *args, **kwds):
+        wx.aui.AuiNotebook.__init__(self, *args, **kwds)
+        self.setMaxPages()
+
+    def setMaxPages(self, defval=30):
+        self.maxpages = defval
+        
+
+    def addPage(self, *args, **kwds):
+        #print self.GetPageCount(), self.maxpages
+        if self.GetPageCount() >= self.maxpages:
+            #print 'called'
+            page = self.GetPage(0)
+            #page.Close()
+            self.DeletePage(0)
+            
+        self.AddPage(*args, **kwds)
+            
 def main(*fn):
     """
     fn: a filename
@@ -761,7 +839,8 @@ def main(*fn):
 
     for fn in fns:
         panel = ImagePanel(frame, fn)
-        frame.imEditWindows.AddPage(panel, 'name', select=True)
+        name = os.path.basename(fn)
+        frame.imEditWindows.addPage(panel, name, select=True)
     return frame
 
 if __name__ is '__main__':

@@ -15,6 +15,7 @@ class AlignError(exceptions.Exception): pass
 
 CTHRE=0.065
 MAX_SHIFT = 2 #0.4 # um
+MIN_PXLS_YX = 30
 
 QUADRATIC_AREA=['Right-Top', 'Left-Top', 'Left-Bottom', 'Right-Bottom']
 
@@ -28,6 +29,7 @@ def prep2D(a3d, zs=None):
     """
     if zs is None:
         zs = findBestRefZs(a3d)
+
     aa = a3d[zs]
     return N.max(aa, axis=0)
 
@@ -175,7 +177,10 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         print 'in iteration, initial geuss is', initguess
         ret[:] = initguess[:]
 
-    goodImg = True
+    if if_failed == 'force_simplex':
+        goodImg = False
+    else:
+        goodImg = True
     rough = True
                     
     offset = N.zeros((2,), N.float32)
@@ -315,13 +320,9 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
 def simplex(a, b, phaseContrast=True, rough=True):
     from scipy import optimize
 
-    try:
-        yx, c = xcorr.Xcorr(b, a, phaseContrast=phaseContrast)
-    except (ValueError, ZeroDivisionError):
-        raise AlignError
 
     yxrm = N.zeros((5,), N.float64)
-    yxrm[:2] += yx
+    #yxrm[:2] += yx
     yxrm[-2:] = 1
 
     # rough estimate
@@ -331,6 +332,13 @@ def simplex(a, b, phaseContrast=True, rough=True):
         yxrm[4] = roughRotMag(b, a, yxrm, 4, 0.005, 20)
     
     yxrm = optimize.fmin(_compCost, yxrm, (b, a), disp=0)
+
+    # since xcorr is much better at yx estimation, yx part is replaced.
+    #try:
+    #    yx, c = xcorr.Xcorr(b, a, phaseContrast=phaseContrast)
+    #    yxrm[:2] = yx
+    #except (ValueError, ZeroDivisionError):
+    #    raise AlignError
 
     return yxrm
 
@@ -431,6 +439,50 @@ def findBestRefZs(ref, sigma=1):
 
     return ids
 
+def findBestRefZs(ref, sigma=0.5):
+    """
+    PSF spread along the Z axis is often tilted in the Y or X axis.
+    Thus simple maximum intensity projection may lead to the wrong answer to estimate rotation and magnification.
+    On the other hands, taking a single section may also contain out of focus flare from neighboring sections that are tilted.
+    Therefore, here sections with high complexity are selected and projected.
+
+    An intensity-based method does not work for most (eg. tissue or bright field) images.
+    Using variance is not enough for bright field image where the right focus loses contrast.
+    Thus here we used sections containing higher frequency.
+
+    ref: 3D array
+    return z idx at the focus
+    """
+    from Priithon.all import F
+    nz = ref.shape[0]
+    if ref.ndim == 2:
+        return [0]
+    elif nz <= 3:
+        return range(nz)
+
+    # ring array
+    ring = F.ringArr(ref.shape[-2:], radius1=ref.shape[-1]//10, radius2=ref.shape[-2]//4, orig=(0,0), wrap=1)
+    
+    # Due to the roll up after FFT, the edge sections in Z may contain different information among the channels. Thus these sections are left unused.
+    ms = N.zeros((nz -2,), N.float32)
+    for z in xrange(1, nz-1):
+        af = F.rfft(ref[z])
+        ar = af * ring[:,:af.shape[-1]]
+        ms[z-1] = N.sum(N.abs(ar))
+        
+        #ms[z-1] = N.prod(U.mmms(arr)[-2:]) # mean * std
+    del ring, af, ar
+
+    mi,ma,me,st = U.mmms(ms)
+    thr = me + st * sigma
+
+    ids = [idx for idx in range(1,nz-1) if ms[idx-1] > thr]
+    if not ids:
+        ids = range(1,nz-1)
+
+    return ids
+
+
 def applyShift(arr, zyxrm, dyx=(0,0)):
     """
     zyxrm: [tz,ty,tx,r,mz,my,mx]
@@ -475,6 +527,9 @@ def remapWithAffine(img, mapzyx, affine, interp=2):
 
     return remapped image
     """
+    if mapzyx.ndim == 4 and mapzyx.shape[0] == 1:
+        mapzyx = mapzyx[0]
+        #print 'mapzyx.ndim', mapzyx.ndim
     if mapzyx.ndim == 4:
         mapzyx = resizeLocal3D(mapzyx, img.shape[-3:])
     elif mapzyx.ndim == 3:
@@ -499,7 +554,7 @@ def remapWithAffine(img, mapzyx, affine, interp=2):
         else:
             mapy, mapx = mapzyx
 
-        if do:
+        if do or mapy.max() or mapx.max():
             arr2[z] = imgResample.remap(a, ret[0]+mapy, ret[1]+mapx)
         else:
             arr2[z] = a
@@ -560,6 +615,43 @@ def chopImage2D(arr, npxls=(32,32)):
         slcs.append(slc)
     return slcs, arrs
 
+def chopImageND(arr, npxls=(32,32)):
+    """
+    arr: image to be split
+    npxls: number of pixels to divide (y,x) or scaler
+
+    return (list_of_slice, list_of_arrs)
+    """
+    try:
+        if len(npxls) != arr.ndim:
+            raise ValueError, 'length of the list of npxls must be the same as arr.ndim'
+    except TypeError:
+        npxls = [npxls for d in range(arr.ndim)]
+        
+    chopSlcs = chopShapeND(arr.shape, npxls)
+
+    if len(chopSlcs) == 3:
+        zslc = chopSlcs[-3]
+    yslc = chopSlcs[-2]
+    xslc = chopSlcs[-1]
+
+    arrs = []
+    slcs = []
+
+    if len(chopSlcs) == 3:
+        for zs in zslc:
+            for ys in yslc:
+                slc = [[zs,ys,xs] for xs in xslc]
+                arrs.append([arr[s] for s in slc])
+                slcs.append(slc)
+    else:
+        for ys in yslc:
+            slc = [[ys,xs] for xs in xslc]
+            arrs.append([arr[s] for s in slc])
+            slcs.append(slc)
+            
+    return slcs, arrs
+
 def calcPearson(a0, a1):
     a0div = a0 - N.average(a0)
     a1div = a1 - N.average(a1)
@@ -568,7 +660,7 @@ def calcPearson(a0, a1):
     r1 = (N.sum(a0div**2) * N.sum(a1div**2)) ** 0.5
     return r0 / r1
 
-def xcorNonLinear(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre=CTHRE):
+def xcorNonLinear(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre=CTHRE, pxlshift_allow=0.5):
     """
     arr: image to be registered
     ref: iamge to find the alignment parameter
@@ -576,7 +668,7 @@ def xcorNonLinear(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre=
     threshold: threshold value to decide if the region is to be cross correlated
     pahseContrast: phase contrast filter in cross correlation
 
-    return (yx_arr, px_analyzed_arr)
+    return (yx_arr, px_analyzed_arr[bool,var,cqual], result_arr)
     """
     try:
         if len(npxls) != len(arr.shape):
@@ -611,10 +703,15 @@ def xcorNonLinear(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre=
                 cqual = c.max() - csd
                 regions[2,y,x] = cqual
                 if cqual >= cthre: # 0.3 is the max
-                    yxs[:,y,x] = yx
-                    regions[0,y,x] = 1
+                    if N.abs(yx).max() < pxlshift_allow:
+                        #print yx.max()
+                        yxs[:,y,x] = yx
+                        regions[0,y,x] = 1
+                        #else:
+                        #print 'yx too large', yx
+                del c
 
-    del arrs, refs, c
+    del arrs, refs#, c
     return yxs, regions, cs
 
 def cleanUpNonLinear(yxs, region):
@@ -631,11 +728,14 @@ def cleanUpNonLinear(yxs, region):
 
     return N.where(region, yxs, medfilt)
 
-def findNonLinearSection(arr_ref_guess, npxl=32, affine=None, threshold=None, phaseContrast=True, maxErr=0.01):
+def findNonLinearSection(arr_ref_guess, npxl=MIN_PXLS_YX, affine=None, threshold=None, phaseContrast=True, maxErr=0.01):
     arr, ref, guess = arr_ref_guess
     return iterNonLinear(arr, ref, npxl=npxl, affine=affine, initGuess=guess, threshold=threshold, phaseContrast=phaseContrast, maxErr=maxErr)
 
-def iterWindowNonLinear(arr, ref, minwin=32, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+    """
+    return (yx_arr, px_analyzed_arr, result_arr)
+    """
     shape = N.array(arr.shape)
 
     if affine is not None:
@@ -705,7 +805,7 @@ def resizeLocal3D(arr, targetShape):
             canvas[zt] = resizeLocal2D(arr[z], targetShape[1:])
         return canvas
 
-def paddYX(yx, npxl, shape, maxcutY, maxcutX):
+def paddYX(yx, npxl, shape, maxcutY=0, maxcutX=0):
     """
     """
     yx = ndimage.zoom(yx, zoom=(1,npxl,npxl))
@@ -748,7 +848,7 @@ def paddYX(yx, npxl, shape, maxcutY, maxcutX):
     return zeros
 
 
-def iterNonLinear(arr, ref, npxl=32, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
     """
     arr: image to be registered
     ref: image to find the alignment parameter
@@ -829,7 +929,379 @@ def iterNonLinear(arr, ref, npxl=32, affine=None, initGuess=None, threshold=None
             echofunc('    iteration %i: npxls=%i, min_cc=%.4f, mean_pxl_shift=%.4f' % (i, npxls, ccq.min(), err))
 
         #-- smoothly zoom up the non-linear alignment parameter
-        yxc = cleanUpNonLinear(yx, region[0])
+        yxc = yx#cleanUpNonLinear(yx, region[0])
+
+        yx = paddYX(yxc, npxl, arr.shape, maxcutY, maxcutX)
+        
+        #-- combine result
+        ret += yx
+        yxs += yx
+
+        if err < maxErr:
+            break
+
+        # although returning yxc is more interesting, it does not hold information from initguess
+        # thus only the zoomed and padded information can be returned...
+
+    return yxs, regions, N.array((ref2, arr2, cs))
+
+## ---- remove outside of significant signals -----
+
+def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+    """
+    arr: image to be registered
+    ref: image to find the alignment parameter
+    nplx: number of pixels to divide, a scaler
+    initGuess: initGuess of the nonlinear parameter
+    affine: affine transform parameter as [tz,ty,yx,r,mz,my,mx]
+    threshold: threshold value to decide if the region is to be cross correlated
+    pahseContrast: phase contrast filter in cross correlation
+    niter: maximum number of iteration
+    maxErr: minimum error in pixel to terminate iterations
+
+    return (yx_arr, px_analyzed_arr)
+    """
+    shape = arr.shape
+    last_shape = None
+    
+    #-- prepare output array
+    ret = N.indices(arr.shape, N.float32) # hold affine + mapyx + initial_guess
+    yxs = N.zeros_like(ret) # hold mapyx + initial_guess
+
+    # to return something similar to yxc in case of no iteration was done.
+    tslcs, arrs = chopImage2D(arr, npxl)
+    nsplit = (len(tslcs), len(tslcs[0]))
+    yxc = N.zeros((2,)+tuple(nsplit), N.float32)
+
+    maxcutY = maxcutX = 0
+    if affine is not None:
+        tyx = -affine[1:3] # minus to match cv coordinate
+        r = affine[3]
+        mag = affine[5:7]
+        ret = imgGeo.affine_index(ret, r, mag, tyx)
+
+        # cut out
+        shiftZYX = cutoutAlign.getShift(affine, [0]+list(shape))
+        maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
+        maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
+        slc = [slice(maxcutY, shape[0]-maxcutY),
+               slice(maxcutX, shape[1]-maxcutX)]
+
+    if initGuess is not None:
+        ret += initGuess
+        yxs += initGuess
+        
+    for i in range(niter):
+        #-- first apply the initial guess
+        if i or affine is not None:
+            arr2 = imgResample.remap(arr, ret[0], ret[1])
+
+            if affine is not None:
+                arr2 = arr2[slc]
+                ref2 = ref[slc]
+            else:
+                ref2 = ref
+        else:
+            arr2 = arr
+            ref2 = ref
+
+        #-- calculate local cross corelation
+        if threshold is None:
+            variance = (arr2.var() + ref2.var()) / 2.
+            threshold = variance * 0.1
+        yx, region, cs = xcorNonLinear(arr2, ref2, npxl, threshold, phaseContrast, cthre)
+        try:
+            regions
+        except NameError:
+            regions = N.zeros(region[0].shape, N.uint16)
+        #regions += region[0]
+        regions = N.add(regions, region[0]) # DEBUG: ufunc casting rule
+        if not region[0].sum():
+            if N.any(region[1] > threshold):
+                if echofunc:
+                    echofunc('variance high enough (%.1f > %.1f) but quality of CC too low (%.3f)' % (region[1].max(), threshold, region[2].max()))
+            else:
+                if echofunc:
+                    echofunc('variance too low (%.1f < %.1f)' % (region[1].max(), threshold))
+            break
+
+        npxls = region[0].sum()
+        err = N.abs(yx).sum() / float(npxls)
+        rgn = N.nonzero(region[0].ravel())[0]
+        ccq = region[2].ravel()[rgn]
+        if echofunc:
+            echofunc('(nplxs: %i) iteration %i: num_regions=%i, min_cc=%.4f, pxl_shift_mean=%.4f, max=%.4f' % (npxl, i, npxls, ccq.min(), err, N.abs(yx).max()))
+
+        #-- smoothly zoom up the non-linear alignment parameter
+        yxc = yx#cleanUpNonLinear(yx, region[0])
+
+        yx = paddYX(yxc, npxl, arr.shape, maxcutY, maxcutX)
+        
+        #-- combine result
+        ret += yx
+        yxs += yx
+
+        if err < maxErr:
+            break
+
+        # although returning yxc is more interesting, it does not hold information from initguess
+        # thus only the zoomed and padded information can be returned...
+
+    return yxc, regions, N.array((ref2, arr2, cs))
+
+def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+    """
+    return (yx_arr, px_analyzed_arr, result_arr)
+    """
+    shape = N.array(arr.shape)
+
+    maxcutY = maxcutX = 0
+    if affine is not None:
+        shiftZYX = cutoutAlign.getShift(affine, [0]+list(shape))
+        maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
+        maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
+        shape = N.subtract(shape, (maxcutY*2, maxcutX*2))
+        #shape -= (maxcutY*2, maxcutX*2) # casting rule
+    win0 = float(min(shape//2))
+
+    series = int(N.sqrt(win0 / minwin)) + 1
+    wins0 = win0 / (2 ** N.arange(series))
+    wins = []
+    for win in wins0:
+        win = int(win)
+        if win % 2:
+            win -= 1
+        wins.append(win)
+
+    currentGuess = initGuess
+    yx_acc = N.zeros((2,) + tuple(shape//wins[-1]), N.float32) #2**series, 2**series), N.float32)
+    
+    for i, win in enumerate(wins):
+        old="""
+        win = int(win)
+        if win % 2:
+            win -= 1"""
+        if echofunc:
+            echofunc('--current window size: %i' % win)
+        yxc, regions, arr2 = iterNonLinear(arr, ref, npxl=win, affine=affine, initGuess=currentGuess, threshold=threshold, phaseContrast=phaseContrast, niter=niter, maxErr=maxErr, cthre=cthre, echofunc=echofunc)
+
+        print 'shape', yxc.shape, yx_acc.shape, arr.shape
+        #for d in xrange(2):
+        #    yx_acc[d] += U.nd.zoom(yxc[d], zoom=(2**(series-1-i)))
+        yxz = paddYX(yxc, 2**(series-1-i), yx_acc.shape[-2:])#U.nd.zoom(yxc, zoom=N.divide(yx_acc.shape, yxc.shape))#(1, 2**(series-1-i), 2**(series-1-i)))
+        yx_acc += yxz
+
+        if currentGuess is None:
+            currentGuess = paddYX(yxc, win, arr.shape, maxcutY, maxcutX)
+        else:
+            currentGuess += paddYX(yxc, win, arr.shape, maxcutY, maxcutX)
+
+        rmax = regions.max()
+        if not rmax:
+            #print 'no regions was good enough, rmax: %.2f' % rmax
+            if echofunc:
+                echofunc('  no region was found to be good enough')
+            break
+        else:
+            print 'rmax: %.2f, -- continue' % rmax
+
+    # throw away regions with low contrast
+    if rmax:
+        thre = N.where(regions == rmax, 1, 0)
+        yx_acc[:] *= thre#N.where(regions == rmax, 1, 0)
+        yxs = paddYX(yx_acc, wins[-1], arr.shape, maxcutY, maxcutX)
+    else:
+        yxs = N.zeros((2,)+arr.shape, N.float32)
+
+    if initGuess is not None:
+        yxs += initGuess
+        
+    return yxs, regions, arr2#, thre, yx_acc
+
+
+# this does not work and possibly even slower
+def xcorNonLinear_para(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre=CTHRE):
+    """
+    arr: image to be registered
+    ref: iamge to find the alignment parameter
+    nplxs: number of pixels to divide (y,x) or scaler
+    threshold: threshold value to decide if the region is to be cross correlated
+    pahseContrast: phase contrast filter in cross correlation
+
+    return (yx_arr, px_analyzed_arr[bool,var,cqual], result_arr)
+    """
+    from PriCommon import ppro26
+    
+    try:
+        if len(npxls) != len(arr.shape):
+            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+    except TypeError:
+        npxls = [npxls for d in range(len(arr.shape))]
+    
+    tslcs, arrs = chopImage2D(arr, npxls)
+    rslcs, refs = chopImage2D(ref, npxls)
+
+
+    if threshold is None:
+        variance = (arr.var() + ref.var()) / 2.
+        threshold = variance * 0.1
+
+    nsplit = (len(tslcs), len(tslcs[0]))
+    yxs = N.zeros((2,)+tuple(nsplit), N.float32)
+    regions = N.zeros((3,)+tuple(nsplit), N.float32)
+    cs = N.zeros_like(arr)
+
+    abyxs = []
+    for y, ay in enumerate(arrs):
+        for x, a in enumerate(ay):
+            b = refs[y][x]
+            abyxs.append((a, b, y, x))
+            old="""
+
+            av = imgFilters.cutOutCenter(a, 0.5, interpolate=False)
+            bv = imgFilters.cutOutCenter(b, 0.5, interpolate=False)
+            var = (N.var(av) + N.var(bv)) / 2. # crop to throw away the tip object
+            regions[1,y,x] = var
+            if var > threshold:
+                yx, c = xcorr.Xcorr(a, b, phaseContrast=phaseContrast)
+                cs[tslcs[y][x]] = c
+                csd = c[:c.shape[0]//4].std()
+                cqual = c.max() - csd
+                regions[2,y,x] = cqual
+                if cqual >= cthre: # 0.3 is the max
+                    yxs[:,y,x] = yx
+                    regions[0,y,x] = 1
+                del c"""
+
+
+    if 0:#ppro26.NCPU > 1:
+        print 'multi'
+        ccy = ppro26.pmap(_xcorNonLinear, abyxs, threshold=threshold, phaseContrast=phaseContrast)
+    else:
+        print 'single'
+        ccy = [_xcorNonLinear(ab, threshold=threshold, phaseContrast=phaseContrast) for ab in abyxs]
+
+    for c, var, cqual, yx, y, x in ccy:
+        regions[1,y,x] = var
+        if var > threshold:
+            regions[2,y,x] = cqual
+            if cqual >= cthre:
+                yxs[:,y,x] = yx
+                regions[0,y,x] = 1
+                cs[tslcs[y][x]] = c
+            del c
+
+    del arrs, refs#, c
+    return yxs, regions, cs
+
+def _xcorNonLinear(abyx, threshold, phaseContrast):
+    a, b, y, x = abyx
+    av = imgFilters.cutOutCenter(a, 0.5, interpolate=False)
+    bv = imgFilters.cutOutCenter(b, 0.5, interpolate=False)
+    var = (N.var(av) + N.var(bv)) / 2. # crop to throw away the tip object
+    #regions[1,y,x] = var
+    if var > threshold:
+        yx, c = xcorr.Xcorr(a, b, phaseContrast=phaseContrast)
+        #cs[tslcs[y][x]] = c
+        csd = c[:c.shape[0]//4].std()
+        cqual = c.max() - csd
+        #regions[2,y,x] = cqual
+        #if cqual >= cthre: # 0.3 is the max
+            #yxs[:,y,x] = yx
+            #regions[0,y,x] = 1
+            # del c
+    else:
+        c = None
+        cqual = 0
+        yx = 0
+    return c, var, cqual, yx, y, x
+
+# old func
+def iterNonLinear_old(arr, ref, npxl=32, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=10, maxErr=0.01, cthre=CTHRE, echofunc=None):
+    """
+    arr: image to be registered
+    ref: image to find the alignment parameter
+    nplx: number of pixels to divide, a scaler
+    initGuess: initGuess of the nonlinear parameter
+    affine: affine transform parameter as [tz,ty,yx,r,mz,my,mx]
+    threshold: threshold value to decide if the region is to be cross correlated
+    pahseContrast: phase contrast filter in cross correlation
+    niter: maximum number of iteration
+    maxErr: minimum error in pixel to terminate iterations
+
+    return (yx_arr, px_analyzed_arr)
+    """
+    arr = arr.astype(N.float32)
+    ref = arr.astype(N.float32)
+    
+    shape = arr.shape
+    last_shape = None
+    
+    #-- prepare output array
+    ret = N.indices(arr.shape, N.float32) # hold affine + mapyx + initial_guess
+    yxs = N.zeros_like(ret) # hold mapyx + initial_guess
+    
+    maxcutY = maxcutX = 0
+    if affine is not None:
+        tyx = -affine[1:3] # minus to match cv coordinate
+        r = affine[3]
+        mag = affine[5:7]
+        ret = imgGeo.affine_index(ret, r, mag, tyx)
+
+        # cut out
+        shiftZYX = cutoutAlign.getShift(affine, [0]+list(shape))
+        maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
+        maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
+        slc = [slice(maxcutY, shape[0]-maxcutY),
+               slice(maxcutX, shape[1]-maxcutX)]
+
+    if initGuess is not None:
+        ret += initGuess
+        yxs += initGuess
+        
+    for i in range(niter):
+        #-- first apply the initial guess
+        if i or affine is not None:
+            arr2 = imgResample.remap(arr, ret[0], ret[1])
+
+            if affine is not None:
+                arr2 = arr2[slc]
+                ref2 = ref[slc]
+            else:
+                ref2 = ref
+        else:
+            arr2 = arr
+            ref2 = ref
+
+        #-- calculate local cross corelation
+        if threshold is None:
+            variance = (arr2.var() + ref2.var()) / 2.
+            threshold = variance * 0.1
+        yx, region, cs = xcorNonLinear(arr2, ref2, npxl, threshold, phaseContrast, cthre)
+        try:
+            regions
+        except NameError:
+            regions = N.zeros(region[0].shape, N.uint16)
+        #regions += region[0]
+        regions = N.add(regions, region[0]) # DEBUG: ufunc casting rule
+        if not region[0].sum():
+            if N.any(region[1] > threshold):
+                if echofunc:
+                    echofunc('variance high enough (%.1f > %.1f) but quality of CC too low (%.3f)' % (region[1].max(), threshold, region[2].max()))
+            else:
+                if echofunc:
+                    echofunc('variance too low (%.1f < %.1f)' % (region[1].max(), threshold))
+            break
+
+        npxls = region[0].sum()
+        err = N.abs(yx).sum() / float(npxls)
+        rgn = N.nonzero(region[0].ravel())[0]
+        ccq = region[2].ravel()[rgn]
+        if echofunc:
+            echofunc('iteration %i: num_regions=%i, min_cc=%.4f, pxl_shift_mean=%.4f, max=%.4f' % (i, npxls, ccq.min(), err, N.abs(yx).max()))
+
+        #-- smoothly zoom up the non-linear alignment parameter
+        yxc = yx#cleanUpNonLinear(yx, region[0])
 
         yx = paddYX(yxc, npxl, arr.shape, maxcutY, maxcutX)
         

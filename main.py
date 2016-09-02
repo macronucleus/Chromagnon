@@ -5,7 +5,7 @@
 # 
 # Load image file, make calibration file and then apply calibration to image file
 ##################################################################################
-
+__version__ = 0.4
 
 import sys, os
 
@@ -13,7 +13,7 @@ import wx, threading#, exceptions
 from PriCommon import guiFuncs as G, imgfileIO, commonfuncs as C
 from PriCommon.ndviewer import main as aui
 from Priithon.all import U, N, Mrc
-import aligner, listbox, cutoutAlign, alignfuncs as af, threads, chromeditor
+import aligner, listbox, cutoutAlign, alignfuncs as af, threads, chromeditor, flatfielder
 #import stopit
 
 #----------- Global constants
@@ -32,16 +32,20 @@ elif sys.platform.startswith('darwin'):
 else:
     LIST_Y=150
 
+    #FRAMESIZE_Y += LIST_Y# + LIST_Y2
+
 FILTER = '*.dv*'
 
+LOCAL_CHOICE = ['None', 'Projection']
+
 #----------- Execute this function to start
-def main(sysarg=None, title="Chromagnon"):
+def main(sysarg=None, title="Chromagnon v%.1f" % __version__):
     """
     start up the GUI
     return the frame object
     """
-    if sys.platform in ('linux2', 'win32'):
-        aui.initglut()
+    #if sys.platform in ('linux2', 'win32'):
+    aui.initglut()
     
     frame = wx.Frame(None, title=title, size=(FRAMESIZE_X, FRAMESIZE_Y))
     frame.panel = BatchPanel(frame)
@@ -66,13 +70,14 @@ class BatchPanel(wx.Panel):
         # fill in the contents
         self.makePanel()
 
+        old="""
     def __del__(self, evt=None):
         self.OnClose()
         
     def OnClose(self, evt=None):
         if self.aui:
             self.aui.Close()
-        evt.Skip()
+        evt.Skip()"""
 
     def makePanel(self, tif=False):
         # config
@@ -90,11 +95,13 @@ class BatchPanel(wx.Panel):
 
         self.refClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Clear selected', tip='', enable=False)
 
-        label, self.maxShift = G.makeTxtBox(self, box, 'max shift allowed (um)', defValue=confdic.get('maxShift', af.MAX_SHIFT), tip='maximum possible shift of each channel', sizeX=50)
+        maxShiftLabel, self.maxShift = G.makeTxtBox(self, box, 'max shift allowed (um)', defValue=confdic.get('maxShift', af.MAX_SHIFT), tip='maximum possible shift of each channel', sizeX=50)
 
-        self.forceZmag = G.makeCheck(self, box, "force to calculate Z mag", tip='z mag calculation is often omitted if the z stack does not contain sufficient information', defChecked=confdic.get('forceZmag', False))
+        parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
+
         # ---- target ------
-        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + self.forceZmag.GetSize()[0] + label.GetSize()[0] + self.maxShift.GetSize()[0]
+
+        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + maxShiftLabel.GetSize()[0] + self.maxShift.GetSize()[0]
         G.newSpaceH(box, LISTSIZE_X+LISTSPACE-refsize)
 
         self.tgtAddButton = G.makeButton(self, box, lambda ev:self.OnChooseImgFiles(ev,'target'), title='Target files', tip='', enable=True)
@@ -102,6 +109,8 @@ class BatchPanel(wx.Panel):
         self.tgtClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'tareget'), title='Clear selected', tip='', enable=False)
 
         self.cutoutCb = G.makeCheck(self, box, "crop margins", tip='', defChecked=confdic.get('cutout', True))
+
+        label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
 
         ## --- list ----
         # \n
@@ -111,23 +120,21 @@ class BatchPanel(wx.Panel):
                                  style=wx.LC_REPORT
                                  | wx.BORDER_NONE
                                  | wx.LC_SORT_ASCENDING,
-    size=(LISTSIZE_X, LIST_Y)#300+200+100+30,LIST_Y)
+                                 size=(LISTSIZE_X, LIST_Y)
                                  )
-        #self.listRef.defPxlSiz = confdic.get('defPxlSiz', self.listRef.defPxlSiz)
         box.Add(self.listRef)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, lambda ev:self.OnItemSelected(ev, 'reference'), self.listRef)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemSelected, self.listRef)
         self.listRef.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
         
-        G.newSpaceH(box, 10)
+        G.newSpaceH(box, LISTSPACE)#10)
 
         self.listTgt = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
                                  | wx.BORDER_NONE
                                  | wx.LC_SORT_ASCENDING,
-        size=(LISTSIZE_X, LIST_Y)#300+200+100+30,LIST_Y)
+        size=(LISTSIZE_X, LIST_Y)
                                  )
-        #self.listTgt.defPxlSiz = confdic.get('defPxlSiz', self.listTgt.defPxlSiz)
         box.Add(self.listTgt)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, lambda ev:self.OnItemSelected(ev, 'target'), self.listTgt)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemSelected, self.listTgt)
@@ -138,16 +145,12 @@ class BatchPanel(wx.Panel):
         # \n
         box = G.newSpaceV(sizer)
         
-        #self.viewButton = G.makeButton(self, box, self.OnViewSelected, title='Preview selected', tip='', enable=False)
-
         self.goButton = G.makeToggleButton(self, box, self.OnGo, title='Run all', tip='', enable=False)
-
-        self.localChoice = ['None', 'Projection', 'Section-wise']
+        self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
+        
+        self.localChoice = LOCAL_CHOICE#['None', 'Projection']#, 'Section-wise']
         label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'))
 
-
-        #label, self.cthretxt = G.makeTxtBox(self, box, 'CC SNR threshold (0-0.3)', defValue=confdic.get('cthre', af.CTHRE), tip='threshold for cross-correlation quality', sizeX=50)
-        #label, self.cthretxt = G.makeTxtBox(self, box, 'CC SNR threshold (0-0.3)', defValue=af.CTHRE, tip='threshold for cross-correlation quality', sizeX=50)
         #------ initial guess -------
         self.label = G.makeTxt(self, box, ' ')
 
@@ -155,12 +158,45 @@ class BatchPanel(wx.Panel):
         box = G.newSpaceV(sizer)
         
         self.initguessButton = G.makeButton(self, box, self.OnChooseInitGuess, title='Initial guess', tip='', enable=True)
-        label, self.initGuess = G.makeTxtBox(self, box, '', tip='Initial guess file name', sizeX=550)
 
-        dropTarget = MyFileDropTarget(self.initGuess)
-        self.initGuess.SetDropTarget(dropTarget)
+        _col_sizes=[(key, val) for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')]
+        _col_sizes.sort()
+
+        LISTSIZE_X2 = sum([val for key, val in _col_sizes[:3]])
+        LIST_Y2 = 30
+        self.initGuess = listbox.BasicFileListCtrl(self, wx.NewId(),
+                                 style=wx.LC_REPORT
+                                 | wx.BORDER_NONE
+                                 | wx.LC_SORT_ASCENDING
+                                 | wx.LC_NO_HEADER,
+        size=(LISTSIZE_X2, LIST_Y2),
+        multiple=False
+                                 )
+
+        initguess = confdic.get('initguess', '')
+        if os.path.isfile(initguess):
+            self.initGuess.addFile(initguess)
+        
+        box.Add(self.initGuess)
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, lambda ev:self.OnItemSelected(ev, 'initGuess'), self.initGuess)
+        self.initGuess.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
+
         
         self.clearInitguessButton = G.makeButton(self, box, self.OnClearInitGuess, title='Clear', tip='', enable=True)
+        self.clearInitguessButton.Enable(0)
+
+        #------ flat fielder --------
+
+        self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
+        self.flatButton.SetToolTipString('Open a graphical interphase to flat field images')
+        flatsize = self.initguessButton.GetSize()[0] + LISTSIZE_X2 + self.clearInitguessButton.GetSize()[0] + self.flatButton.GetSize()[0]
+
+        G.newSpaceH(box, FRAMESIZE_X-flatsize)
+
+        box.Add(self.flatButton)
+        frame = self.GetTopLevelParent()
+        frame.Bind(wx.EVT_BUTTON, self.onFlatFielder, self.flatButton)
+        
         # ----- finishing -----
         self.Layout()
         self.parent.Layout()
@@ -175,6 +211,7 @@ class BatchPanel(wx.Panel):
         """
         self.refselected = [i for i in range(self.listRef.GetItemCount()) if self.listRef.IsSelected(i)]
         self.tgtselected = [i for i in range(self.listTgt.GetItemCount()) if self.listTgt.IsSelected(i)]
+        self.initselected = [i for i in range(self.initGuess.GetItemCount()) if self.initGuess.IsSelected(i)]
 
         #if self.refselected or self.tgtselected:
         #    self.viewButton.Enable(1)
@@ -190,6 +227,11 @@ class BatchPanel(wx.Panel):
             self.tgtClearButton.Enable(1)
         else:
             self.tgtClearButton.Enable(0)
+
+        if self.initselected:
+            self.clearInitguessButton.Enable(1)
+        else:
+            self.clearInitguessButton.Enable(0)
             
         if evt:
             self.currentItem = (rt, evt.m_itemIndex) # for doubleclick
@@ -197,8 +239,10 @@ class BatchPanel(wx.Panel):
     def OnDoubleClick(self, evt=None):
         if self.currentItem[0] == 'reference':
             ll = self.listRef
-        else:
+        elif self.currentItem[0] == 'target':
             ll = self.listTgt
+        elif self.currentItem[0] == 'initGuess':
+            ll = self.initGuess
         fn = os.path.join(*ll.getFile(self.currentItem[1])[:2])
         self.makeExtraInfo(*self.currentItem[:2])
         self.view(fn)#viewSingle(fn)
@@ -209,15 +253,21 @@ class BatchPanel(wx.Panel):
         """
         if which.startswith('r'):
             ll = self.listRef
-        else:
+        elif which.startswith('t'):
             ll = self.listTgt
+        elif which.startswith('i'):
+            ll = self.initGuess
 
         item = ll.getFile(index)
         einfo = {}
-        einfo['nt'] = int(item[3])
+
         waves = [int(wave) for wave in item[2].split(',')]
         einfo['nw'] = len(waves)
         einfo['waves'] = waves
+        if which.startswith(('r', 't')):
+            einfo['nt'] = int(item[3])
+        else:
+            einfo['nt'] = 1
         einfo['seq'] = ll.seqs[index]
         einfo['pixsiz'] = ll.pxszs[index]
 
@@ -230,10 +280,10 @@ class BatchPanel(wx.Panel):
         confdic = C.readConfig()
         if listtype == 'ref':
             ll = self.listRef
-            wildcard = confdic.get('lastwildcard', FILTER)
+            wildcard = confdic.get('lastwildcardref', FILTER)
         else:
             ll = self.listTgt
-            wildcard = confdic.get('lastwildcard', FILTER)
+            wildcard = confdic.get('lastwildcardtgt', FILTER)
 
         if os.name == 'posix':
             dlg = G.FileSelectorDialog(self, self.lastpath, wildcard=wildcard)
@@ -253,7 +303,10 @@ class BatchPanel(wx.Panel):
             ll.addFiles(fns)
             
             self.lastpath = os.path.dirname(fns[0])
-            C.saveConfig(lastwildcard=wildcard, lastpath=self.lastpath)
+            if listtype == 'ref':
+                C.saveConfig(lastwildcardref=wildcard, lastpath=self.lastpath)
+            else:
+                C.saveConfig(lastwildcardtgt=wildcard, lastpath=self.lastpath)
 
             self.checkGo()
 
@@ -266,31 +319,46 @@ class BatchPanel(wx.Panel):
         if os.name == 'posix':
             dlg = G.FileSelectorDialog(self, direc=self.lastpath, wildcard=wildcard, multiple=False)
         else:
-            dlg = wx.FileDialog(self, 'Choose chromagnon files', defaultDir=self.lastpath, style=wx.FD_MULTIPLE, wildcard=wildcard)
+            dlg = wx.FileDialog(self, 'Choose chromagnon files', defaultDir=self.lastpath, wildcard=wildcard)
             
         if dlg.ShowModal() == wx.ID_OK:
             fn = dlg.GetPath()
             an = aligner.Chromagnon(fn)
             if an.img.hdr.type == aligner.IDTYPE:
-                self.initGuess.SetValue(fn)
-                self.initGuess.SetForegroundColour(wx.BLACK)
+                self._setInitGuess(fn)
+                old="""
+                self.initGuess.clearAll()
+                self.initGuess.addFile(fn)
+                self.clearInitguessButton.Enable(1)
+                C.saveConfig(initguess=fn)"""
+                #self.initGuess.SetValue(fn)
+                #self.initGuess.SetForegroundColour(wx.BLACK)
             else:
                 G.openMsg(parent=self, msg='The file is not a valid chromagnon file', title="Warning")
             an.close()
+
+    def _setInitGuess(self, fn):
+        self.initGuess.clearAll()
+        self.initGuess.addFile(fn)
+        self.clearInitguessButton.Enable(1)
+        C.saveConfig(initguess=fn)
 
     def OnClearInitGuess(self, evt=None):
         """
         cealr initial guess
         """
-        self.initGuess.SetValue('')
+        #self.initGuess.SetValue('')
+        self.initGuess.clearAll()
+        self.clearInitguessButton.Enable(0)
 
+        old='''
     def checkReferences(self, evt=None):
         """
         return indices of reference if they are chromagnon files.
         """
         boolean = [index for index in self.listRef.columnkeys if self.listRef.getFile(index)[1].endswith(aligner.PARM_EXT)]
 
-        return boolean
+        return boolean'''
         
             
     def checkGo(self, evt=None):
@@ -368,16 +436,39 @@ class BatchPanel(wx.Panel):
                         extrainfo[what][fn]['pixsiz'] = ll.pxszs[index]
 
             # other parameters
+            if self.initGuess.columnkeys:
+                initguess = os.path.join(*self.initGuess.getFile(0)[:2])
+            else:
+                initguess = ''
             parms = [self.cutoutCb.GetValue(),
-                     self.initGuess.GetValue(),
+                     initguess,
+            #self.initGuess.GetValue(),
                      self.localListChoice.GetStringSelection(),
-                     self.forceZmag.GetValue(),
-                     float(self.maxShift.GetValue()),
+                        #self.forceZmag.GetValue(),
+                     self.maxShift.GetValue(),
+                     self.zmagch.GetStringSelection(),
                         #float(self.cthretxt.GetValue()),
+                    self.parm_suffix_txt.GetValue(),
+                        self.img_suffix_txt.GetValue(),
                      [nt for nt in self.listRef.nts]] # copy
 
-            C.saveConfig(cutout=parms[0], local=parms[2], forceZmag=parms[3], maxShift=parms[4])
+            # check the user-inputs
+            try:
+                parms[3] = float(parms[3])
+            except ValueError:
+                G.openMsg(parent=self, msg='The default value (%.2f um) will be used' % af.MAX_SHIFT, title="The value for max shift allowed is missing")
+                parms[3] = af.MAX_SHIFT
+                self.maxShift.SetValue(str(parms[3]))
+                        
+            if not parms[6]:
+                G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
+                parms[6] = alginer.IMG_SUFFIX
+                self.img_suffix_txt.SetValue(parms[6])
 
+            # save current settings
+            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], initguess=initguess)
+
+            # run program
             gui = threads.GUImanager(self, __name__)
             
             self.th = threads.ThreadWithExc(gui, self.localChoice, fns, targets, parms, extrainfo)
@@ -386,63 +477,8 @@ class BatchPanel(wx.Panel):
         else:
             tid = self.th._get_my_tid()
             #stopit.async_raise(tid, threads.MyError)
-            async_raise(tid, threads.MyError)
+            threads.async_raise(tid, threads.MyError)
 
-
-    old='''
-    def OnViewSelected(self, ev=None, calib=None, target=None):
-        """
-        preview selected items
-        """
-        rinds = [os.path.join(*self.listRef.getFile(i)[:2]) for i in self.refselected]
-        tinds = [os.path.join(*self.listTgt.getFile(i)[:2]) for i in self.tgtselected]
-
-        mids = max((len(rinds), len(tinds)))
-        rinds += [None for i in range(mids - len(rinds))]
-        tinds += [None for i in range(mids - len(tinds))]
-
-        for target, calib in zip(tinds, rinds):
-            self.viewSingle(target, calib)
-
-    def viewSingle(self, target):#=None, calib=None):
-        """
-        view a single combination of target and calib
-        """
-        initGuess = self.initGuess.GetValue()
-
-        if target:
-            if calib and calib.endswith(aligner.PARM_EXT):
-                self.view(target, calib)
-            elif calib:
-                self.view(calib)
-                self.view(target)
-            else:
-                self.view(target)
-
-        else:
-            if calib and calib.endswith(aligner.PARM_EXT):
-                arr = N.squeeze(Mrc.bindFile(calib))
-                if arr.ndim <= 2:
-                    try:
-                        from matplotlib import pyplot as P
-                        P.hold(0)
-                        for a in arr:
-                            P.plot(a)
-                            P.hold(1)
-                        P.hold(0)
-                    except ImportError:
-                        from Priithon import usefulP as P
-                        #from Priithon.all import Y
-                        #if hasattr(Y, 'ploty'):
-                        for i, a in enumerate(arr):
-                            P.ploty(a, hold=i)
-                else:
-                    self.view(calib)
-                    
-            elif initGuess:
-                self.view(calib, initGuess)
-            else:
-                self.view(calib)'''
 
     def view(self, target):
         """
@@ -450,7 +486,7 @@ class BatchPanel(wx.Panel):
         """
         # prepare viewer
         if not self.aui:
-            self.aui = aui.MyFrame(parent=None)
+            self.aui = aui.MyFrame(parent=self)#None)
             self.aui.Show()
 
         # draw
@@ -487,42 +523,68 @@ class BatchPanel(wx.Panel):
         else:
             name = target.file
         if sys.platform in ('linux2', 'win32'):
-            wx.CallAfter(self.aui.imEditWindows.AddPage, newpanel, name, select=True)
+            wx.CallAfter(self.aui.imEditWindows.addPage, newpanel, name, select=True)
         else:
-            self.aui.imEditWindows.AddPage(newpanel, name, select=True)
-            
+            self.aui.imEditWindows.addPage(newpanel, name, select=True)
 
-class MyFileDropTarget(wx.FileDropTarget):
-    def __init__(self, parent):
-        wx.FileDropTarget.__init__(self)
-        self.txt = parent
-
-    def OnDropFiles(self, x, y, filenames):
-        self.txt.SetValue(filenames[-1])
-
-# from stopit
-def async_raise(target_tid, exception):
-    """Raises an asynchronous exception in another thread.
-    Read http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
-    for further enlightenments.
-
-    :param target_tid: target thread identifier
-    :param exception: Exception class to be raised in that thread
-    """
-    import ctypes
-    # Ensuring and releasing GIL are useless since we're not in C
-    # gil_state = ctypes.pythonapi.PyGILState_Ensure()
-    ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid),
-                                                     ctypes.py_object(exception))
-    # ctypes.pythonapi.PyGILState_Release(gil_state)
-    if ret == 0:
-        raise ValueError("Invalid thread ID {}".format(target_tid))
-    elif ret > 1:
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), None)
-        raise SystemError("PyThreadState_SetAsyncExc failed")
-
+    def onFlatFielder(self, ev):
+        self.flat = flatfielder.main(parent=self)
     
+
+## command line behavior
 if __name__ == '__main__':
-    from Priithon import PriApp
-    PriApp._maybeExecMain()
+    if len(sys.argv) == 1:
     
+        from Priithon import PriApp
+        PriApp._maybeExecMain()
+
+    else:
+        import argparse, glob
+
+        description = r"""
+           Chromagnon is an adaptive channel alignment program for fluorescnece microscope images.
+           Feed one reference file each time.
+           If no image file is supplied, a GUI will open to feed multiple files"""
+        
+        p = argparse.ArgumentParser(description=description)
+        p.add_argument('targets', nargs='*',
+                     help='target images files (required)')
+        p.add_argument('--reference', '-R', required=True,
+                     help='a reference image or chromagnon file (required)')
+        p.add_argument('--local', '-l', default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
+                     help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
+        p.add_argument('--initguess', '-I', default=None,
+                     help='a chromagnon file name for initial guess (default=None)')
+        p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
+                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+        p.add_argument('--zmag', '-z', default=aligner.ZMAG_CHOICE[0], choices=aligner.ZMAG_CHOICE,
+                     help='choose from %s (default=%s)' % (aligner.ZMAG_CHOICE, aligner.ZMAG_CHOICE[0]))
+        p.add_argument('--parm_suffix', '-P', default='',
+                     help='suffix for the chromagnon files (default=None)')
+        p.add_argument('--img_suffix', '-S', default=aligner.IMG_SUFFIX,
+                     help='suffix for the target files (default=%s)' % aligner.IMG_SUFFIX)
+        options = p.parse_args()
+
+        ref = glob.glob(os.path.expandvars(os.path.expanduser(options.reference)))
+        
+        fns = []
+        for fn in options.targets:
+            fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
+        nts = []
+        for fn in fns:
+            h = imgfileIO.load(fn)
+            nts.append(h.nt)
+            h.close()
+
+        parms = [True, # crop mergins
+                options.initguess,
+                options.local,
+                options.maxShift,
+                options.zmag,
+                options.parm_suffix,
+                options.img_suffix,
+                nts]
+
+        extrainfo = {}
+        th = threads.ThreadWithExc(None, LOCAL_CHOICE, ref, fns, parms, extrainfo)
+        th.start()

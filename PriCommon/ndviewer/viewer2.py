@@ -23,6 +23,8 @@ class GLViewer(GLViewerCommon):
         self.originLeftBottom = 1
         self.gllist = None
 
+        self.vclose = False
+        self.hclose = False
         self.myViewManager = weakref.proxy(parent.parent)
 
         self.imgList = [] # each elem.:
@@ -751,12 +753,21 @@ class GLViewer(GLViewerCommon):
             if abs(y - horizontal_line) <=1:
                 self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENS))
                 self.dragSide = 9
+                self.hclose = True
+                self.vclose = False
             elif abs(x - vertical_line) <=1:
                 self.SetCursor(wx.StockCursor(wx.CURSOR_SIZEWE))
                 self.dragSide = 10
+                self.vclose = True
+                self.hclose = False
             elif not self.cropboxDragging:
                 self.dragSide = 0
                 self.SetCursor(self.defaultCursor)
+                self.vclose = False
+                self.hclose = False
+            else:
+                self.vclose = False
+                self.hclose = False
 
         viewer2update = -1 ## only when dragging sectioning lines is a viewer# (0,1,2) needed
         if self._onMouseEvt.LeftIsDown():
@@ -781,6 +792,7 @@ class GLViewer(GLViewerCommon):
                     elif self.dims[1] == 2:
                         self.mydoc.x = v
                 self.myViewManager.updateGLGraphics(viewer2update)
+                print self.mydoc.z, self.mydoc.y, self.mydoc.x
 
         for wi in range(self.mydoc.nw):
             if hasattr(self.mydoc, 'alignParms'):
@@ -894,50 +906,75 @@ class GLViewer(GLViewerCommon):
 
         #if xyEffInside:
         self.doOnMouse(xEff, yEff, None)
+
+        #yEff, xEff
         ev.Skip() # other things like EVT_MOUSEWHEEL are lost
 
     def OnReload(self, event=None):
         self.Refresh(False)
 
     def OnArrowKeys(self, event):
+        old="""
+        sliceIdx = [self.mydoc.z, self.mydoc.y, self.mydoc.x]
+        horizontal_line = sliceIdx[self.dims[0]]
+        vertical_line   = sliceIdx[self.dims[1]]
+        
+        x = self.xEff
+        y = self.yEff
+        if abs(y - horizontal_line) <=1:
+            hclose = True
+        else:
+            hclose = False
+
+        if abs(x - vertical_line) <=1:
+            vclose = True
+        else:
+            vclose = False"""
+        
+        
         evtId = event.GetId()
-        if  evtId == 2051: ## left arrow
-            if self.dims[1] == 0 and self.mydoc.nz > 0:
-                self.mydoc.nz -= 1
-            elif self.dims[1] == 1 and self.mydoc.ny > 0:
-                self.mydoc.ny -= 1
-            elif self.dims[1] == 2 and self.mydoc.nx > 0:
-                self.mydoc.nx -= 1
+        if  evtId == 2051 and self.vclose: ## left arrow
+            print 'left', self.dims
+            if self.dims[1] == 0 and self.mydoc.z > 0:
+                self.mydoc.z -= 1
+            elif self.dims[1] == 1 and self.mydoc.y > 0:
+                self.mydoc.y -= 1
+            elif self.dims[1] == 2 and self.mydoc.x > 0:
+                self.mydoc.x -= 1
             #if self.mydoc.sliceIdx[self.dims[1]] >0:
             #    self.mydoc.sliceIdx[self.dims[1]] -= 1
-        elif evtId == 2052:   ## right arrow
-            if self.dims[1] == 0 and self.mydoc.nz < (self.pic_nx-1):
-                self.mydoc.nz += 1
-            elif self.dims[1] == 1 and self.mydoc.ny < (self.pic_nx-1):
-                self.mydoc.ny += 1
-            elif self.dims[1] == 2 and self.mydoc.nx < (self.pic_nx-1):
-                self.mydoc.nx += 1
+        elif evtId == 2052 and self.vclose:   ## right arrow
+            print 'right', self.dims, self.mydoc.x, self.pic_nx-1
+            if self.dims[1] == 0 and self.mydoc.z < (self.pic_nx-1):
+                self.mydoc.z += 1
+            elif self.dims[1] == 1 and self.mydoc.y < (self.pic_nx-1):
+                self.mydoc.y += 1
+            elif self.dims[1] == 2 and self.mydoc.x < (self.pic_nx-1):
+                self.mydoc.x += 1
             #if self.mydoc.sliceIdx[self.dims[1]] < self.pic_nx-1:
             #    self.mydoc.sliceIdx[self.dims[1]] += 1
-        elif evtId == 2053:   ## up arrow
-            if self.dims[0] == 0 and self.mydoc.nz < (self.pic_ny-1):
-                self.mydoc.nz += 1
-            elif self.dims[0] == 1 and self.mydoc.ny < (self.pic_ny-1):
-                self.mydoc.ny += 1
-            elif self.dims[0] == 2 and self.mydoc.nx < (self.pic_ny-1):
-                self.mydoc.nx += 1
+        elif evtId == 2053 and self.hclose:   ## up arrow
+            print 'up', self.dims, self.mydoc.x, self.pic_nx-1
+            if self.dims[0] == 0 and self.mydoc.z < (self.pic_ny-1):
+                self.mydoc.z += 1
+            elif self.dims[0] == 1 and self.mydoc.y < (self.pic_ny-1):
+                self.mydoc.y += 1
+            elif self.dims[0] == 2 and self.mydoc.x < (self.pic_ny-1):
+                self.mydoc.x += 1
             #if self.mydoc.sliceIdx[self.dims[0]] < self.pic_ny-1:
             #    self.mydoc.sliceIdx[self.dims[0]] += 1
-        else:   ## down arrow
-            if self.dims[0] == 0 and self.mydoc.nz > 0:
-                self.mydoc.nz -= 1
-            elif self.dims[0] == 1 and self.mydoc.ny > 0:
-                self.mydoc.ny -= 1
-            elif self.dims[0] == 2 and self.mydoc.nx > 0:
-                self.mydoc.nx -= 1
+        elif evtId == 2054 and self.hclose:   ## down arrow
+            print 'down', self.dims
+            if self.dims[0] == 0 and self.mydoc.z > 0:
+                self.mydoc.z -= 1
+            elif self.dims[0] == 1 and self.mydoc.y > 0:
+                self.mydoc.y -= 1
+            elif self.dims[0] == 2 and self.mydoc.x > 0:
+                self.mydoc.x -= 1
             #if self.mydoc.sliceIdx[self.dims[0]] >0:
             #    self.mydoc.sliceIdx[self.dims[0]] -= 1
             
         self.myViewManager.updateGLGraphics(self.dims[1] if evtId == 2051 or evtId == 2052 else self.dims[0])
         self.dragSize = 0   ## to prevent the next mouse click from changing slicing lines abruptly
+        event.Skip()
 

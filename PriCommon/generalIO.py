@@ -15,6 +15,7 @@ class GeneralReader(object):
         """
         self.filename = self.fn = fn
         self.dr, self.file = os.path.split(fn)
+        self.pxlsiz = [1.,1.,1.] # z,y,x
 
         self.mode = mode
         
@@ -155,8 +156,9 @@ class GeneralReader(object):
         hdr.NumTimes = self.nt
         hdr.NumWaves = self.nw
         hdr.Num[-1] = self.nt * self.nw * self.nz
-        if self.wave:
+        if len(self.wave):
             hdr.wave[:self.nw] = self.wave[:self.nw]
+        hdr.d = self.pxlsiz[::-1]
 
         self.hdr = hdr
 

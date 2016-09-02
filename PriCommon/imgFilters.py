@@ -463,7 +463,8 @@ def _smoothBorder(arr, start, stop, smooth, value):
                 slc = copy.copy(sliceTemplate)
                 slc[d] = slice(i,i+1,None)
                 edgeArr = edges[s].reshape(arr[slc].shape)
-                arr[slc] += edgeArr * (smooth - f)
+                #arr[slc] += edgeArr * (smooth - f) 
+                arr[slc] = arr[slc] + edgeArr * (smooth - f) # casting rule
 
     arr = N.ascontiguousarray(arr)
     return arr
@@ -797,7 +798,7 @@ def radialaverage(data, center=None, useMaxShape=False):
     else:
         tbin = N.bincount(r.ravel(), data.ravel())
     nr = N.bincount(r.ravel())
-    radialprofile = tbin / float(nr)
+    radialprofile = tbin / nr.astype(N.float32)
 
     if not useMaxShape:
         minShape = min(list(N.array(data.shape) - center) + list(center))
@@ -813,7 +814,7 @@ def radialAverage2D(arr, center=None, useMaxShape=False):
     return ND-1 array
     """
     if arr.ndim == 2:
-        return radialaverage(img, center, useMaxShape)
+        return radialaverage(arr, center, useMaxShape)
     
     for t, img in enumerate(arr):
         if img.ndim >= 3:

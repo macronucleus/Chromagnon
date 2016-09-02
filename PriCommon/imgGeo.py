@@ -131,7 +131,7 @@ def closeEnough(pos, pos0, r):
     """
     diff = N.abs(N.subtract(pos0, pos))
     try:
-        if len(r) == len(diff.shape):
+        if len(r) == diff.shape[-1]:
             if len(r) == len(diff[0]):
                 return N.array([N.alltrue(d < r) for d in diff])
             else:

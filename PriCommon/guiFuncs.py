@@ -202,6 +202,10 @@ class FileSelectorDialog(wx.Dialog):
 
         hsz = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(hsz, 0, wx.EXPAND)
+
+        self.up_button = wx.Button(self, wx.ID_UP, style=wx.BU_EXACTFIT)
+        hsz.Add(self.up_button)
+        wx.EVT_BUTTON(self, self.up_button.GetId(), self.onUp)
         
         self.txt = wx.TextCtrl(self, wx.ID_ANY, os.path.join(self.direc, self.fnPat))
         hsz.Add(self.txt, 1, wx.EXPAND|wx.ALL, 2)
@@ -211,10 +215,10 @@ class FileSelectorDialog(wx.Dialog):
         sizer.Add(hsz, 0, wx.EXPAND)
 
         if self.multiple:
-            style = wx.LB_EXTENDED|wx.LB_NEEDED_SB
+            style = wx.LB_EXTENDED|wx.LB_NEEDED_SB|wx.LB_HSCROLL
         else:
-            style = wx.LB_SINGLE|wx.LB_NEEDED_SB
-        self.lb = wx.ListBox(self, wx.ID_ANY, size=(300,400), style=style)
+            style = wx.LB_SINGLE|wx.LB_NEEDED_SB|wx.LB_HSCROLL
+        self.lb = wx.ListBox(self, wx.ID_ANY, size=(350,400), style=style)
         sizer.Add(self.lb, 1, wx.EXPAND | wx.ALL, 5)
         
         wx.EVT_LISTBOX_DCLICK(self, self.lb.GetId(), self.onDClick)
@@ -255,6 +259,8 @@ class FileSelectorDialog(wx.Dialog):
 
         strings = self.lb.GetStrings()
         s = [strings[idx] for idx in self.lb.GetSelections()]
+        if not s:
+            return ''
         
         return os.path.join(self.getDirec(), s[0])
     
@@ -273,12 +279,15 @@ class FileSelectorDialog(wx.Dialog):
             else:
                 return []
 
+    def onUp(self, evt=None):
+        self.onDClick(fn=os.path.dirname(self.getDirec()))
 
-    def onDClick(self, evt=None):
+    def onDClick(self, evt=None, fn=None):
         """
         change directory
         """
-        fn = self.GetPath()
+        if not fn:
+            fn = self.GetPath()
         self.fn = fn
 
         if os.path.isdir(fn) or os.path.isdir(os.path.normpath(fn)):
@@ -319,19 +328,19 @@ class FileSelectorDialog(wx.Dialog):
         self.SetTitle(title)
 
 
-    class MyFileDropTarget(wx.FileDropTarget):
-        def __init__(self, parent):
-            wx.FileDropTarget.__init__(self)
-            self.myLFV = parent
+class MyFileDropTarget(wx.FileDropTarget):
+    def __init__(self, parent):
+        wx.FileDropTarget.__init__(self)
+        self.myLFV = parent
 
-        def OnDropFiles(self, x, y, filenames):
-            import os.path
-            fn = filenames[0]
-            
-            if os.path.isdir(fn):
-                self.myLFV.dir =                 os.path.normpath(fn)
-            else:
-                self.myLFV.dir,_ = os.path.split(os.path.normpath(fn))
+    def OnDropFiles(self, x, y, filenames):
+        import os.path
+        fn = filenames[0]
 
-            self.myLFV.txt.SetValue(self.myLFV.getPath())
-            self.myLFV.refreshList()
+        if os.path.isdir(fn):
+            self.myLFV.dir =                 os.path.normpath(fn)
+        else:
+            self.myLFV.dir,_ = os.path.split(os.path.normpath(fn))
+
+        self.myLFV.txt.SetValue(self.myLFV.getPath())
+        self.myLFV.refreshList()

@@ -26,10 +26,22 @@ def dic2str(dic, sep=SEP, wsep=WSP):
     """
     return wave:value wave:value
     """
-    ss = []
-    for wave, value in dic.iteritems():
-        ss.append('%i%s%.4f' % (wave, wsep, value))
-    return sep.join(ss)
+    if type(dic) == dict:
+        ss = []
+        for wave, value in dic.iteritems():
+            if value % 1:#type(value) == float:
+                ss.append('%i%s%.4f' % (wave, wsep, value))
+            else:#if type(value) == int:
+                ss.append('%i%s%i' % (wave, wsep, value))
+                #else:
+                #raise ValueError, 'the values in dic has to be float or int, you gave %s' % type(value)
+        return sep.join(ss)
+    elif dic % 1:#type(dic) == float:
+        return '%.4f' % dic
+    else:#if type(dic) == int:
+        return str(dic)
+    #else:
+    #    raise ValueError, 'dic has to be dict or float or int'
 
 def dic2val(dic, key):
     """

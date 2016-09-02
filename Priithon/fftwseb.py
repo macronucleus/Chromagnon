@@ -16,8 +16,9 @@ RTYPE = _N.float32
 RTYPES = (_N.float32, _N.float64)
 CTYPE = _N.complex64
 CTYPES = (_N.complex64, _N.complex128)
+ncpu = 1
 
-def rfft(a,af=None, inplace=0):
+def rfft(a,af=None, inplace=0, nthreads=1):
     #CHECK b type size
 
     if inplace:
@@ -100,7 +101,7 @@ def rfft(a,af=None, inplace=0):
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
                (af is None and "af is None" or "af.dtype=%s"%af.dtype))
 
-def irfft(af, a=None, inplace=0, copy=1):
+def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
     """if copy==1 (and inplace==0 !!) fftw uses a copy of af to prevent overwriting the original
        (fftw always messes up the input array when inv-fft complex_to_real)
        """
@@ -226,7 +227,7 @@ def destroy_plans():
 '''
 
 
-def fft(a,af=None, inplace=0):
+def fft(a,af=None, inplace=0, nthreads=1):
     #CHECK b type size
 
     if inplace:
@@ -300,7 +301,7 @@ def fft(a,af=None, inplace=0):
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
                (af is None and "af is None" or "af.dtype=%s"%af.dtype))
 
-def ifft(af, a=None, inplace=0):
+def ifft(af, a=None, inplace=0, nthreads=1):
     #CHECK b type size
     global shape,s2
 

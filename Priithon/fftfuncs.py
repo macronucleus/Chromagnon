@@ -889,7 +889,7 @@ def ifft(af, normalize=True, minCdtype=fftw.CTYPE):#N.complex64):
     else:
         return fftw.ifft(af)
         
-def rfft(a, minFdtype=fftw.RTYPE):#N.float32):
+def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):#N.float32):
     """
     calculate nd fourier transform
     performs real- fft, i.e. the return array has shape with last dim halfed+1
@@ -902,8 +902,8 @@ def rfft(a, minFdtype=fftw.RTYPE):#N.float32):
         a = N.asarray(a, minFdtype)
 
     #import fftw
-    return fftw.rfft(a)
-def irfft(af, normalize=True, minCdtype=fftw.CTYPE):#N.complex64):
+    return fftw.rfft(a, nthreads=nthreads)
+def irfft(af, normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#N.complex64):
     """
     calculate nd inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -927,9 +927,9 @@ def irfft(af, normalize=True, minCdtype=fftw.CTYPE):#N.complex64):
         vol *= (af.shape[-1]-1)*2
         return fftw.irfft(af) / vol
     else:
-        return fftw.irfft(af)            # 
+        return fftw.irfft(af, nthreads=nthreads)            # 
 
-def rfft2d(a, minFdtype=fftw.RTYPE):#N.float32):
+def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):#N.float32):
     """
     calculate (section-wise) 2d fourier transform
     performs real- fft, i.e. the return array has shape with last dim halfed+1
@@ -957,10 +957,10 @@ def rfft2d(a, minFdtype=fftw.RTYPE):#N.float32):
     else:
         raise TypeError, "a must be of dtype float32 or float64 (%s given)"%a.dtype 
     for tup in N.ndindex(a.shape[:-2]):
-        af[tup] = fftw.rfft(N.asarray(a[tup], aDtype))#, af[tup])
+        af[tup] = fftw.rfft(N.asarray(a[tup], aDtype), nthreads=nthreads)#, af[tup])
     return af
 
-def irfft2d(af, preserve=True, normalize=True, minCdtype=fftw.CTYPE):#N.complex64):
+def irfft2d(af, preserve=True, normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#N.complex64):
     """
     calculate (section-wise) 2d inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -998,7 +998,7 @@ def irfft2d(af, preserve=True, normalize=True, minCdtype=fftw.CTYPE):#N.complex6
             myAF = N.array(af[tup], afDtype, copy=1)
         else:
             myAF = N.asarray(af[tup], afDtype)
-        a[tup] = fftw.irfft(myAF)#,a[tup], copy=False)
+        a[tup] = fftw.irfft(myAF, nthreads=nthreads)#,a[tup], copy=False)
         if normalize:
             a[tup] /= vol2d
     return a

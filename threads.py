@@ -2,7 +2,7 @@
 import os, threading, exceptions, time, sys
 import wx
 import aligner, alignfuncs
-from PriCommon import imgfileIO
+from PriCommon import imgfileIO, flatConv
 
 
 ###--- thread-safe gui -----------
@@ -14,6 +14,7 @@ EVT_VIEW_ID = wx.NewId()
 EVT_ABORT_ID = wx.NewId()
 EVT_ERROR_ID = wx.NewId()
 EVT_ECHO_ID = wx.NewId()
+EVT_INITGUESS_ID = wx.NewId()
 
 # Dine events
 def BindEvent(win, func, evt_id):
@@ -43,6 +44,7 @@ class ThreadWithExc(threading.Thread):
         self.targets = targets
         self.parms = parms
         self.extrainfo = extrainfo
+        self.img_suffix = aligner.IMG_SUFFIX
         
     def _get_my_tid(self):
         """determines this (self's) thread id
@@ -65,7 +67,10 @@ class ThreadWithExc(threading.Thread):
                 return tid
 
     def echo(self, msg):
-        wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
+        if self.notify_obj:
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
+        else:
+            print msg
             
     def run(self):
         """
@@ -85,9 +90,12 @@ class ThreadWithExc(threading.Thread):
             raise ValueError, 'The initial guess is not a valid Chromagnon file'
         local = parms[2]
         #cthre = parms[3]
-        forceZmag = parms[3]
-        maxShift = parms[4]
-        nts = parms[5]
+        #forceZmag = parms[3]
+        maxShift = parms[3]
+        zmag = parms[4]
+        self.parm_suffix = parms[5]
+        self.img_suffix = parms[6]
+        nts = parms[7]
         
         saveAlignParam = True
         alignChannels = True
@@ -108,11 +116,11 @@ class ThreadWithExc(threading.Thread):
                 an = aligner.Chromagnon(fn)
                 # calculation
                 if an.img.hdr.type != aligner.IDTYPE:
-                    
-                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
+                    if self.notify_obj:
+                        wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
                     an = self.getAligner(fn, index, what='ref')
-                    an.setForceZmag(forceZmag)
+                    an.setZmagSwitch(zmag)#setForceZmag(forceZmag)
                     an.setMaxShift(maxShift)
                     
                     if initGuess:
@@ -142,6 +150,9 @@ class ThreadWithExc(threading.Thread):
                         an.findAlignParamTime(doWave=False)
 
                     fn = an.saveParm()
+                    if not initGuess and self.notify_obj:
+                        wx.PostEvent(self.notify_obj, MyEvent(EVT_INITGUESS_ID, [fn]))
+                        
                     initGuess = fn
                         #fn = initGuess = an.saveParm()
                         #self.initGuess.SetValue(initGuess)
@@ -154,7 +165,8 @@ class ThreadWithExc(threading.Thread):
                     if local in self.localChoice[1:]:# and not wx.__version__.startswith('2.8'):
                         an.loadParm(fn)
                         nonlinear = imgfileIO.load(an.saveNonlinearImage())
-                        wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
+                        if self.notify_obj:
+                            wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
                         #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fn]))
                         #else:
                         #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fns[index], fn]))
@@ -163,10 +175,12 @@ class ThreadWithExc(threading.Thread):
                 
                 doneref.append(index)
 
-                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.BLUE]))
+                if self.notify_obj:
+                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.BLUE]))
   
                 if index < len(targets):
-                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
+                    if self.notify_obj:
+                        wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
                     
                     target = targets[index]
                     an = self.getAligner(target, index, what='target')
@@ -180,7 +194,8 @@ class ThreadWithExc(threading.Thread):
 
                     an.close()
 
-                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
+                    if self.notify_obj:
+                        wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
                     
                     out = aligner.Chromagnon(out)
                     if type(out.img) == imgfileIO.MultiTiffReader:
@@ -188,13 +203,15 @@ class ThreadWithExc(threading.Thread):
                         out.setExtrainfo(einfo)
                         out.restoreDimFromExtra()
                         out.img.imgSequence = 2
-                    wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                    if self.notify_obj:
+                        wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
 
 
             # remaining target files use the last alignment file
             for index, target in enumerate(targets[len(fns):]):
                 index += len(fns)
-                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
+                if self.notify_obj:
+                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
                 target = targets[index]
                 an = self.getAligner(target, index, what='target')
@@ -210,7 +227,8 @@ class ThreadWithExc(threading.Thread):
 
                 an.close()
 
-                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
+                if self.notify_obj:
+                    wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
 
                 out = aligner.Chromagnon(out)
@@ -219,17 +237,27 @@ class ThreadWithExc(threading.Thread):
                     out.setExtrainfo(einfo)
                     out.restoreDimFromExtra()
                     out.img.imgSequence = 2
-                wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                if self.notify_obj:
+                    wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
 
         except MyError:
-            wx.PostEvent(self.notify_obj, MyEvent(EVT_ABORT_ID, []))
+            if self.notify_obj:
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_ABORT_ID, []))
+            else:
+                pass
         except:
-            import traceback, sys
             #exc_type, exc_value, exc_traceback = sys.exc_info()
-            #formatted = traceback.format_exception(exc_type, exc_value, exc_traceback) 
-            wx.PostEvent(self.notify_obj, MyEvent(EVT_ERROR_ID, sys.exc_info()))#formatted]))
+            #formatted = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            if self.notify_obj:
+                import traceback, sys
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_ERROR_ID, sys.exc_info()))#formatted]))
+            else:
+                pass
         else:
-            wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
+            if self.notify_obj:
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
+            else:
+                pass
 
     def getAligner(self, fn, index, what='ref'):
         """
@@ -237,6 +265,9 @@ class ThreadWithExc(threading.Thread):
         """
         try:
             an = aligner.Chromagnon(fn)
+            an.setImgSuffix(self.img_suffix)
+            an.setParmSuffix(self.parm_suffix)
+
         except IOError:
             raise IOError, 'filename %s, index %i, fns %s' % (fn, index, fns)
 
@@ -272,6 +303,8 @@ class GUImanager(wx.EvtHandler):
         BindEvent(self, self.OnError, EVT_ERROR_ID)
 
         BindEvent(self, self.OnEcho, EVT_ECHO_ID)
+
+        BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
 
         self.OnStart()
         
@@ -365,3 +398,112 @@ class GUImanager(wx.EvtHandler):
     def echo(self, msg, color='red'):
         self.panel.label.SetLabel(msg)
         self.panel.label.SetForegroundColour(color)
+        print msg
+
+    def OnInitGuess(self, evt):
+        self.panel._setInitGuess(evt.data[0])
+
+
+class ThreadFlat(ThreadWithExc):
+    '''A thread class that supports raising exception in the thread from
+       another thread.
+    '''
+    def __init__(self, notify_obj, localChoice, fns, targets, parms, extrainfo={}):
+        ThreadWithExc.__init__(self, notify_obj, localChoice, fns, targets, parms, extrainfo)
+            
+    def run(self):
+        """
+        This function execute the series of processes
+
+        Since it uses GUI, this function uses several events to control GUI
+        They are called by wx.PostEvent()
+        """
+        fn = self.fns[0]
+        targets = self.targets
+        parms = self.parms
+
+        
+        saveAlignParam = True
+        alignChannels = True
+        alignTimeFrames = True
+
+        outs0 = []
+        outs = []
+        doneref = []#0]
+        donetgt = []
+        errs = []
+
+        kwds = {}
+
+        try:
+            # calibration
+            clk0 = time.clock()
+            an = aligner.Chromagnon(fn)
+            if an.img.hdr.type != flatConv.IDTYPE:
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', 0, wx.RED]))
+                self.echo('Making a calibration file...')
+                flatFile = flatConv.makeFlatConv(fn, suffix=parms[0])
+
+                out = aligner.Chromagnon(flatFile)
+                if type(out.img) == imgfileIO.MultiTiffReader:
+                    einfo = self.extrainfo['target'][target]
+                    out.setExtrainfo(einfo)
+                    out.restoreDimFromExtra()
+                    out.img.imgSequence = 2
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                clk1 = time.clock()
+            else:
+                flatFile = fn
+                
+            an.close()
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', 0, wx.BLUE]))
+
+            # remaining target files use the last alignment file
+            for index, target in enumerate(targets):
+                self.echo('Applying flat fielding to %s...' % os.path.basename(target))
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
+
+                out = flatConv.flatConv(target, flatFile, out=None, suffix=parms[1])
+
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
+
+                out = aligner.Chromagnon(out)
+                if type(out.img) == imgfileIO.MultiTiffReader:
+                    einfo = self.extrainfo['target'][target]
+                    out.setExtrainfo(einfo)
+                    out.restoreDimFromExtra()
+                    out.img.imgSequence = 2
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                donetgt.append(index)
+
+        except MyError:
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_ABORT_ID, []))
+        except:
+            import traceback, sys
+            #exc_type, exc_value, exc_traceback = sys.exc_info()
+            #formatted = traceback.format_exception(exc_type, exc_value, exc_traceback) 
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_ERROR_ID, sys.exc_info()))#formatted]))
+        else:
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
+
+
+# from stopit
+def async_raise(target_tid, exception):
+    """Raises an asynchronous exception in another thread.
+    Read http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
+    for further enlightenments.
+
+    :param target_tid: target thread identifier
+    :param exception: Exception class to be raised in that thread
+    """
+    import ctypes
+    # Ensuring and releasing GIL are useless since we're not in C
+    # gil_state = ctypes.pythonapi.PyGILState_Ensure()
+    ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid),
+                                                     ctypes.py_object(exception))
+    # ctypes.pythonapi.PyGILState_Release(gil_state)
+    if ret == 0:
+        raise ValueError("Invalid thread ID {}".format(target_tid))
+    elif ret > 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
