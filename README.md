@@ -14,8 +14,7 @@ Read the domument: https://github.com/macronucleus/chromagnon/releases/download/
 Downloads
 ---------
 The ready to use packages are available.
-* Mac (10.9-): https://github.com/macronucleus/chromagnon/releases/tag/mac-v0.3
-* Windows (64-bit): https://github.com/macronucleus/chromagnon/releases/tag/win-v0.3
+https://github.com/macronucleus/Chromagnon/releases
 
 The source
 ----------
