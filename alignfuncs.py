@@ -466,7 +466,7 @@ def findBestRefZs(ref, sigma=0.5):
     # Due to the roll up after FFT, the edge sections in Z may contain different information among the channels. Thus these sections are left unused.
     ms = N.zeros((nz -2,), N.float32)
     for z in xrange(1, nz-1):
-        af = F.rfft(ref[z])
+        af = F.rfft(N.ascontiguousarray(ref[z]))
         ar = af * ring[:,:af.shape[-1]]
         ms[z-1] = N.sum(N.abs(ar))
         
