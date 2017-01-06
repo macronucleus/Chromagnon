@@ -6,6 +6,7 @@ Acceptable image file formats
 -----------------------------
 ### Reading
 * Most microscopy formats
+
 ### Writing
 * multipage-tiff (ome.tif)
 * DeltaVision (.dv)
