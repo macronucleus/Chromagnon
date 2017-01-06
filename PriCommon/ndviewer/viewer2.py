@@ -1,5 +1,5 @@
 """provides the bitmap OpenGL panel for Priithon's ND 2d-section-viewer (multi-color version)"""
-import weakref
+import weakref, sys
 from viewerCommon import *
 from PriCommon import imgGeo
 
@@ -176,6 +176,8 @@ class GLViewer(GLViewerCommon):
         self.picTexRatio_x = float(pic_nx) / tex_nx
         self.picTexRatio_y = float(pic_ny) / tex_ny
 
+        if sys.platform.startswith('linux'):
+            wx.Yield() # added 20161209 for linux miniconda
         self.SetCurrent(self.context) ## makes the implicit rendering context of this canvas current with this canvas
         textureID = glGenTextures(1)  ## create one name for a texture object
         glBindTexture(GL_TEXTURE_2D, textureID)
@@ -516,7 +518,8 @@ class GLViewer(GLViewerCommon):
 
             self.zoomChanged = False
 
-        ## cut preview 
+        ## cut preview
+        old="""
         if self.myViewManager.IsCut():
             ly = self.mydoc.cropbox_l[self.dims[0]]
             uy = self.mydoc.cropbox_u[self.dims[0]]
@@ -537,11 +540,11 @@ class GLViewer(GLViewerCommon):
             glEnable(GL_CLIP_PLANE2)
             glClipPlane(GL_CLIP_PLANE3, eqn3)
             glEnable(GL_CLIP_PLANE3)
-        else:
-            glDisable(GL_CLIP_PLANE0)
-            glDisable(GL_CLIP_PLANE1)
-            glDisable(GL_CLIP_PLANE2)
-            glDisable(GL_CLIP_PLANE3)
+        else:"""
+        glDisable(GL_CLIP_PLANE0)
+        glDisable(GL_CLIP_PLANE1)
+        glDisable(GL_CLIP_PLANE2)
+        glDisable(GL_CLIP_PLANE3)
             
 
         if self.imgsGlListChanged:
@@ -884,7 +887,7 @@ class GLViewer(GLViewerCommon):
                 self.y0 = h2 - (h2-self.y0)*fac
                 self.zoomChanged = True
 
-            else:
+            elif hasattr(self, 'mouse_last_x'):
                 self.x0 += (x-self.mouse_last_x) #/ self.sx
                 self.y0 += (y-self.mouse_last_y) #/ self.sy
             self.zoomChanged = 1

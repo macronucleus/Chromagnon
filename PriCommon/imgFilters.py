@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 from Priithon.all import N, U, Y, F, Mrc
 from scipy import optimize
 import mrcIO, imgFit
@@ -361,7 +362,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
             if stop > shape[d]: 
                 stop = shape[d]
                 slc_edge[d] = slice(slc_edge[d].start, shape[d], None)
-            slc += [slice(start, stop, None)]
+            slc += [slice(int(start), int(stop), None)]
 
         # cutout, shift and cutout
         try:

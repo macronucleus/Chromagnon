@@ -1,8 +1,8 @@
 
 import os
 import numpy as N
-from PriCommon import imgfileIO as im, mrcIO, imgGeo, imgFilters, xcorr
-import alignfuncs as af, cutoutAlign
+from PriCommon import bioformatsIO as im, mrcIO, imgGeo, imgFilters, xcorr, fntools
+from . import alignfuncs as af, cutoutAlign, chromformat
 from Priithon.all import Mrc
 from scipy import ndimage as nd
 
@@ -16,7 +16,6 @@ if __name__ == '__main__':
 else:
     NCPU = 1
 
-
 MAXITER = 20
 MAXERROR = 0.001
 
@@ -29,6 +28,7 @@ ZMAG_CHOICE = ['Auto', 'Always', 'Never']
 # file extention
 PARM_EXT='chromagnon'
 IMG_SUFFIX='_ALN'#'ALN.dv'
+WRITABLE_FORMATS = im.WRITABLE_FORMATS
 
 # chromagnon file format
 IDTYPE = 101
@@ -78,6 +78,7 @@ class Chromagnon(object):#im.ImageManager):
         self.setphaseContrast()
         self.setEchofunc()
         self.setImgSuffix()
+        self.setFileFormats()
         self.setParmSuffix()
         
         self.alignParms = N.zeros((self.img.nt, self.img.nw, NUM_ENTRY), N.float32)
@@ -105,7 +106,7 @@ class Chromagnon(object):#im.ImageManager):
         self.ny = self.img.ny
         self.nx = self.img.nx
         self.dtype = self.img.dtype
-        self.hdr = self.img.hdr
+        #self.hdr = self.img.hdr
         self.dirname = os.path.dirname(self.img.filename)#path)
         self.file = self.path = os.path.basename(self.img.filename)#path)
 
@@ -114,11 +115,19 @@ class Chromagnon(object):#im.ImageManager):
         self.z = self.img.z
         self.y = self.img.y
         self.x = self.img.x
+        self.wave = self.img.wave
+
+        self.pxlsiz = self.img.pxlsiz
 
         self.get3DArr = self.img.get3DArr # be carefull since after closing file, and reopen with self.img = im.load(), then this does not work anymore
 
     def setImgSuffix(self, suffix=IMG_SUFFIX):
         self.img_suffix = suffix
+
+    def setFileFormats(self, ext='ome.tif'):
+        if not ext.startswith(os.path.extsep):
+            ext = os.path.extsep + ext
+        self.img_ext = ext
 
     def setParmSuffix(self, suffix=''):
         self.parm_suffix = suffix
@@ -143,16 +152,20 @@ class Chromagnon(object):#im.ImageManager):
                 des.hdr.d[:] = self.extrainfo['pixsiz']
 
             else:
-                self.hdr.NumTimes = self.img.hdr.NumTimes = self.img.nt = self.nt = self.extrainfo['nt']
-                self.hdr.NumWaves = self.img.hdr.NumWaves = self.img.nw = self.nw = self.extrainfo['nw']
-                self.hdr.wave[:self.hdr.NumWaves] = self.extrainfo['waves']
+                #self.hdr.NumTimes = self.img.hdr.NumTimes = self.img.nt = self.nt = self.extrainfo['nt']
+                self.hdr.NumTimes = self.img.nt = self.nt = self.extrainfo['nt']
+                #self.hdr.NumWaves = self.img.hdr.NumWaves = self.img.nw = self.nw = self.extrainfo['nw']
+                self.hdr.NumWaves = self.img.nw = self.nw = self.extrainfo['nw']
+                #self.hdr.wave[:self.hdr.NumWaves] = self.extrainfo['waves']
+                self.img.wave[:self.img.nw] = self.extrainfo['waves']
+                #self.img.nz = self.nz = self.hdr.Num[-1] // (self.hdr.NumTimes * self.hdr.NumWaves)
                 self.img.nz = self.nz = self.hdr.Num[-1] // (self.hdr.NumTimes * self.hdr.NumWaves)
                 if self.t > self.nt:
                     self.t = self.nt // 2
                 if self.z > self.nz:
                     self.z = self.nz // 2
                 self.img.imgSequence = self.img.hdr.ImgSequence = self.hdr.ImgSequence = im.generalIO.IMGSEQ.index(self.extrainfo['seq'])
-                self.img.hdr.d[:] = self.hdr.d[:] = self.extrainfo['pixsiz']
+                self.img.pxlsiz[:] = self.hdr.d[:] = self.extrainfo['pixsiz']
 
         if self.alignParms.shape != (self.img.nt, self.img.nw, NUM_ENTRY):
             self.alignParms = N.zeros((self.img.nt, self.img.nw, NUM_ENTRY), N.float32)
@@ -169,8 +182,8 @@ class Chromagnon(object):#im.ImageManager):
         """
         self.maxErr = val
 
-        self.maxErrYX = self.maxErr / N.mean(self.img.hdr.d[:2])
-        self.maxErrZ = self.maxErr / self.img.hdr.d[2]
+        self.maxErrYX = self.maxErr / N.mean(self.img.pxlsiz[:2])
+        self.maxErrZ = self.maxErr / self.img.pxlsiz[2]
 
     def setMaxIter(self, val=MAXITER):
         """
@@ -189,7 +202,7 @@ class Chromagnon(object):#im.ImageManager):
         self.cthre = val
 
     def setMaxShift(self, um=af.MAX_SHIFT):
-        self.max_shift_pxl = um / N.mean(self.img.hdr.d[:2])
+        self.max_shift_pxl = um / N.mean(self.img.pxlsiz[1:])#:2])
         if self.max_shift_pxl > min((self.img.nx, self.img.ny)):
             self.max_shift_pxl = min((self.img.nx, self.img.ny))
 
@@ -316,9 +329,11 @@ class Chromagnon(object):#im.ImageManager):
         # take into account for the PSF distortion due to chromatic aberration
         elif self.img.nw > 2:
             # the middle channel should have the intermediate PSF shape
-            waves = [mrcIO.getWaveFromHdr(self.img.hdr, w) for w in range(self.img.nw)]
+            #waves = [mrcIO.getWaveFromHdr(self.img.hdr, w) for w in range(self.img.nw)]
+            waves = [self.img.getWaveFromIdx(w) for w in range(self.img.nw)]
             waves.sort()
-            candidates = [mrcIO.getWaveIdxFromHdr(self.img.hdr, wave) for wave in waves[1:-1]]
+            #candidates = [mrcIO.getWaveIdxFromHdr(self.img.hdr, wave) for wave in waves[1:-1]]
+            candidates = [self.img.getWaveIdx(wave) for wave in waves[1:-1]]
 
             # find out channels with enough signal
             thr = N.mean(pwrs) / 1.25
@@ -489,10 +504,10 @@ class Chromagnon(object):#im.ImageManager):
                 continue
 
             self.echo('3D cross correlation for wave %i' % w)
-            img = self.get3DArrayAligned(w=w, t=t)
-            zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
-            self.alignParms[t,w,:3] += zyx
-            print 'the result of the last correlation', zyx
+            #img = self.get3DArrayAligned(w=w, t=t)
+            #zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+            #self.alignParms[t,w,:3] += zyx
+            #print 'the result of the last correlation', zyx
 
     ##-- non linear ----
     def findNonLinear2D(self, t=0, npxls=af.MIN_PXLS_YX, phaseContrast=True):
@@ -517,7 +532,7 @@ class Chromagnon(object):#im.ImageManager):
             
         if N.all((N.array(self.mapyx.shape[-2:]) - self.img.shape[-2:]) >= 0):
             slcs = imgGeo.centerSlice(self.mapyx.shape[-2:], win=self.img.shape[-2:], center=None)
-            self.mapyx = self.mapyx[[Ellipsis]+slcs]
+            self.mapyx = self.mapyx[slcs] # Ellipsis already added #[Ellipsis]+slcs]
         else:
             self.mapyx = imgFilters.paddingValue(self.mapyx, shape=self.img.shape[-2:], value=0)
 
@@ -739,51 +754,14 @@ class Chromagnon(object):#im.ImageManager):
     def saveParm(self, fn=None):
         """
         save a chromagnon file
-        (as a Mrc file format)
+        (as a csv or ome.tif file format)
 
         return output file name
         """
         if not fn:
             fn = os.path.extsep.join((self.img.filename + self.parm_suffix, PARM_EXT))
 
-        hdr = mrcIO.makeHdr_like(self.hdr)
-        hdr.ImgSequence = 2
-        hdr.PixelType = 2
-
-        hdr.type = IDTYPE
-        hdr.n1 = self.refwave
-        
-        if self.mapyx is None:
-            hdr.Num[0] = NUM_ENTRY
-            hdr.Num[1] = 1
-            hdr.Num[2] = self.img.nt * self.img.nw
-            hdr.n2 = 1
-            
-            # squeeze shape
-            parm = N.squeeze(self.alignParms.reshape((self.img.nt, self.img.nw, NUM_ENTRY)))
-            parm = parm.reshape(parm.shape[:-1] + (1,1) + (parm.shape[-1],))
-
-            Mrc.save(parm, fn, hdr=hdr, ifExists='overwrite')
-        else:
-            parm = self.alignParms.reshape((self.img.nt * self.img.nw, NUM_ENTRY))
-            hdr.NumFloats = self.alignParms.shape[-1]
-            hdr.NumIntegers = 1
-
-            extFloats = N.zeros((self.img.nt * self.img.nw * self.img.nz * 2,NUM_ENTRY), N.float32)
-
-            extFloats[:self.img.nt * self.img.nw] = parm
-
-            mapyx = self.mapyx
-            mapyx = mapyx.reshape(mapyx.shape[:2] + (N.prod(mapyx.shape[2:-2]),) + mapyx.shape[-2:])
-
-            hdr.Num[-1] = N.prod(mapyx.shape[:-2])
-            hdr.n2 = 2
-
-            o = mrcIO.MrcWriter(fn, hdr, extFloats=extFloats)
-            for t in range(self.img.nt):
-                for w in range(self.img.nw):
-                    o.write3DArr(mapyx[t,w], w=w, t=t)
-            o.close()
+        self.cwriter = chromformat.ChromagnonWriter(fn, self.img, self)
 
         return fn
 
@@ -791,96 +769,10 @@ class Chromagnon(object):#im.ImageManager):
         """
         load a chromagnon file
         """
-        arr = Mrc.bindFile(fn)
+        self.creader = chromformat.ChromagnonReader(fn, self.img, self)
+        self.creader.close()
 
-        if arr.Mrc.hdr.type != IDTYPE:
-            raise ValueError, 'This file is not a valid chromagnon file'
-
-        # reading the header
-        dratio = arr.Mrc.hdr.d / self.img.hdr.d
-        dratio = dratio[::-1] # zyx
-        
-        pwaves = list(arr.Mrc.hdr.wave[:arr.Mrc.hdr.NumWaves])
-        twaves = list(self.img.hdr.wave[:self.img.nw])
-        tids = [twaves.index(wave) for wave in pwaves if wave in twaves]
-        pids = [pwaves.index(wave) for wave in twaves if wave in pwaves]
-        refwave = pwaves[arr.Mrc.hdr.n1]
-        somewaves = [w for w, wave in enumerate(pwaves) if wave in twaves]
-        if refwave in twaves:
-            self.refwave = twaves.index(refwave)
-        elif len(somewaves) >= 1: # the reference wavelength was not found but some found
-            self.refwave = somewaves[0]
-            from PriCommon import guiFuncs as G
-            message = 'The original reference wavelength %i was not found in the target %s' % (refwave, self.file)
-            G.openMsg(msg=message, title='WARNING')
-
-        else:
-            self.parm = N.zeros((arr.Mrc.hdr.NumTimes, self.img.nw, NUM_ENTRY), arr.dtype.type)
-            from PriCommon import guiFuncs as G
-            message = 'No common wavelength was found in %s and %s' % (os.path.basename(fn), self.img.file)
-            G.openMsg(msg=message, title='WARNING')
-            return
-
-        # obtain affine parms
-        target = N.zeros((arr.Mrc.hdr.NumTimes, self.img.nw, NUM_ENTRY), arr.dtype.type)
-        target[:,:,4:] = 1
-
-        if arr.Mrc.hdr.n2 == 1:
-            parm = arr
-            nentry = NUM_ENTRY
-        else:
-            parm = arr.Mrc.extFloats[:arr.Mrc.hdr.NumTimes * arr.Mrc.hdr.NumWaves,:arr.Mrc.hdr.NumFloats]
-            nentry = arr.Mrc.hdr.NumFloats
-        parm = parm.reshape((arr.Mrc.hdr.NumTimes, arr.Mrc.hdr.NumWaves, nentry))
-
-        target[:,tids] = parm[:,pids]
-        for w in [w for w, wave in enumerate(twaves) if wave not in pwaves]:
-            target[:,w] = parm[:,self.refwave]
-        target[:,:,:3] *= dratio
-
-        self.setAlignParam(target)
-
-
-        # obtain mapping array
-        # 
-        hdr = arr.Mrc.hdr
-        if hdr.n2 == 2:
-            # pixel size adjustment + time, wavelength
-            nz = hdr.Num[-1] / (hdr.NumTimes * hdr.NumWaves * 2)
-            if nz == 1:
-                dratio[0] = 1
-            arr = arr.reshape((hdr.NumTimes, 
-                               hdr.NumWaves, 
-                               nz, 
-                               2, 
-                               hdr.Num[1], 
-                               hdr.Num[0]))
-
-            if any(dratio[1:] != 1):
-                nzyx = hdr.Num[::-1].copy()
-                nzyx[0] = nz
-                nzyx *= dratio
-                arr2 = N.empty((self.img.nt, self.img.nw, nzyx[0], 2, nzyx[1], nzyx[2]), arr.dtype.type)
-
-                tmin = min(self.img.nt, hdr.NumTimes)
-                for t, tarr in enumerate(arr):
-                    if t < tmin:
-                        for wt, wp in enumerate(pids):
-                            for s in xrange(2):
-                                warr = tarr[wp,:,s]
-                                w = tids[wt]
-                                arr2[t,w,:,s] = nd.zoom(warr, dratio) * dratio[1+(s%2)]
-                for w in [w for w, wave in enumerate(twaves) if wave not in pwaves]:
-                    arr2[:tmin,w] = arr2[:tmin,self.refwave]
-
-                if nz == 1:
-                    arr2 = arr2[:,:,0]
-
-                arr = arr2
-                del arr2
-
-            self.mapyx = arr
-
+        if not self.creader.text:
             self.fixAlignParmWithCurrRefWave()
 
         
@@ -922,6 +814,7 @@ class Chromagnon(object):#im.ImageManager):
         shiftZYX = N.array((mm[0], MM[0], mm[1], MM[1], mm[2], MM[2]))
 
         # rearrange as a slice
+        shiftZYX = shiftZYX.astype(N.int)
         slc = [Ellipsis, 
                slice(shiftZYX[0], shiftZYX[1]),
                slice(shiftZYX[2], shiftZYX[3]),
@@ -949,10 +842,10 @@ class Chromagnon(object):#im.ImageManager):
         """
         arr = self.img.get3DArr(w=w, t=t)
 
-        self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
+        #self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
         arr = af.applyShift(arr, self.alignParms[t,w])#, self.alignParms[t,w,:3])
-        self.img = im.load(os.path.join(self.dirname, self.file))
-        self.restoreDimFromExtra()
+        #self.img = im.load(os.path.join(self.dirname, self.file))
+        #self.restoreDimFromExtra()
 
         arr = arr[self.cropSlice]
         
@@ -971,10 +864,10 @@ class Chromagnon(object):#im.ImageManager):
         
         arr = self.img.get3DArr(w=w, t=t)
         
-        self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
+        #self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
         arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
-        self.img = im.load(os.path.join(self.dirname, self.file))
-        self.restoreDimFromExtra()
+        #self.img = im.load(os.path.join(self.dirname, self.file))
+        #self.restoreDimFromExtra()
         
         #arr = arr[self._zIdx]
         arr = arr[self.cropSlice]#_yxSlice]
@@ -998,33 +891,25 @@ class Chromagnon(object):#im.ImageManager):
 
         use self.setRegionCutOut() prior to calling this function if the img is to be cutout
         """
-        hdr = mrcIO.makeHdr_like(self.img.hdr)
-        #hdr.Num[:2] = self._yxSize[::-1]
-        hdr.Num[0] = self.cropSlice[-1].stop - self.cropSlice[-1].start
-        hdr.Num[1] = self.cropSlice[-2].stop - self.cropSlice[-2].start
-        hdr.Num[2] = self.img.nt * self.img.nw * (self.cropSlice[-3].stop - self.cropSlice[-3].start)#len(self._zIdx)
-        #hdr.ntst = self._tIdx[0]
-        #hdr.mst[:2] = self._yxSlice[1].start, self._yxSlice[0].start
-        #hdr.mst[-1] = self._zIdx[0]
-        hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
+        # prepare writer
+        try:
+            des = im.getWriter(fn, self.img)
+        except OSError:
+            # even though old readers/writers are closed, very often they are still alive.
+            # In fact, some other program may is opening the file.
+            # this is a temporary workaround for windows where open files cannot be overwritten
+            fn = fntools.nextFN(fn)
+            des = im.getWriter(fn, self.img)
 
-        if os.path.splitext(fn)[1][1:].lower() in im.IMGEXTS_MULTITIFF:#['tif', 'tiff']:
-            des = im.MultiTiffWriter(fn, self.multipagetif)
-            des.setDimFromMrcHdr(hdr)
-            #des.dtype = N.float32
-            des.setSecSize()
-            #des.setParameters(metadata={'axes': 'ZYX'})
-        else:
-            extInts = None
-            extFloats = None
-            if hasattr(self.img.hdr, 'NumIntegers') and self.img.hdr.NumIntegers and hasattr(self.img, 'extInts'):
-                extInts = self.img.extInts
-            if hasattr(self.img.hdr, 'NumFloats') and self.img.hdr.NumFloats and hasattr(self.img, 'extFloats'):
-                extFloats = self.img.extFloats
-            
-            des = mrcIO.MrcWriter(fn, hdr, extInts, extFloats, byteorder=self.byteorder)
-
+        nx = self.cropSlice[-1].stop - self.cropSlice[-1].start
+        ny = self.cropSlice[-2].stop - self.cropSlice[-2].start
+        nz = self.cropSlice[-3].stop - self.cropSlice[-3].start
+        #nx = self.img.nt * self.img.nw * (self.cropSlice[-3].stop - self.cropSlice[-3].start)
+        des.setDim(nx, ny, nz)
+        if type(des) == mrcIO.MrcWriter:
+            des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
         return des
+        
 
     def min_is_zero(self):
         """
@@ -1045,24 +930,8 @@ class Chromagnon(object):#im.ImageManager):
         return output file name
         """
         base, ext = os.path.splitext(self.img.filename)
-        if ext[1:].lower() in im.IMGEXTS_MULTITIFF:
-            target_is_mrc = False
-        else:
-            target_is_mrc = True
 
-        if not fn:
-            if target_is_mrc:
-                if self.img.filename.endswith('.dv'):
-                    #img_suffix = os.path.splitext(IMG_SUFFIX)[0]
-                    #fn = base + '_' + self.img_suffix + ext
-                    fn = base + self.img_suffix + ext
-                else:
-                    fn = self.img.filename + self.img_suffix + '.dv'#IMG_SUFFIX))
-            else:
-                #fn = base + '_aln' + ext
-                #fn = base + '_' + self.img_suffix + ext
-                fn = base + self.img_suffix + ext
-
+        fn = base + self.img_suffix + self.img_ext
         min0 = self.min_is_zero()
                 
         des = self.prepSaveFile(fn)
@@ -1076,16 +945,16 @@ class Chromagnon(object):#im.ImageManager):
                     arr = arr[self.cropSlice]#_yxSlice]
                 elif self.mapyx is None:
                     self.echo('Applying affine transformation to the target image, t: %i, w: %i' % (t, w))
-                    if target_is_mrc:
+                    if 0:#1:#target_is_mrc:
                         des.close()
                     arr = self.get3DArrayAligned(w=w, t=t)
                 else:
                     self.echo('Remapping local alignment, t: %i, w: %i' % (t, w))
-                    if target_is_mrc:
+                    if 0:#1:#target_is_mrc:
                         des.close()
                     arr = self.get3DArrayRemapped(w=w, t=t)
 
-                if target_is_mrc and des.closed():
+                if 0:#1 and des.closed():#target_is_mrc and des.closed():
                     des.init()
                     des.openFile()
 
@@ -1109,39 +978,14 @@ class Chromagnon(object):#im.ImageManager):
             return
         
         if not out:
-            out = os.path.extsep.join((self.img.filename, 'local'))
+            out = os.path.extsep.join((self.img.filename, 'local', 'ome', 'tif'))
 
-        arr = N.zeros(self.mapyx.shape[:3]+self.mapyx.shape[-2:], N.float32)
-        for t in xrange(self.nt):
-            a = self.img.get3DArr(w=self.refwave, t=t)
-            if arr.shape[2] == 1:
-                a = N.max(a, 0)
-                arr[t,self.refwave,0] = a
-            else:
-                arr[t,self.refwave] = a
-            me = a.max()#
-            arr[t,:,:,::gridStep,:] = me#1.
-            arr[t,:,:,:,::gridStep] = me#1.
-        affine = N.zeros((7,), N.float64)
-        affine[-3:] = 1
         
-        self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
-        
-        canvas = N.empty_like(arr)
-        for t in xrange(self.nt):
-            for w in xrange(self.nw):
-                canvas[t,w] = af.remapWithAffine(arr[t,w], self.mapyx[t,w], affine)
-                
-        del arr
-        self.img = im.load(os.path.join(self.dirname, self.file))
-        self.restoreDimFromExtra()
-        
-        hdr = mrcIO.makeHdr_like(self.hdr)
-        hdr.ImgSequence = 2
-        hdr.Num[-1] = N.prod(self.mapyx.shape[:3])
-
-        Mrc.save(N.squeeze(canvas), out, hdr=hdr, ifExists='overwrite')
-        del canvas
+        try:
+            return chromformat.makeNonliearImg(self, out, gridStep)
+        except OSError:#WindowsError:
+            out = fntools.nextFN(out)
+            print out
+            return chromformat.makeNonliearImg(self, out, gridStep)
     
-        return out
         

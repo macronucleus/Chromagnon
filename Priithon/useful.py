@@ -1,4 +1,4 @@
-"""Priithon U modules: lot's of simple 'useful' (shortcut) functions
+"""priithon U modules: lot's of simple 'useful' (shortcut) functions
 """
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
@@ -24,7 +24,10 @@ except ImportError:
 #20060722  from numarray import linear_algebra as la
 #20060722  from numarray import random_array as ra
 
-import pdb # useful for U.pdb.pm()  # no time to first import: exception would get lost
+try:
+    import pdb # useful for U.pdb.pm()  # no time to first import: exception would get lost
+except ImportError:
+    pass
 
 try:
     import Priithon_bin.seb as S
@@ -1639,7 +1642,9 @@ def histogramXY(a, nBins=None, amin=None,amax=None, histArr=None, norm=False, cu
     """ 
     b,x = histogramYX(a, nBins, amin,amax, histArr, norm, cumsum, exclude_amax)
     return x,b
-histogramXY.__doc__ += '\n' + histogram.__doc__
+
+# 20161214 py2exe did not allow this...
+#histogramXY.__doc__ += '\n' + histogram.__doc__
 def histogramYX(a, nBins=None, amin=None,amax=None, histArr=None, norm=False, cumsum=False, exclude_amax=False):
     """
     returns same as U.histogram
@@ -1656,7 +1661,7 @@ def histogramYX(a, nBins=None, amin=None,amax=None, histArr=None, norm=False, cu
         x = N.linspace(amin,amax, nBins, endpoint=not exclude_amax)
 
     return b, x
-histogramYX.__doc__ += '\n' + histogram.__doc__
+#histogramYX.__doc__ += '\n' + histogram.__doc__
 
 def generalhistogram(a, weightImg, nBins=None, amin=None,amax=None):
     """

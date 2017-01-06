@@ -11,7 +11,7 @@ import select # polling works on pipes on Unix
 #import socket
 import traceback
 import time
-from packages import pprocess, logger
+import pprocess, logger
 
 try:
     import cPickle as pickle

@@ -164,6 +164,33 @@ def makeCombo(panel, horizontalSizer, labelTxt, choices, defVal='', tip='', size
 
     return label, comb
 
+
+def makeRadioButtons(panel, horizontalSizer, labelTxts, targetFunc=None, size=wx.DefaultSize, **sizerKwds):
+    """
+    returns list of radioButtons number of which is determined by labelTxts
+    """
+    if isinstance(labelTxts, basestring):
+        nbuts = 1
+        labelTxts = [labelTxts]
+    else:
+        nbuts = len(labelTxts)
+    
+    ctrls = []
+    for i, labelTxt in enumerate(labelTxts):
+        if i == 0:
+            radio = wx.RadioButton(panel, -1, labelTxt, size=size, style=wx.RB_GROUP)
+        else:
+            radio = wx.RadioButton(panel, -1, labelTxt, size=size)
+        horizontalSizer.Add(radio, **sizerKwds)
+
+        if targetFunc:
+            frame = panel.GetTopLevelParent()
+            frame.Bind(wx.EVT_RADIOBUTTON, targetFunc, radio)
+            
+        ctrls.append(radio)
+    
+    return ctrls
+
 def openMsg(parent=None, msg='', title="You are not ready"):
     dlg = wx.MessageDialog(parent, msg, title, wx.OK | wx.ICON_EXCLAMATION)
     if dlg.ShowModal() == wx.ID_OK:

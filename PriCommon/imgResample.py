@@ -4,7 +4,7 @@ try:
     if not hasattr(Y, 'view'):
         import multiprocessing as mp
         NCPU=mp.cpu_count()
-        from PriCommon import ppro26 as ppro
+        from . import ppro26 as ppro
     else:
         mp = None
         NCPU = 1
@@ -16,7 +16,11 @@ try:
     import cv
     import cv2
 except ImportError:
-    pass
+    try:
+        import cv2
+        cv = cv2
+    except:
+        pass
 
 METHODS = {'0nearest': 0,
            '1bilinear': 1,
@@ -569,15 +573,23 @@ def remap(img, mapy, mapx, interp=2):
     des = N.empty_like(img)
 
     # cv.fromarray: array can be 2D or 3D only
-    cimg = cv.fromarray(img)
-    cdes = cv.fromarray(des)
+    if cv2.__version__.startswith('2'):
+        cimg = cv.fromarray(img)
+        cdes = cv.fromarray(des)
 
-    cmapx = cv.fromarray(mapx.astype(N.float32))
-    cmapy = cv.fromarray(mapy.astype(N.float32))
-    
-    cv.Remap(cimg, cdes, cmapx, cmapy, flags=interp+cv.CV_WARP_FILL_OUTLIERS)
+        cmapx = cv.fromarray(mapx.astype(N.float32))
+        cmapy = cv.fromarray(mapy.astype(N.float32))
+        
+        cv.Remap(cimg, cdes, cmapx, cmapy, flags=interp+cv.CV_WARP_FILL_OUTLIERS)
+    else:
+        cimg = img
+        cdes = des
+        cmapx = mapx.astype(N.float32)
+        cmapy = mapy.astype(N.float32)
 
-    return N.array(cdes)
+        cdes = cv2.remap(cimg, cmapx, cmapy, interp)
+
+    return N.asarray(cdes)
 
 def logpolar(img, center=None, mag=1):
     des = N.empty_like(img)

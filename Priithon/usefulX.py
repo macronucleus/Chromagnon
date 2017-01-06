@@ -2568,16 +2568,23 @@ def vgMarkIn3D(v_id=-1, zyx = (None,200,200), kind='Cross',
     z1 = z+zPlusMinus
     if z1>nz:
         z1 = nz
+
+    ids = []
     for i in range(z0,z):
         q=fffff(v_id, [yx], s, color=colLessZ, width=widthLessZ, 
                 name=["markedIn3D", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+        ids.append(q)
 
     for i in range(z+1,z1):
         q=fffff(v_id, [yx], s, color=colMoreZ, width=widthMoreZ, 
                 name=["markedIn3D", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+        ids.append(q)
         
     q=fffff(v_id, [yx], s, color=colAtZ, width=widthAtZ, 
             name=["markedIn3D", name,(z,)], idx=None, enable=z==zShown, refreshNow=refreshNow)
+    ids.append(q)
+
+    return ids
 
 
 

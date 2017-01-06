@@ -1,14 +1,15 @@
 #!/usr/bin/env priithon
 
 import os, sys
-import wx, wx.aui
+import wx, wx.aui, wx.lib.scrolledpanel as scrolled
 from Priithon import histogram, useful as U
 
 import viewer2
 import glfunc as GL
+import OpenGL
 
 import numpy as N
-from PriCommon import guiFuncs as G ,microscope, imgfileIO, imgResample
+from PriCommon import guiFuncs as G ,microscope, bioformatsIO, imgResample
 from scipy import ndimage as nd
 
 GLUTINITED = False
@@ -35,7 +36,11 @@ def initglut():
     global GLUTINITED
     if not GLUTINITED and sys.platform in ('linux2', 'win32'):
         from OpenGL import GLUT
-        GLUT.glutInit([])  ## in order to call Y.glutText()
+        try:
+            GLUT.glutInit([])  ## in order to call Y.glutText()
+        except OpenGL.error.NullFunctionError:
+            #pass
+            raise RuntimeError, 'FreeGlut is not installed on your computer'
         GLUTINITED = True
 
 class ImagePanel(wx.Panel):
@@ -54,7 +59,7 @@ class ImagePanel(wx.Panel):
         
         ## self.doc contains all the information on the displayed image
         if isinstance(imFile, basestring):
-            self.doc = imgfileIO.load(imFile)#aligner.Chromagnon(imFile)
+            self.doc = bioformatsIO.load(imFile)#aligner.Chromagnon(imFile)
         else:
             self.doc = imFile
 
@@ -87,11 +92,11 @@ class ImagePanel(wx.Panel):
                 self.viewers[-1].updateAlignParm(-1, alignParm)
 
         # sliders
-        if self.doc.nz > 1 or self.doc.nt > 1:
+        if 1:#self.doc.nz > 1 or self.doc.nt > 1:
             self.addZslider()
             ysize = int(self.doc.nz > 1) * 60 + int(self.doc.nt > 1) * 40
             ysize = max(self.doc.nz, ysize)
-            self._mgr.AddPane(self.sliderPanel, wx.aui.AuiPaneInfo().Name('Sliders').Caption("Sliders").Right().Position(1).BestSize((200,ysize)).MinSize((200,ysize)))
+            self._mgr.AddPane(self.sliderPanel, wx.aui.AuiPaneInfo().Name('Image').Caption("Image").Right().Position(1).BestSize((200,ysize)).MinSize((200,ysize)))
                         
         # histogram
         self.recalcHist_todo_Set = set()
@@ -101,7 +106,7 @@ class ImagePanel(wx.Panel):
         self.recalcHistL(False)
         self.autoFitHistL()
 
-        self._mgr.AddPane(self.histsPanel, wx.aui.AuiPaneInfo().Name('Histogram').Caption("HistoPanel").MaximizeButton(True).Right().Position(0).BestSize((200, self.doc.ny)).MinSize((200,50+70*self.doc.nw)))
+        self._mgr.AddPane(self.histsPanel, wx.aui.AuiPaneInfo().Name('Histogram').Caption("HistoPanel").MaximizeButton(True).Right().Position(0).BestSize((200, self.doc.ny)).MinSize((200,50+70*2)).MaxSize((250,self.doc.ny)))#MinSize((200,50+70*self.doc.nw)).MaxSize((250,self.doc.ny)))
 
         wx.CallAfter(self._mgr.Update)
         self.histsPanel.Layout()
@@ -154,9 +159,9 @@ class ImagePanel(wx.Panel):
                 #v.dragSide = 0
         #self.doc.setIndices()
 
-
+    old="""
     def IsCut(self):
-        return self.viewCut
+        return self.viewCut"""
 
     def updateCropboxEdit(self):
         pass
@@ -166,6 +171,40 @@ class ImagePanel(wx.Panel):
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.sliderPanel.SetSizer(sizer)
+
+        # image info
+        # \n
+        box = G.newSpaceV(sizer)
+
+        bb, box = G.newStaticBox(self.sliderPanel, box, title='Image info', size=wx.DefaultSize)
+
+        if sys.platform.startswith(('win', 'linux')):
+            fsize = 9
+        else:
+            fsize = 11
+        font = wx.Font(fsize, wx.SWISS, wx.NORMAL, wx.NORMAL)
+        
+        # pixel size
+        pxsiz = tuple(self.doc.pxlsiz[::-1])
+        dimstr = ('X', 'Y', 'Z')
+        line = 'Pixel size (um):\n'
+        pxstr = '  '
+        for i, d in enumerate(pxsiz):
+            if d:
+                pxstr += '%s %.3f: ' % (dimstr[i], d)
+        if pxstr:
+            line += pxstr[:-2]
+        else:
+            line = ''
+        if line:
+            label = G.makeTxt(self.sliderPanel, box, line)
+            label.SetFont(font)
+        # data type
+        pxtype = bioformatsIO.pixeltype_to_bioformats(self.doc.dtype)
+        line = 'Data type: %s' % pxtype
+        label = G.makeTxt(self.sliderPanel, box, line)
+        label.SetFont(font)
+
         
         # z slider
         if self.doc.nz > 1:
@@ -217,28 +256,29 @@ class ImagePanel(wx.Panel):
             if self.doc.nz == 1:
                 self.sliderPanel.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
             self.tSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
-                
+
+
     def onOrthogonal(self, evt=None):
         """
         transform to the orthogonal viewer
         """
         if self.orthogonal_toggle.GetValue() and len(self.viewers) == 1:
-            self._mgr.GetPane('Sliders').Left().Position(1)
+            self._mgr.GetPane('Image').Left().Position(1)
             self.OnAddX()
             self.OnAddY()
             self.OnAddLastViewer()
         elif self.orthogonal_toggle.GetValue():
-            self._mgr.GetPane('Sliders').Left().Position(1)
+            self._mgr.GetPane('Image').Left().Position(1)
             self._mgr.GetPane('XZ').Show()
             self._mgr.GetPane('ZY').Show()
             self._mgr.Update()
         else:
-            self._mgr.GetPane('Sliders').Right().Position(1)
+            self._mgr.GetPane('Image').Right().Position(1)
             self._mgr.GetPane('ZY').Hide()
             self._mgr.GetPane('XZ').Hide()
             self._mgr.Update()
             self.updateGLGraphics(0, True)
-        
+
     def OnAddY(self, evt=None):
         """
         add ZY viewer
@@ -299,7 +339,7 @@ class ImagePanel(wx.Panel):
 
         if self.doc.nw > 1:
             for i in range(self.doc.nw):
-                wave = self.doc.hdr.wave[i]
+                wave = self.doc.wave[i]
                 self.setColor(i, wave, False)
 
         self.autoFitHistL()
@@ -310,7 +350,7 @@ class ImagePanel(wx.Panel):
         ''' Initialize the histogram/aligner panel, and a bunch of empty lists;
         define HistogramCanvas class;s doOnBrace() and doOnMouse() behaviors
         '''
-        self.histsPanel = wx.Panel(self, -1)
+        self.histsPanel = scrolled.ScrolledPanel(self, -1)#wx.Panel(self, -1)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.histsPanel.SetSizer(sizer)
@@ -336,7 +376,7 @@ class ImagePanel(wx.Panel):
         self.hist_toggleID2col    = {}
 
         for i in range(self.doc.nw):
-            wave = self.doc.hdr.wave[i]#mrcIO.getWaveFromHdr(self.doc.hdr, i)
+            wave = self.doc.wave[i]#mrcIO.getWaveFromHdr(self.doc.hdr, i)
             self.hist_show[i] = True
 
             box = G.newSpaceV(sizer)
@@ -386,7 +426,7 @@ class ImagePanel(wx.Panel):
 
         if self.doc.nw > 1:
             for i in range(self.doc.nw):
-                wave = self.doc.hdr.wave[i]
+                wave = self.doc.wave[i]
                 self.setColor(i, wave, False)
 
         #/n/n
@@ -394,6 +434,9 @@ class ImagePanel(wx.Panel):
         G.makeTxt(self.histsPanel, box, ' ') # dummy
         box = G.newSpaceV(sizer)
         self.xy_label = G.makeTxt(self.histsPanel, box, ' ')
+
+        self.histsPanel.SetAutoLayout(1)
+        self.histsPanel.SetupScrolling()
                 
     def OnAutoScale(self, evt=None):
         """
@@ -506,7 +549,7 @@ class ImagePanel(wx.Panel):
         if mode == 'r':
             if self.hist_singleChannelMode == i: # switch back to normal
                 for ii in range(self.doc.nw):
-                    wave = self.doc.hdr.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
+                    wave = self.doc.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
                     label = str(wave)
                     self.hist_toggleButton[ii].SetLabel(label)
                     r, g, b = self.hist[ii].m_histGlRGB
@@ -516,7 +559,7 @@ class ImagePanel(wx.Panel):
             else:                                # active grey mode for color i only
                 for ii in range(self.doc.nw):
                     if ii == i:
-                        wave = self.doc.hdr.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
+                        wave = self.doc.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
                         label = str(wave)
                         self.hist_toggleButton[ii].SetLabel(label)
                         visible = self.hist_show[ii]
@@ -531,7 +574,7 @@ class ImagePanel(wx.Panel):
         else:
             if self.hist_singleChannelMode is not None: # switch back to normal
                 for ii in range(self.doc.nw):
-                    wave = self.doc.hdr.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
+                    wave = self.doc.wave[ii]#mrcIO.getWaveFromHdr(self.doc.hdr, ii)
                     label = str(wave)
                     self.hist_toggleButton[ii].SetLabel(label)#'%d'%ii)
                     r, g, b = self.hist[ii].m_histGlRGB
@@ -769,7 +812,7 @@ class ImagePanel(wx.Panel):
 
 class MyFrame(wx.Frame):
 
-    def __init__(self, title='Chromagnon viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):
+    def __init__(self, title='ND viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):
         wx.Frame.__init__(self, parent, id, title, style=wx.DEFAULT_FRAME_STYLE | wx.BORDER_SUNKEN, size=wx.Size(size[0], size[1]))
 
         

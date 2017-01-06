@@ -1,58 +1,64 @@
 #!/usr/bin/env priithon
 
 import os
-from Priithon import Mrc
 import numpy as N
-#import OMXlab2 as O
-import guiFuncs as G, imgfileIO, mrcIO
+import guiFuncs as G, bioformatsIO
 
 # GUI
 import wx, time
 
 # Constants
 EXT='flat'
-IDTYPE = 101
+IDTYPE = '101'
+
+if EXT not in bioformatsIO.OMETIFF:
+    bioformatsIO.OMETIFF = tuple(list(bioformatsIO.OMETIFF) + [EXT])
+
 
 # functions
+def is_flat(fn, check_img_to_open=True):
+    check = False
+    if fn.endswith(EXT):
+        check = True
+    else:
+        if check_img_to_open:
+            rdr = bioformatsIO.BioformatsReader(fn)
+            if hasattr(rdr, 'ome') and \
+                rdr.ome.get_structured_annotation('idtype') == IDTYPE:
+                    check = True
+            rdr.close()
 
-def makeFlatConv(fn, out=None, suffix=''):#, dark=None):
+    return check
+
+def makeFlatConv(fn, out=None, suffix=''):
     """
     save a calibration file
     
     return output file name
     """
     if not out:
-        out = os.path.extsep.join((os.path.splitext(fn)[0] + suffix, EXT))
-        #out = fn + EXT
-    h = imgfileIO.load(fn)#mrcIO.MrcReader(fn)
-    h.makeHdr()
-    ntz = h.nz * h.nt
-    hdr = mrcIO.makeHdr_like(h.hdr)
-    hdr.NumTimes = 1
-    hdr.Num[-1] = h.nw# * 2
-    hdr.PixelType = Mrc.dtype2MrcMode(N.float32)
-    hdr.type = IDTYPE
-    for w in range(h.nw):
-        if w == 0:
-            hdr.mmm1[0] = 0
-            hdr.mmm1[1] = 2
-        else:
-            exec('hdr.mm%i[0] = 0' % (w+1))
-            exec('hdr.mm%i[1] = 2' % (w+1))
+        out = os.path.splitext(fn)[0] + suffix + os.path.extsep + EXT
+    elif not out.endswith(EXT):
+        out = os.path.extsep.join(os.path.splitext(out)[0], EXT)
 
-    #o = imgfileIO.getWriter(out, hdr)
-    o = mrcIO.MrcWriter(out, hdr)
+    h = bioformatsIO.load(fn)
+    ntz = h.nz * h.nt
+    
+    o = bioformatsIO.getWriter(out)
+    o.setFromReader(h)
+    o.nt = 1
+    o.nz = 1
+    o.dtype = N.float32
+    o.ome.add_structured_annotation('idtype', IDTYPE)
+    
     for w in range(h.nw):
         canvas = N.zeros((h.nt, h.nz, h.ny, h.nx), N.float32)
-        #o.writeArr(canvas[0,0], w=w, z=0)
-        # o.writeArr(canvas[0,0], w=w, z=2)
-        #o.writeArr(canvas[0,0], w=w, z=3)
         for t in range(h.nt):
             for z in range(h.nz):
                 canvas[t,z] = h.getArr(w=w, t=t, z=z)
-        arr = canvas.reshape(ntz, h.ny, h.nx).mean(axis=0)
+        arr = canvas.reshape((ntz, h.ny, h.nx)).mean(axis=0)
         arr = arr.mean() / arr
-        o.writeArr(arr.astype(N.float32), w=w, z=0)#1)
+        o.writeArr(arr.astype(N.float32), w=w, z=0)
     o.close()
     h.close()
 
@@ -67,20 +73,21 @@ def flatConv(fn, flatFile, out=None, suffix='_'+EXT.upper()):
     if not out:
         base, ext = os.path.splitext(fn)
         out = base + suffix + ext
-        #out = fn + EXT
 
-    h = imgfileIO.load(fn)#mrcIO.MrcReader(fn)
-    h.makeHdr()
-    f = mrcIO.MrcReader(flatFile)#imgfileIO.load(flatFile)
-    o = imgfileIO.getWriter(out, h.hdr)#mrcIO.MrcWriter(out, h.Mrc.hdr)
+    h = bioformatsIO.load(fn)
+
+    f = bioformatsIO.load(flatFile)
+    o = bioformatsIO.getWriter(out)
+    o.setFromReader(h)
+    if out.endswith('ome.tif'):
+        o.imgSequence = 0
 
     for w in range(h.nw):
-        tgt_wave = mrcIO.getWaveFromHdr(h.hdr, w)
+        tgt_wave = h.getWaveFromIdx(w)
 
-        if tgt_wave in f.hdr.wave:
-            rw = mrcIO.getWaveIdxFromHdr(f.hdr, tgt_wave)
+        if tgt_wave in f.wave:
+            rw = h.getWaveIdx(tgt_wave)
             fs = f.getArr(w=rw, z=0)
-            #print tgt_wave, f.hdr.wave, rw, fs.shape, h.getArr(w=w, t=0, z=0).shape
             
             for t in range(h.nt):
                 for z in range(h.nz):
@@ -95,8 +102,6 @@ def flatConv(fn, flatFile, out=None, suffix='_'+EXT.upper()):
     o.close()
     h.close()
     f.close()
-
-    mrcIO.recalcMinMax(out)
 
     return out
                 

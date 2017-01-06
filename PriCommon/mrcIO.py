@@ -1,8 +1,8 @@
 from Priithon import Mrc
 import numpy as N
-from PriCommon import generalIO
+from . import generalIO
 
-
+READABLE_FORMATS = WRITABLE_FORMATS = ('mrc', 'dv')
 # 'Image sequence. 0=ZTW, 1=WZT, 2=ZWT (idx = [2,1,0])
 
 class MrcReader(generalIO.GeneralReader):
@@ -40,6 +40,25 @@ class MrcReader(generalIO.GeneralReader):
 
         self.fp._secByteSize = self._secByteSize
 
+    def makeHdr(self):
+        """
+        make a Mrc header using the available dimension information to export
+        """
+        if not self.hdr:
+            hdr = Mrc.makeHdrArray()
+            Mrc.init_simple(hdr, Mrc.dtype2MrcMode(self.dtype), self.shape)
+            hdr.ImgSequence = self.imgSequence
+            hdr.NumTimes = self.nt
+            hdr.NumWaves = self.nw
+            hdr.Num[-1] = self.nt * self.nw * self.nz
+            if len(self.wave):
+                hdr.wave[:self.nw] = self.wave[:self.nw]
+            hdr.d = self.pxlsiz[::-1]
+            if self.metadata.has_key('Instrument'):
+                hdr.hdr.LensNum = eval(self.metadata['Instrument']['Objective']['ID'].split(':')[1])
+
+            self.hdr = hdr
+
 
     def getArr(self, t=0, z=0, w=0):
         i = self.findFileIdx(t, z, w)
@@ -47,28 +66,23 @@ class MrcReader(generalIO.GeneralReader):
         return self.fp.readSec(i)
 
 
-class MrcWriter(generalIO.GeneralWriter):
-    def __init__(self, outfn, hdr, extInts=None, extFloats=None, byteorder='='):
+class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
+    def __init__(self, outfn, hdr=None, extInts=None, extFloats=None, byteorder='='):
         """
         prepare your hdr and output filename
         """
         generalIO.GeneralWriter.__init__(self, outfn, mode='w')
 
-        self.writeHeader(hdr, extInts, extFloats, byteorder)
-
-        old="""
-        nx = self.fp.hdr.Num[0]
-        ny = self.fp.hdr.Num[1]
-        nt = self.fp.hdr.NumTimes
-        nw = self.fp.hdr.NumWaves
-        nz = self.fp.hdr.Num[2] // (nt * nw)
-        dtype = self.fp._dtype
-        wave = self.fp.hdr.wave[:nw]
-        imgseq = self.fp.hdr.ImgSequence
+        self.hdr = hdr
+        self.extInts = extInts
+        self.extFloats = extFloats
         
-        self.setDim(nx, ny, nz, nt, nw, dtype, wave, imgseq)"""
+        #if not self.hdr:
+        #    self.hdr = makeHdr()
+            #self.writeHeader(hdr, extInts, extFloats, byteorder)
 
-        self.setDimFromMrcHdr(hdr)
+        if self.hdr:
+            self.setDimFromMrcHdr(self.hdr, extInts, extFloats, byteorder)
 
         self.init()
         
@@ -80,8 +94,55 @@ class MrcWriter(generalIO.GeneralWriter):
         self.handle = self.fp._f
 
     def init(self):
-        self.fp._secByteSize = self._secByteSize
+        pass
+        #self.fp._secByteSize = self._secByteSize
         #self.fp._dtype = self.dtype
+        
+
+    def doOnSetDim(self):
+        pixelType = Mrc.dtype2MrcMode(self.dtype)
+        num = self.nx, self.ny, self.nz * self.nw * self.nt
+        if not self.hdr:
+            self.hdr = Mrc.makeHdrArray()
+            init_simple(self.hdr, pixelType, num)
+        self.hdr.Num = num
+        self.hdr.NumTimes = self.nt
+        self.hdr.NumWaves = self.nw
+        self.hdr.PixelType = pixelType
+        self.hdr.ImgSequence = self.imgSequence
+        self.hdr.wave[:self.nw] = self.wave[:self.nw]
+        self.hdr.d[:] = self.pxlsiz[::-1]
+
+        #self.makeHdr()
+        #self.setDimFromMrcHdr(hdr)
+        self.writeHeader(self.hdr, extInts=self.extInts, extFloats=self.extFloats)
+
+    def setFromReader(self, rdr):
+        """
+        read dimensions, imgSequence, dtype, pixelsize from a reader
+        """
+        if type(rdr) == MrcReader:
+            if hasattr(rdr, 'extInts'):
+                self.setDimFromMrcHdr(rdr.hdr, rdr.extInts, rdr.extFloats)
+            else:
+                self.setDimFromMrcHdr(rdr.hdr)
+        else:
+            self.setPixelSize(*rdr.pxlsiz)
+            self.setDim(rdr.roi_size[-1], rdr.roi_size[-2], rdr.roi_size[-3], rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
+            self.metadata = rdr.metadata
+        
+    def setDimFromMrcHdr(self, hdr, extInts=None, extFloats=None, byteorder='='):
+        """
+        set dimensions using a Mrc header
+        """
+        #self.writeHeader(hdr, extInts, extFloats, byteorder)
+        self.hdr = makeHdr_like(hdr)
+        self.setPixelSize(*hdr.d[::-1])
+        nz = hdr.Num[2] // (hdr.NumWaves * hdr.NumTimes)
+        dtype = Mrc.MrcMode2dtype(hdr.PixelType)
+
+        self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes, hdr.NumWaves, dtype, hdr.wave, hdr.ImgSequence)#, 1, False)
+        #self.hdr = hdr
         
         
     def writeHeader(self, hdr, extInts=None, extFloats=None, byteorder='='):
@@ -111,8 +172,11 @@ class MrcWriter(generalIO.GeneralWriter):
 
 
         self.hdr = self.fp.hdr
+        self.extInts = extInts
+        self.extFloats = extFloats
 
     def writeArr(self, arr2D, w=0, t=0, z=0):
+        #print 'w, t, z', w, t, z
         i = self.findFileIdx(t, z, w)
 
         self.fp.writeSec(arr2D, i)
@@ -154,6 +218,10 @@ def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
         else: exec('hdr.%s = 0' % field)
 
 def makeHdr_like(hdrSrc):
+    """
+    hdrSrc: header of the source
+    return header
+    """
     hdr = Mrc.makeHdrArray()
     init_simple(hdr, hdrSrc.PixelType, hdrSrc.Num[::-1])
     Mrc.initHdrArrayFrom(hdr, hdrSrc)
@@ -162,6 +230,32 @@ def makeHdr_like(hdrSrc):
     hdr.NumIntegers = hdrSrc.NumIntegers
     hdr.NumFloats = hdrSrc.NumFloats
     return hdr
+
+def makeHdrFromRdr(rdr):
+    """
+    rdr: reader object
+    return header
+    """
+    if hasattr(rdr, 'hdr'):
+        hdr = rdr.hdr
+    else:
+        hdr = Mrc.makeHdrArray()
+        Mrc.init_simple(hdr, Mrc.dtype2MrcMode(rdr.dtype), rdr.shape)
+        hdr.ImgSequence = rdr.imgSequence
+        hdr.NumTimes = rdr.nt
+        hdr.NumWaves = rdr.nw
+        hdr.Num[-1] = rdr.nt * rdr.nw * rdr.nz
+        if len(rdr.wave):
+            if [1 for wave in rdr.wave[:rdr.nw] if isinstance(wave, basestring)]:
+                hdr.wave[:rdr.nw] = 0
+            else:
+                hdr.wave[:rdr.nw] = rdr.wave[:rdr.nw]
+        hdr.d = rdr.pxlsiz[::-1]
+        if rdr.metadata.has_key('Instrument'):
+            hdr.LensNum = eval(rdr.metadata['Instrument']['Objective']['ID'].split(':')[1])
+
+    return hdr
+
 
 def addExtHdrFromExt(hdl, numInts=0, numFloats=0, extInts=None, extFloats=None):
     nSecs = hdl.hdr.Num[2]

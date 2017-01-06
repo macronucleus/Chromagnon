@@ -1,4 +1,5 @@
 ### Here all kinds of fitting
+
 from Priithon.all import N, U
 import imgFilters, imgGeo
 import exceptions
@@ -469,7 +470,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
         dif = (s2 - shape) / 2.
         dm = dif % 1
        # print s2, cent, dif, dm
-        slc = [Ellipsis] + [slice(d, d+shape[i]) for i, d in enumerate(dif)]
+        slc = [Ellipsis] + [slice(int(d), int(d)+shape[i]) for i, d in enumerate(dif)]
         # This slice is float which shift array when cutting out!!
 
         inds = N.indices(s2, N.float32)
@@ -480,7 +481,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
             inds = N.reshape(inds, (nz,)+ind_shape[-2:])
         irs = N.empty_like(inds)
         for d, ind in enumerate(inds):
-            idx = d//nsec
+            idx = int(d//nsec)
             c = cent[idx]
             if rot and inds.ndim > 2:
                 U.trans2d(ind - c, irs[d], (0,0,rot,1,0,1))

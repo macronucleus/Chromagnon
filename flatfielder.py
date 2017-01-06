@@ -9,9 +9,9 @@
 import sys, os
 
 import wx
-from PriCommon import guiFuncs as G, commonfuncs as C, imgfileIO
+from PriCommon import guiFuncs as G, commonfuncs as C, flatConv, listbox, bioformatsIO
 from PriCommon.ndviewer import main as aui
-import listbox, chromeditor, aligner, threads
+from . import chromformat, aligner, chromeditor, threads
 
 #----------- Global constants
 
@@ -98,6 +98,14 @@ class BatchPanel(wx.Panel):
         #------- execute ------
 
         self.goButton = wx.ToggleButton(self, -1, 'Run all')
+
+        if sys.platform.startswith('win'):
+            ft = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.NORMAL, wx.FONTWEIGHT_BOLD)
+        elif sys.platform.startswith('linux'):
+            ft = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.NORMAL, wx.FONTWEIGHT_BOLD)
+        else:
+            ft = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.NORMAL, wx.FONTWEIGHT_BOLD)
+        self.goButton.SetFont(ft)
         #self.goButton.SetToolTipString('Open a graphical interphase to flat field images')
         gosize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + self.goButton.GetSize()[0] + flatSuffixLabel.GetSize()[0] + self.flat_suffix_txt.GetSize()[0]
 
@@ -128,7 +136,7 @@ class BatchPanel(wx.Panel):
         if os.path.isfile(flatfn):
             self.listRef.addFile(flatfn)
         
-                
+        self.listRef.setDefaultFileLoadFunc(self._load_func)
         # ---- list target ------
 
         # \n
@@ -138,7 +146,10 @@ class BatchPanel(wx.Panel):
         
         self.tgtClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'tareget'), title='Clear selected', tip='', enable=False)
 
-        label, self.flatimg_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('flatimg_suffix_txt', '_FLAT'), tip='A suffix for the output file name', sizeX=100)
+        label, self.flatimg_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('flatimg_suffix_txt', '_'+flatConv.EXT.upper()), tip='A suffix for the output file name', sizeX=100)
+
+        choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
+        label, self.outextch = G.makeListChoice(self, box, '', choices, defValue=confdic.get('flat_format', aligner.WRITABLE_FORMATS[0]), tip='Choose image file formats; for reading with ImageJ, dv is recommended.')
         
         # \n
         box = G.newSpaceV(sizer)
@@ -154,7 +165,12 @@ class BatchPanel(wx.Panel):
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemSelected, self.listTgt)
         self.listTgt.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
 
+        self.listTgt.setDefaultFileLoadFunc(self._load_func)
+        # ---- Drop befavior ----
+        self.listRef.setOnDrop(self.checkGo, 1)#goButton.Enable, 1)
+        self.listTgt.setOnDrop(self.checkGo, 1)#goButton.Enable, 1)
 
+        
         # ---- Output ------
 
         # \n
@@ -167,6 +183,22 @@ class BatchPanel(wx.Panel):
         #self.parent.Layout()
 
         self.checkGo()
+
+        
+    def _load_func(self, fn):
+        try:
+            h = bioformatsIO.load(fn)
+        except ValueError:
+            dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
+            if dlg.ShowModal() == wx.ID_OK:
+                return
+
+        if h.nseries > 1:
+            dlg = wx.MessageDialog(self, 'Multiple series data sets are not allowed, please make a file with a single image in a file', 'Error in image file', wx.OK | wx.ICON_EXCLAMATION)
+            if dlg.ShowModal() == wx.ID_OK:
+                return
+        return h
+        
 
     def OnItemSelected(self, evt=None, rt='reference'):
         """
@@ -196,29 +228,8 @@ class BatchPanel(wx.Panel):
         elif self.currentItem[0] == 'target':
             ll = self.listTgt
         fn = os.path.join(*ll.getFile(self.currentItem[1])[:2])
-        self.makeExtraInfo(*self.currentItem[:2])
-        self.view(fn)#viewSingle(fn)
 
-    def makeExtraInfo(self, which='ref', index=0):
-        """
-        set self.einfo
-        """
-        if which.startswith('r'):
-            ll = self.listRef
-        elif which.startswith('t'):
-            ll = self.listTgt
-
-        item = ll.getFile(index)
-        einfo = {}
-
-        waves = [int(wave) for wave in item[2].split(',')]
-        einfo['nw'] = len(waves)
-        einfo['waves'] = waves
-        einfo['nt'] = int(item[3])
-        einfo['seq'] = ll.seqs[index]
-        einfo['pixsiz'] = ll.pxszs[index]
-
-        self.einfo = einfo
+        self.view(fn)
 
     def OnChooseReferenceFile(self, evt):
         """
@@ -295,6 +306,14 @@ class BatchPanel(wx.Panel):
         self.checkGo()
         self.OnItemSelected()
 
+    def _setFlat(self, fns):
+        #ids = range(len(fns))
+        #ids.reverse()
+        #[self.listRef.clearRaw(i) for i in ids]
+        self.listRef.clearAll()
+        for i, fn in enumerate(fns):
+            self.listRef.addFile(fn)
+        C.saveConfig(flatfn=fns[0])
             
     def checkGo(self, evt=None):
         """
@@ -319,37 +338,17 @@ class BatchPanel(wx.Panel):
             fns = [os.path.join(*self.listRef.getFile(index)[:2]) for index in self.listRef.columnkeys]
             targets = [os.path.join(*self.listTgt.getFile(index)[:2]) for index in self.listTgt.columnkeys]
 
-            # tif support
-            extrainfo = {'ref': {}, 'target': {}}
-            for what in ['ref', 'target']:
-                if what == 'ref':
-                    ffs = fns
-                    ll = self.listRef
-                else:
-                    ffs = targets
-                    ll = self.listTgt
-                for index, fn in enumerate(ffs):
-                    if fn.endswith(tuple(imgfileIO.IMGEXTS_MULTITIFF)):
-                        item = ll.getFile(index)
-                        extrainfo[what][fn] = {}
-                        extrainfo[what][fn]['nt'] = int(item[3])
-                        waves = [int(wave) for wave in item[2].split(',')]
-                        extrainfo[what][fn]['nw'] = len(waves)
-                        extrainfo[what][fn]['waves'] = waves
-                        extrainfo[what][fn]['seq'] = ll.seqs[index]#item[5]
-                        extrainfo[what][fn]['pixsiz'] = ll.pxszs[index]
-
-
             # run program
             parms = [self.flat_suffix_txt.GetValue(),
-                     self.flatimg_suffix_txt.GetValue()]
+                     self.flatimg_suffix_txt.GetValue(),
+                     self.outextch.GetStringSelection()]
 
             gui = threads.GUImanager(self, __name__)
             
-            self.th = threads.ThreadFlat(gui, None, fns, targets, parms, extrainfo)
+            self.th = threads.ThreadFlat(gui, None, fns, targets, parms)#, extrainfo)
             self.th.start()
 
-            C.saveConfig(flat_suffix_txt=parms[0], flatimg_suffix_txt=parms[1], flatfn=fns[0])
+            C.saveConfig(flat_suffix_txt=parms[0], flatimg_suffix_txt=parms[1], flatfn=fns[0], flat_format=parms[2])
             
         else:
             tid = self.th._get_my_tid()
@@ -369,39 +368,33 @@ class BatchPanel(wx.Panel):
         view with viewer
         """
         # prepare viewer
-        if not self.aui:# and (self.parent and not self.parent.aui):
+        if not self.aui:
             if self.parent and not self.parent.aui:
                 self.aui = aui.MyFrame(parent=self.parent)
                 self.parent.aui = self.aui
+                self.aui.Show()
             elif not self.parent:
                 self.aui = aui.MyFrame(parent=self)
-            self.aui.Show()
 
+                self.aui.Show()
+            
+            elif self.parent and self.parent.aui:
+                self.aui = self.parent.aui
 
         # draw
         if isinstance(target, basestring):
-            an = aligner.Chromagnon(target)
-            ext = os.path.splitext(target)[1][1:]
-            exts = imgfileIO.IMGEXTS_MULTITIFF + ('dv', 'mrc')
-            if ext == aligner.PARM_EXT:
+
+            if chromformat.is_chromagnon(target):
                 target_is_image = False
-            elif ext in imgfileIO.IMGEXTS_MULTITIFF:
-                target_is_image = True
-                an.setExtrainfo(self.einfo)
-                an.restoreDimFromExtra()
-            elif ext in ('dv', 'mrc'):
-                target_is_image = True
             else:
-                if an.hdr.type == aligner.IDTYPE:
-                    target_is_image = False
-                else:
-                    target_is_image = True
+                target_is_image = True
+                an = aligner.Chromagnon(target)
         else:
             an = target
             target_is_image = True
 
         if target_is_image:
-            newpanel = aui.ImagePanel(self.aui, an)#target)
+            newpanel = aui.ImagePanel(self.aui, an)
 
         else:
             an.close()

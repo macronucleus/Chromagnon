@@ -57,7 +57,11 @@ def nextFN(path):
     return filename with the next number
     """
     while os.path.exists(path):
-        fn, ext = os.path.splitext(path)
+        if path.endswith('.ome.tif'):
+            fn = path.replace('.ome.tif', '')
+            ext = '.ome.tif'
+        else:
+            fn, ext = os.path.splitext(path)
         digi = _findLastDigit(fn)
         if digi:
             nd = slice(-len(digi))

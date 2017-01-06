@@ -127,6 +127,8 @@ class MultiTiffReader(generalIO.GeneralReader):
             waxis = axes.index('W')
             nw = shape[waxis]
             if nw > 5:
+                # other systems are not always limited to 5 wavelengths
+                temp="""
                 if nz == 1:
                     nz = nw
                     nw = 1
@@ -138,9 +140,10 @@ class MultiTiffReader(generalIO.GeneralReader):
                     while nw % maxw:
                         maxw -= 1
                     nz *= nw // maxw
-                    nw = maxw
+                    nw = maxw"""
         waves = [600, 500, 450, 700, 400][:nw]
 
+        #print waves
         imgSeq = self.findImgSequence(axes[:-2])
         
         p = self.fp.pages[0]
@@ -285,7 +288,8 @@ class ImgSeqReader(generalIO.GeneralReader):
         wrange = xrange(nztw[2] or 1)
         waves = [RGB for i, RGB in enumerate([515, 625, 450, 700, 350]) if i in wrange]
 
-        self.setDim(nx, ny, nztw[0] or 1, nztw[1] or 1, nztw[2] or 1, t, waves, imgSeq, isSwapped=isSwapped)
+        self.isSwapped = isSwapped
+        self.setDim(nx, ny, nztw[0] or 1, nztw[1] or 1, nztw[2] or 1, t, waves, imgSeq)#, isSwapped=isSwapped)
 
     def determineDimFromName(self):
         fns = [os.path.basename(fn) for fn in self.fns]

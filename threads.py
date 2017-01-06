@@ -1,9 +1,13 @@
 
 import os, threading, exceptions, time, sys
 import wx
-import aligner, alignfuncs
-from PriCommon import imgfileIO, flatConv
+from . import alignfuncs, chromformat, aligner
+from PriCommon import bioformatsIO, flatConv
 
+
+# cross platform
+if not getattr(__builtins__, "WindowsError", None):
+    class WindowsError(OSError): pass
 
 ###--- thread-safe gui -----------
 # http://wiki.wxpython.org/LongRunningTasks
@@ -15,6 +19,8 @@ EVT_ABORT_ID = wx.NewId()
 EVT_ERROR_ID = wx.NewId()
 EVT_ECHO_ID = wx.NewId()
 EVT_INITGUESS_ID = wx.NewId()
+EVT_SETFLAT_ID = wx.NewId()
+EVT_CLOSE_PAGE_ID = wx.NewId()
 
 # Dine events
 def BindEvent(win, func, evt_id):
@@ -36,14 +42,13 @@ class ThreadWithExc(threading.Thread):
     '''A thread class that supports raising exception in the thread from
        another thread.
     '''
-    def __init__(self, notify_obj, localChoice, fns, targets, parms, extrainfo={}):
+    def __init__(self, notify_obj, localChoice, fns, targets, parms):
         threading.Thread.__init__(self)
         self.notify_obj = notify_obj
         self.localChoice = localChoice
         self.fns = fns
         self.targets = targets
         self.parms = parms
-        self.extrainfo = extrainfo
         self.img_suffix = aligner.IMG_SUFFIX
         
     def _get_my_tid(self):
@@ -96,6 +101,7 @@ class ThreadWithExc(threading.Thread):
         self.parm_suffix = parms[5]
         self.img_suffix = parms[6]
         nts = parms[7]
+        self.img_ext = parms[8]
         
         saveAlignParam = True
         alignChannels = True
@@ -113,12 +119,13 @@ class ThreadWithExc(threading.Thread):
             # calibration
             for index, fn in enumerate(fns):
                 clk0 = time.clock()
-                an = aligner.Chromagnon(fn)
+               # an = aligner.Chromagnon(fn)
                 # calculation
-                if an.img.hdr.type != aligner.IDTYPE:
+                if not chromformat.is_chromagnon(fn):#hasattr(an.img, 'hdr') or an.img.hdr.type != aligner.IDTYPE:
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
+                    an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
                     an.setZmagSwitch(zmag)#setForceZmag(forceZmag)
                     an.setMaxShift(maxShift)
@@ -164,14 +171,15 @@ class ThreadWithExc(threading.Thread):
                     
                     if local in self.localChoice[1:]:# and not wx.__version__.startswith('2.8'):
                         an.loadParm(fn)
-                        nonlinear = imgfileIO.load(an.saveNonlinearImage())
+                        #nonlinear = bioformatsIO.load(an.saveNonlinearImage())
+                        nonlinear = an.saveNonlinearImage()
                         if self.notify_obj:
                             wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
                         #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fn]))
                         #else:
                         #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fns[index], fn]))
 
-                an.close()
+                    an.close()
                 
                 doneref.append(index)
 
@@ -189,6 +197,28 @@ class ThreadWithExc(threading.Thread):
                     if cutout:
                         an.setRegionCutOut()
 
+                    old='''
+                    import sys
+                    if sys.platform.startswith('win'):#self.notify_obj:
+                        base, ext = os.path.splitext(an.img.filename)
+                        outfn = base + an.img_suffix + an.img_ext
+                        # check open windows (to avoid WindowsError when removing pre-existing file)
+                        #if os.path.isfile(outfn):
+                        #    outfn = fntools.nextFN(outfn)
+                        #this_was_not_enough_probably_because_handler_was_not_closed_yet = """
+                        aui = self.notify_obj.panel.aui
+                        if aui:
+                            for i in xrange(aui.imEditWindows.GetPageCount()):
+                                page = aui.imEditWindows.GetPage(i)
+                                print 'prepSaveFile',  page.doc.filename, fn, page.doc.closed()
+                                if page.doc.filename == outfn and not page.doc.closed():
+                                    print 'trying to close...'
+                                    page.doc.close()
+                                    #self.aui.imEditWindows.DeletePage(i)
+                                    #wx.PostEvent(self.notify_obj, MyEvent(EVT_CLOSE_PAGE_ID, [i]))"""
+                    else:
+                        outfn = None#'''
+
                     out = an.saveAlignedImage()
                     donetgt.append(index)
 
@@ -197,13 +227,9 @@ class ThreadWithExc(threading.Thread):
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
                     
-                    out = aligner.Chromagnon(out)
-                    if type(out.img) == imgfileIO.MultiTiffReader:
-                        einfo = self.extrainfo['target'][target]
-                        out.setExtrainfo(einfo)
-                        out.restoreDimFromExtra()
-                        out.img.imgSequence = 2
+                    #out = aligner.Chromagnon(out)
                     if self.notify_obj:
+                        print 'event view', out
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
 
 
@@ -223,6 +249,7 @@ class ThreadWithExc(threading.Thread):
                     an.setRegionCutOut()
 
                 out = an.saveAlignedImage()
+
                 donetgt.append(index)
 
                 an.close()
@@ -231,13 +258,9 @@ class ThreadWithExc(threading.Thread):
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
 
-                out = aligner.Chromagnon(out)
-                if type(out.img) == imgfileIO.MultiTiffReader:
-                    einfo = self.extrainfo['target'][target]
-                    out.setExtrainfo(einfo)
-                    out.restoreDimFromExtra()
-                    out.img.imgSequence = 2
+                #out = aligner.Chromagnon(out)
                 if self.notify_obj:
+                    print 'event view', out
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
 
         except MyError:
@@ -258,6 +281,7 @@ class ThreadWithExc(threading.Thread):
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
             else:
                 pass
+        #bioformatsIO.uninit_javabridge()
 
     def getAligner(self, fn, index, what='ref'):
         """
@@ -266,16 +290,11 @@ class ThreadWithExc(threading.Thread):
         try:
             an = aligner.Chromagnon(fn)
             an.setImgSuffix(self.img_suffix)
+            an.setFileFormats(self.img_ext)
             an.setParmSuffix(self.parm_suffix)
 
         except IOError:
             raise IOError, 'filename %s, index %i, fns %s' % (fn, index, fns)
-
-        if type(an.img) == imgfileIO.MultiTiffReader:
-            einfo = self.extrainfo[what][fn]
-
-            an.setExtrainfo(einfo)
-            an.restoreDimFromExtra()
 
 
         an.setEchofunc(self.echo)
@@ -305,6 +324,11 @@ class GUImanager(wx.EvtHandler):
         BindEvent(self, self.OnEcho, EVT_ECHO_ID)
 
         BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
+
+        BindEvent(self, self.OnSetFlat, EVT_SETFLAT_ID)
+
+        BindEvent(self, self.OnClosePage, EVT_CLOSE_PAGE_ID)
+
 
         self.OnStart()
         
@@ -403,14 +427,22 @@ class GUImanager(wx.EvtHandler):
     def OnInitGuess(self, evt):
         self.panel._setInitGuess(evt.data[0])
 
+    
+    def OnSetFlat(self, evt):
+        self.panel._setFlat(evt.data)
+
+    def OnClosePage(self, evt):
+        self.panel.aui.imEditWindows.DeletePage(evt.data[0])
+        
 
 class ThreadFlat(ThreadWithExc):
     '''A thread class that supports raising exception in the thread from
        another thread.
     '''
-    def __init__(self, notify_obj, localChoice, fns, targets, parms, extrainfo={}):
-        ThreadWithExc.__init__(self, notify_obj, localChoice, fns, targets, parms, extrainfo)
-            
+    def __init__(self, notify_obj, localChoice, fns, targets, parms):
+        ThreadWithExc.__init__(self, notify_obj, localChoice, fns, targets, parms)
+        
+        
     def run(self):
         """
         This function execute the series of processes
@@ -438,24 +470,26 @@ class ThreadFlat(ThreadWithExc):
         try:
             # calibration
             clk0 = time.clock()
-            an = aligner.Chromagnon(fn)
-            if an.img.hdr.type != flatConv.IDTYPE:
+            #an = aligner.Chromagnon(fn)
+            #if not hasattr(an.img, 'hdr') or an.img.hdr.type != flatConv.IDTYPE:
+            if not flatConv.is_flat(fn):
+                #an = aligner.Chromagnon(fn)
+                print 'The file is not flat file'
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', 0, wx.RED]))
                 self.echo('Making a calibration file...')
+
                 flatFile = flatConv.makeFlatConv(fn, suffix=parms[0])
 
-                out = aligner.Chromagnon(flatFile)
-                if type(out.img) == imgfileIO.MultiTiffReader:
-                    einfo = self.extrainfo['target'][target]
-                    out.setExtrainfo(einfo)
-                    out.restoreDimFromExtra()
-                    out.img.imgSequence = 2
-                wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                #out = aligner.Chromagnon(flatFile)
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [flatFile]))#out]))
                 clk1 = time.clock()
+                #an.close()
             else:
+                print 'The file is a flat file'
                 flatFile = fn
                 
-            an.close()
+           # an.close()
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_SETFLAT_ID, [flatFile]))
             wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', 0, wx.BLUE]))
 
             # remaining target files use the last alignment file
@@ -463,16 +497,13 @@ class ThreadFlat(ThreadWithExc):
                 self.echo('Applying flat fielding to %s...' % os.path.basename(target))
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
 
-                out = flatConv.flatConv(target, flatFile, out=None, suffix=parms[1])
+                base, ext = os.path.splitext(target)
+                out = ''.join((base, parms[1], os.path.extsep, parms[2]))
+                out = flatConv.flatConv(target, flatFile, out=out)#None, suffix=parms[1])
 
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
                 out = aligner.Chromagnon(out)
-                if type(out.img) == imgfileIO.MultiTiffReader:
-                    einfo = self.extrainfo['target'][target]
-                    out.setExtrainfo(einfo)
-                    out.restoreDimFromExtra()
-                    out.img.imgSequence = 2
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
                 donetgt.append(index)
 
@@ -485,7 +516,6 @@ class ThreadFlat(ThreadWithExc):
             wx.PostEvent(self.notify_obj, MyEvent(EVT_ERROR_ID, sys.exc_info()))#formatted]))
         else:
             wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
-
 
 # from stopit
 def async_raise(target_tid, exception):

@@ -1,21 +1,36 @@
 __author__ = "Atsushi Matsuda"
 
-import alignfuncs, aligner, listbox, chromeditor, threads, flatfielder, main, testfuncs
 
+
+from . import cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, main
+
+reload(cutoutAlign)
 reload(alignfuncs)
+reload(chromformat)
 reload(aligner)
-reload(listbox)
 reload(chromeditor)
 reload(threads)
 reload(flatfielder)
 reload(main)
-reload(testfuncs)
+try:
+    from . import testfuncs
+    reload(testfuncs)
+except ImportError:
+    pass
 
 __version__ = main.__version__
+
 
 #######
 # Version history
 #
+# v0.5
+# 1. Warning message for init guess was changed slightly
+# 2. Included Bioformats (affected to aligner.py, ndviewer, listbox.py)
+# 3. Added chromformat.py to accomodate string format for wavelength
+# 4. Compatible with OpenCV3.3
+# 5. Fixed instability when opening viewer on Linux
+
 # v0.4
 # 1. Compatible with SIR images after discarding below 0.
 # 2. Added a function to modify the output file suffix by the user.

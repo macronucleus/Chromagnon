@@ -1,12 +1,5 @@
 #!/usr/bin/env priithon
 __version__ = 0.1
-if __name__ == '__main__':
-    from Data import data as D
-    print D.appendPath()
-    #import sys, os
-    #thisDir = os.path.dirname(__file__)
-    #workDir = os.path.dirname(thisDir) # one level higher
-    #sys.path.append(workDir)
 
 from Priithon.all import Mrc, N
 from PriCommon import mrcIO, imgGeo, imgManager

@@ -1,10 +1,10 @@
 from __future__ import with_statement
 from PriCommon.ndviewer import main as aui
-from PriCommon import guiFuncs as G, mrcIO
+from PriCommon import guiFuncs as G, mrcIO, commonfuncs as C
 import wx, wx.lib.mixins.listctrl as listmix
 import os, sys, csv
 from Priithon import Mrc
-import aligner, alignfuncs as af
+from . import aligner, alignfuncs as af, chromformat
 import numpy as N
 
 SIZE_COL0=70
@@ -22,6 +22,8 @@ class ChromagnonEditor(aui.ImagePanel):
         """
         aui.ImagePanel.__init__(self, parent)
 
+        #self.parent = parent # overwrite self.parent
+        
         self.cpanel = ChromagnonPanel(self, fn)
         self._mgr.AddPane(self.cpanel, wx.aui.AuiPaneInfo().Name('cpanel').Caption("cpanel").CenterPane().Position(0))
 
@@ -54,10 +56,23 @@ class ChromagnonPanel(wx.Panel):
 
         # \n
         box = G.newSpaceV(sizer)
-        G.makeTxt(self, box, 'Local: ')
-        self.local_label = G.makeTxt(self, box, self.clist.map_str)
         if self.clist.map_str != 'None':
+            G.makeTxt(self, box, 'Local: ')
+            self.local_label = G.makeTxt(self, box, self.clist.map_str)
             self.viewLocalButton = G.makeButton(self, box, self.onViewLocal, title='View', tip='View local distortion as a image')
+            # \n
+            box = G.newSpaceV(sizer)
+            G.makeTxt(self, box, "The file is a .ome.tif file, and the alignment parameters are stored in it's metadata.")
+        else:
+            # \n
+            box = G.newSpaceV(sizer)
+            G.makeTxt(self, box, 'The file is a text file: rename to ".csv" to open as a spread sheet.')
+
+        # \n\n
+        box = G.newSpaceV(sizer)
+        G.makeTxt(self, box, ' ')
+        box = G.newSpaceV(sizer)
+        G.makeTxt(self, box, 'Pixel size ZYX (um): %.3f  %.3f  %.3f' % tuple(self.clist.creader.pxlsiz))
 
         if self.clist.nt > 1:
             # \n
@@ -85,7 +100,7 @@ class ChromagnonPanel(wx.Panel):
 
         self.saveButton = G.makeButton(self, box, self.onSave, title='Save as...', tip='Save editted parameter into a chromagnon file')#, enable=False)
 
-        self.exportButton = G.makeButton(self, box, self.onExport, title='Export as .csv', tip='Save editted parameter into a comma separated file')
+        #self.exportButton = G.makeButton(self, box, self.onExport, title='Export as .csv', tip='Save editted parameter into a comma separated file')
 
         self.clearButton = G.makeButton(self, box, self.clearSelected, title='Remove selected', tip='Remove one wavelength')
 
@@ -102,44 +117,17 @@ class ChromagnonPanel(wx.Panel):
         parent = self.GetParent()
         book = parent.GetTopLevelParent()
 
+        mapyx = self.clist.mapyx
         name = self.clist.basename + '.Local'
 
-        mapyx = Mrc.bindFile(self.clist.fn)
-        hdr = mapyx.Mrc.hdr
-        nz = hdr.Num[-1] / (hdr.NumTimes * hdr.NumWaves * 2)
-        mapyx = mapyx.reshape((hdr.NumTimes,
-                               hdr.NumWaves,
-                               nz,
-                               2,
-                               hdr.Num[1], 
-                               hdr.Num[0]))  
-        
         if hasattr(parent.doc, 'saveNonlinearImage'):
             parent.doc.mapyx = mapyx
             out = parent.doc.saveNonlinearImage(gridStep=gridStep)
 
         else:
             out = os.path.extsep.join((self.fn, 'local'))
-            
-
-            
-            arr = N.zeros(mapyx.shape[:3]+mapyx.shape[-2:], N.float32)
-            for t in xrange(self.clist.nt):
-                arr[t,:,:,::gridStep,:] = 1.
-                arr[t,:,:,:,::gridStep] = 1.
-            affine = N.zeros((7,), N.float64)
-            affine[-3:] = 1
-
-            canvas = N.empty_like(arr)
-            for t in xrange(self.clist.nt):
-                for w in xrange(self.clist.nw):
-                    canvas[t,w] = af.remapWithAffine(arr[t,w], mapyx[t,w], affine)
-                    
-            hdr = mrcIO.makeHdr_like(hdr)
-            hdr.ImgSequence = 2
-            hdr.Num[-1] = N.prod(mapyx.shape[:3])
-
-            Mrc.save(N.squeeze(canvas), out, hdr=hdr, ifExists='overwrite')
+            self.clist.mapyx = mapyx
+            out = chromformat.makeNonliearImg(self.clist, out, gridStep)
             
         an = aligner.Chromagnon(out)
         newpanel = aui.ImagePanel(book, an)
@@ -169,7 +157,7 @@ class ChromagnonPanel(wx.Panel):
         
     def onSave(self, evt=None):
         """
-        saves self.clist.parm into a chromagnon file
+        saves self.clist.alignParms into a chromagnon file
         """
         # prepare output file name
         base, ext = os.path.splitext(self.clist.basename)
@@ -193,62 +181,19 @@ class ChromagnonPanel(wx.Panel):
             parent.doc.saveParm(out)
 
         else:
-
-            hdr = Mrc.makeHdrArray()
-            Mrc.init_simple(hdr, Mrc.dtype2MrcMode(N.float32), aligner.NUM_ENTRY, 1, self.clist.nt*self.clist.nw)
-            hdr.ImgSequence = 2
-            hdr.PixelType = 2
-            hdr.NumWaves = self.clist.nw
-            hdr.NumTimes = self.clist.nt
-            hdr.wave[:self.clist.nw] = self.clist.waves[:]
-            hdr.d = self.clist.pxlsiz
-            if self.clist.refwave in self.clist.waves:
-                hdr.n1 = list(self.clist.waves).index(self.clist.refwave)
-            else:
-                hdr.n1 = 0
-            hdr.type = aligner.IDTYPE
-
-            if self.clist.map_str == 'None':
-                hdr.n2 = 1
-
-                # squeeze shape
-                parm = N.squeeze(self.clist.parm.reshape((self.clist.nt, self.clist.nw, aligner.NUM_ENTRY)))
-                #parm = N.squeeze(parm)
-                parm = parm.reshape(parm.shape[:-1] + (1,1) + (parm.shape[-1],))
-
-                Mrc.save(parm, out, hdr=hdr, ifExists='overwrite')
-            else:
-                hdr.NumFloats = self.clist.parm.shape[-1]
-                hdr.NumIntegers = 1
-
-                parm = self.clist.parm.reshape((self.clist.nt * self.clist.nw, aligner.NUM_ENTRY))
-                extFloats = N.zeros((self.clist.nt * self.clist.nw * self.clist.nz * 2, aligner.NUM_ENTRY), N.float32)
-
-                extFloats[:self.clist.nt * self.clist.nw] = parm
-
-                mapyx = Mrc.bindFile(self.clist.fn)
-                nz = mapyx.Mrc.hdr.Num[-1] / (mapyx.Mrc.hdr.NumTimes * mapyx.Mrc.hdr.NumWaves * 2)
-                mapyx = mapyx.reshape((mapyx.Mrc.hdr.NumTimes,
-                                       mapyx.Mrc.hdr.NumWaves,
-                                       nz*2,
-                                       mapyx.Mrc.hdr.Num[1], 
-                                       mapyx.Mrc.hdr.Num[0]))                                       
-
-                hdr.Num[0] = mapyx.shape[-1]
-                hdr.Num[1] = mapyx.shape[-2]
-                hdr.Num[2] = N.prod(mapyx.shape[:-2])
-                hdr.n2 = 2
-
-                o = mrcIO.MrcWriter(out, hdr, extFloats=extFloats)
-                for t in range(self.clist.nt):
-                    for w in range(self.clist.nw):
-                        o.write3DArr(mapyx[t,w], w=w, t=t)
-                o.close()
+           # if self.clist.map_str != 'None':
+                
+            self.clist.mapyx = None#self.clist.map_str
+            #self.refwave = self.clist.refwave
+            self.clist.alignParms = self.clist.alignParms.reshape((self.clist.nt, self.clist.nw, aligner.NUM_ENTRY))
+            #self.ny = self.clist.n
+            
+            self.cwriter = chromformat.ChromagnonWriter(out, self.clist, self.clist)
 
 
     def onExport(self, evt=None):
         """
-        export self.clist.parm as a .csv file
+        export self.clist.alignParms as a .csv file
         """
         # prepare output file name
         base, ext = os.path.splitext(self.clist.basename)
@@ -268,7 +213,7 @@ class ChromagnonPanel(wx.Panel):
             writer.writerow(['time','wavelength']+aligner.ZYXRM_ENTRY)
             for t in xrange(self.clist.nt):
                 for w, wave in enumerate(self.clist.waves):
-                    l = list(self.clist.parm[t,w])
+                    l = list(self.clist.alignParms[t,w])
                     writer.writerow([t,wave]+l)
 
     def OnItemSelected(self, evt=None):
@@ -287,7 +232,7 @@ class ChromagnonPanel(wx.Panel):
         
     def clearSelected(self, evt=None):
         """
-        clear selected item from the list and self.clist.parm
+        clear selected item from the list and self.clist.alignParms
         """
         inds = self.selected
 
@@ -295,7 +240,7 @@ class ChromagnonPanel(wx.Panel):
         for i in inds[::-1]:
             
             self.clist.DeleteItem(i)
-            self.clist.parm = N.delete(self.clist.parm, i, axis=1)
+            self.clist.alignParms = N.delete(self.clist.alignParms, i, axis=1)
             if self.clist.waves[i] == self.clist.refwave:
                 refwave_deleted = True
             self.clist.waves = N.delete(self.clist.waves, i)
@@ -309,7 +254,7 @@ class ChromagnonPanel(wx.Panel):
 
     def addRow(self, evt=None):
         """
-        add a row to the list and self.clist.parm
+        add a row to the list and self.clist.alignParms
         """
         if self.clist.nw >= 5:
             G.openMsg(self, 'The maximum wavelength is 5', 'I am sorry for that')
@@ -317,15 +262,15 @@ class ChromagnonPanel(wx.Panel):
         
         index = self.clist.InsertStringItem(sys.maxint, '0')
 
-        self.clist.parm = N.insert(self.clist.parm, self.clist.parm.shape[1], 0, axis=1)
-        self.clist.parm[:,-1,-3:] = 1
+        self.clist.alignParms = N.insert(self.clist.alignParms, self.clist.alignParms.shape[1], 0, axis=1)
+        self.clist.alignParms[:,-1,-3:] = 1
 
         waves = list(self.clist.waves)
         waves.append(0)
         self.clist.waves = N.array(waves)
         self.clist.nw = len(self.clist.waves)
         
-        for i, p in enumerate(self.clist.parm[self.clist.t,index]):
+        for i, p in enumerate(self.clist.alignParms[self.clist.t,index]):
             self.clist.SetStringItem(index, i+1, str(p))
         
 class ChromagnonList(wx.ListCtrl,
@@ -333,7 +278,7 @@ class ChromagnonList(wx.ListCtrl,
                      listmix.TextEditMixin):
     """
     The list to display alignment parameters
-    The actual data is stored in self.parm
+    The actual data is stored in self.alignParms
     """
     def __init__(self, parent, fn):
         """
@@ -354,35 +299,22 @@ class ChromagnonList(wx.ListCtrl,
     def readFile(self):
         """
         get header information
-        set self.parm
+        set self.alignParms
         """
-        arr = Mrc.bindFile(self.fn)
-        self.pxlsiz = arr.Mrc.hdr.d
-        self.waves = arr.Mrc.hdr.wave[:arr.Mrc.hdr.NumWaves].copy()
-        self.refwave = self.waves[arr.Mrc.hdr.n1]
-        self.XYsize = arr.Mrc.hdr.Num[:2]
-        self.nt = arr.Mrc.hdr.NumTimes
-        self.nw = len(self.waves)
+        self.creader = chromformat.ChromagnonReader(self.fn, self, self)
+        #print self.alignParms.shape
+        self.waves = self.wave[:self.nw]
         self.t = 0
-        self.dtype = arr.dtype.type
 
-        if arr.Mrc.hdr.n2 == 1:
-            parm = arr
-            nentry = aligner.NUM_ENTRY
+        if not hasattr(self, 'mapyx'):
             self.map_str = 'None'
         else:
-            parm = arr.Mrc.extFloats[:arr.Mrc.hdr.NumTimes * arr.Mrc.hdr.NumWaves,:arr.Mrc.hdr.NumFloats]
-            nentry = arr.Mrc.hdr.NumFloats
-            self.nz = arr.Mrc.hdr.Num[-1] / (arr.Mrc.hdr.NumTimes * arr.Mrc.hdr.NumWaves * 2)
-            maxval = arr.max()
+            maxval = self.mapyx.max()
             if self.nz == 1:
                 self.map_str = 'Projection (max shift %.3f pixel)' % maxval
             else:
                 self.map_str = 'Section-wise'
-        parm = parm.reshape((arr.Mrc.hdr.NumTimes, arr.Mrc.hdr.NumWaves, nentry))
-        self.parm = parm.copy() # writable
 
-        del arr, parm
 
     def populate(self):
         """
@@ -400,7 +332,7 @@ class ChromagnonList(wx.ListCtrl,
             # column 0
             index = self.InsertStringItem(sys.maxint, str(wave))
             # subsequent columns
-            for i, p in enumerate(self.parm[self.t,w]):
+            for i, p in enumerate(self.alignParms[self.t,w]):
                 self.SetStringItem(index, i+1, str(p))
 
     def set_tSlice(self, t=0):
@@ -416,7 +348,7 @@ class ChromagnonList(wx.ListCtrl,
         
         self.t = t
         for index in xrange(len(self.waves)):
-            for i, p in enumerate(self.parm[t, index]):
+            for i, p in enumerate(self.alignParms[t, index]):
                 self.SetStringItem(index, i+1, str(p))
         for w in range(self.nw):
             self.applyGraphics(w)
@@ -427,7 +359,7 @@ class ChromagnonList(wx.ListCtrl,
         Called when the user try to edit the list
         (also called in populate())
 
-        changes self.parm and upadte graphics.
+        changes self.alignParms and upadte graphics.
 
         index: wavelength idx
         col: column
@@ -435,7 +367,7 @@ class ChromagnonList(wx.ListCtrl,
         """
         val = eval(data)
         if col:
-            self.parm[self.t, index, col-1] = val
+            self.alignParms[self.t, index, col-1] = val
         else:
             self.waves[index] = val
 
@@ -446,14 +378,14 @@ class ChromagnonList(wx.ListCtrl,
 
     def applyGraphics(self, w=0):
         """
-        update graphics according to the current self.parm
+        update graphics according to the current self.alignParms
         w: wave idx
         """
         parent = self.GetParent().GetParent() # chromagnonPanel->chromagnonEditor
         pps = parent._mgr.GetAllPanes()
         if any([pp.name == 'XY' for pp in pps]):
-            parent.doc.setAlignParam(self.parm)
-            alignParm = self.parm[self.t, w]
+            parent.doc.setAlignParam(self.alignParms)
+            alignParm = self.alignParms[self.t, w]
             for v in parent.viewers:
                 v.updateAlignParm(w, alignParm)
 
@@ -468,7 +400,8 @@ class TestViewPanel(wx.Panel):
 
         sizeX = parent.GetSize()[0] - parent.cpanel.clist.GetSize()[0]
         wx.Panel.__init__(self, parent, -1, size=(sizeX,-1))
-
+        #self.parent = parent
+        
         # start drawing
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(sizer)
@@ -489,15 +422,22 @@ class TestViewPanel(wx.Panel):
         get image file
         call self.view()
         """
+        confdic = C.readConfig()
+        lastpath = confdic.get('lastpath', '')
+        #parent = self.GetTopLevelParent()
         if os.name == 'posix':
-            dlg = G.FileSelectorDialog(self)
+            dlg = G.FileSelectorDialog(self, lastpath)
         else:
-            dlg = wx.FileDialog(self, 'Choose a file')
+            dlg = wx.FileDialog(self, 'Choose a file', defaultDir=lastpath)
 
         if dlg.ShowModal() == wx.ID_OK:
             fn = dlg.GetPath()
+        else:
+            return
 
         self.view(fn)
+
+        C.saveConfig(lastpath=os.path.dirname(fn))
             
     def view(self, fn):
         """
@@ -525,6 +465,12 @@ class TestViewPanel(wx.Panel):
         cpanel = parent.cpanel
         #ll = cpanel.getList()
 
+        creader = cpanel.clist.creader
+        creader.rdr = self.doc.img
+        creader.holder = self.doc
+        creader.loadParm()
+
+        old="""
         dratio = cpanel.clist.pxlsiz / self.doc.img.hdr.d
         dratio = dratio[::-1] # zyx
         
@@ -553,16 +499,16 @@ class TestViewPanel(wx.Panel):
         target = N.zeros((cpanel.clist.nt, self.doc.img.nw, aligner.NUM_ENTRY), cpanel.clist.dtype)
         target[:,:,4:] = 1
 
-        target[:,tids] = cpanel.clist.parm[:,pids]
+        target[:,tids] = cpanel.clist.alignParms[:,pids]
         for w in [w for w, wave in enumerate(twaves) if wave not in pwaves]:
-            target[:,w] = cpanel.clist.parm[:,self.doc.refwave]
+            target[:,w] = cpanel.clist.alignParms[:,self.doc.refwave]
         target[:,:,:3] *= dratio
 
-        self.doc.setAlignParam(target)
+        self.doc.setAlignParam(target)"""
 
         parent.doc = self.doc
 
-        parent.cpanel.clist.parm = target
+        #parent.cpanel.clist.alignParms = target
         parent.cpanel.clist.set_tSlice(0)
 
 def setMapyx(fn, doc):

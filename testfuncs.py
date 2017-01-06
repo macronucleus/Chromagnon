@@ -3,7 +3,7 @@ import numpy as N
 from Priithon.all import P, U, Mrc
 
 from PriCommon import xcorr, imgGeo
-import aligner, alignfuncs
+from . import aligner, alignfuncs
 
 import os, tempfile
 

@@ -6,7 +6,7 @@ if hasattr(sys, 'app'):
     from PriCommon import ppro
 else:
     from PriCommon import ppro26 as ppro
-import cutoutAlign
+from . import cutoutAlign
 from scipy import ndimage
 import exceptions
 
@@ -39,6 +39,7 @@ def chopImg(a2d, center=None):
     """
     if center is None:
         center = N.array(a2d.shape) // 2
+    center = [int(c) for c in center]
     r1 = a2d[center[0]:,center[1]:]
     r2 = a2d[center[0]:,:center[1]]
     r3 = a2d[:center[0],:center[1]]
@@ -199,8 +200,8 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             shiftZYX = cutoutAlign.getShift([0]+list(ret), [0]+list(shape))
             maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
             maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-            slc = [slice(maxcutY, shape[0]-maxcutY),
-                   slice(maxcutX, shape[1]-maxcutX)]
+            slc = [slice(int(maxcutY), int(shape[0]-maxcutY)),
+                   slice(int(maxcutX), int(shape[1]-maxcutX))]
             b = b[slc]
             c = ref[slc]
 
@@ -299,8 +300,8 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
             shiftZYX = cutoutAlign.getShift([0]+list(yxs)+[0,1,1], [0]+list(shape))
             maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
             maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-            slc = [slice(shiftZYX[2], shiftZYX[3]),
-                   slice(shiftZYX[4], shiftZYX[5])]
+            slc = [slice(int(shiftZYX[2]), int(shiftZYX[3])),
+                   slice(int(shiftZYX[4]), int(shiftZYX[5]))]
             b = b[slc]
             c = ref[slc]
 
@@ -353,8 +354,8 @@ def _compCost(yxrm, a, b):
     shiftZYX = cutoutAlign.getShift([0]+list(yxrm), [0]+list(shape))
     maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
     maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-    slc = [slice(maxcutY, shape[0]-maxcutY),
-           slice(maxcutX, shape[1]-maxcutX)]
+    slc = [slice(int(maxcutY), int(shape[0]-maxcutY)), # VisibleDeprecationWarning 20161216
+           slice(int(maxcutX), int(shape[1]-maxcutX))]
     a = a[slc]
     b = b[slc]
 
@@ -813,8 +814,11 @@ def paddYX(yx, npxl, shape, maxcutY=0, maxcutX=0):
     #-- fill the mergin
     shape = N.array(shape)
     ndiv = shape // npxl
-    start = (shape - (npxl * ndiv)) // 2
-    stop = start + (npxl * ndiv)
+    start = [int(i) for i in (shape - (npxl * ndiv)) // 2]
+    stop = [int(i) for i in start + (npxl * ndiv)] # VisibleDeprecationWarning
+    maxcutY = int(maxcutY)
+    maxcutX = int(maxcutX)
+    shape = [int(i) for i in shape]
 
     zeros = N.zeros((2,)+tuple(shape), N.float32)
     zeros[:,start[0]+maxcutY:start[0]+yx.shape[1]+maxcutY,start[1]+maxcutX:start[1]+yx.shape[2]+maxcutX] += yx
@@ -984,8 +988,8 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
         shiftZYX = cutoutAlign.getShift(affine, [0]+list(shape))
         maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
         maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-        slc = [slice(maxcutY, shape[0]-maxcutY),
-               slice(maxcutX, shape[1]-maxcutX)]
+        slc = [slice(int(maxcutY), int(shape[0]-maxcutY)),
+               slice(int(maxcutX), int(shape[1]-maxcutX))]
 
     if initGuess is not None:
         ret += initGuess
@@ -1074,7 +1078,8 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
         wins.append(win)
 
     currentGuess = initGuess
-    yx_acc = N.zeros((2,) + tuple(shape//wins[-1]), N.float32) #2**series, 2**series), N.float32)
+    tmp_shape = [int(n) for n in (2,) + tuple(shape//wins[-1])] # VisibleDeprecationWarning
+    yx_acc = N.zeros(tmp_shape, N.float32)#(2,) + tuple(shape//wins[-1]), N.float32) #2**series, 2**series), N.float32)
     
     for i, win in enumerate(wins):
         old="""

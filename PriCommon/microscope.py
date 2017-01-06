@@ -64,9 +64,10 @@ def laserM2(m2=1.05, wave=488, diam_mm=1, distance_mm=1000):
 
 #------------ color LUT -----------------#
 
-COLOR_TABLE=[(1,0,1),   (0,0,1), (0,1,1), (0,1,0), (1,1,0),  (1,0,0), (1,1,1), (0,0,0)]
-COLOR_NAME =['purple', 'blue',  'cyan',  'green', 'yellow', 'red', 'white', 'black']
-WAVE_CUTOFF=[400,       450,     500,     530,     560,      660,   800,     1100]
+COLOR_TABLE=[(1,0,1),   (0,0,1), (0,1,1), (0,1,0), (1,1,0),  (1,0,0), (1,0,1), (1,1,1)]
+COLOR_NAME =['purple', 'blue',  'cyan',  'green', 'yellow', 'red', 'purple', 'white']
+#WAVE_CUTOFF=[400,       450,     500,     530,     560,      660,   800,     1100]
+WAVE_CUTOFF=[420,       460,     500,     540,      580,     640,    700,   1100]
 
 def LUT(wave):
     """
