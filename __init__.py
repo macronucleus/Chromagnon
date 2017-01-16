@@ -30,6 +30,7 @@ __version__ = main.__version__
 # 3. Added chromformat.py to accomodate string format for wavelength
 # 4. Compatible with OpenCV3.3
 # 5. Fixed instability when opening viewer on Linux
+# 6. Fixed "nan" pixels in uint8 image after local alignment
 
 # v0.4
 # 1. Compatible with SIR images after discarding below 0.

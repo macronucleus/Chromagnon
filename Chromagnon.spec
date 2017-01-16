@@ -5,7 +5,7 @@
 # conda install appdirs
 
 # execute like...
-# pyinstaller --clean E:\py\chromagnon\Chromagnon.spec
+# pyinstaller --clean --upx_dir=upx392w E:\py\chromagnon\Chromagnon.spec
 
 block_cipher = None
 
