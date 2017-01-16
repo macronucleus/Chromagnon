@@ -246,9 +246,6 @@ class DynamicList(object):
     def __contains__(self, y):
         return y in self._list
 
-    def __getslice__(self, i, j):
-        return [self.__getitem__(x) for x in range(i, j)]
-
     def __iter__(self):
         return iter([self.__getitem__(idx) for idx in xrange(len(self._list))])
 
@@ -665,8 +662,61 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
             xywh[2:] = self.roi_size[1:][::-1]
             xywh = tuple(xywh)
 
+        # spectral imaging of Olympus microscope was not read correctly by Bioformats
+        # here is the workaround
+        if self.file.endswith('oib') and self.imgSequence == 2 and self.nw > 4:
+            t, z, w = self.convertFileIdx(t, z, w)
         return self.fp.read(c=w, z=z, t=t, series=self.series, rescale=False, XYWH=xywh)[::-1]
 
+    # reading file
+    def convertFileIdx(self, t=0, z=0, w=0, targetSeq=1):
+        """
+        return section_number in the file
+        """
+        if targetSeq == 0:
+            i = w*self.nt*self.nz + t*self.nz + z
+        elif targetSeq == 1:
+            i = t*self.nz*self.nw + z*self.nw + w
+        elif targetSeq == 2:
+            i = t*self.nz*self.nw + w*self.nz + z
+        elif targetSeq == 3:
+            i = w*self.nz*self.nt + z*self.nt + t
+        elif targetSeq == 4:
+            i = z*self.nt*self.nw + t*self.nw + w
+        elif targetSeq == 5:
+            i = z*self.nw*self.nt + w*self.nt + t
+
+        if self.imgSequence == 0:
+            w = i // (self.nt * self.nz)
+            ii = i // (w+1)
+            t = ii // self.nz
+            z = ii - ((t+1) * self.nz)
+        elif self.imgSequence == 1:
+            t = i // (self.nz * self.nw)
+            ii = i // (t+1)
+            z = ii // self.nw
+            w = ii - (z * self.nw)
+        elif self.imgSequence == 2:
+            t = i // (self.nw * self.nz)
+            ii = i // (t+1)
+            w = ii // self.nz
+            z = ii - (w * self.nz)
+        elif self.imgSequence == 3:
+            w = i // (self.nz * self.nt)
+            ii = i // (w+1)
+            z = ii // self.nt
+            t = ii - ((z+1) * self.nt)
+        elif self.imgSequence == 4:
+            z = i // (self.nt * self.nw)
+            ii = i // (z+1)
+            t = ii // self.nw
+            w = ii - ((t+1) * self.nw)
+        elif self.imgSequence == 5:
+            z = i // (self.nw * self.nt)
+            ii = i // (w+1)
+            w = ii // self.nt
+            t = ii - ((w+1) * self.nt)
+        return t, z, w
 
 class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
     def __init__(self, fn):

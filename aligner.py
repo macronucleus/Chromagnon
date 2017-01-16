@@ -411,7 +411,7 @@ class Chromagnon(object):#im.ImageManager):
                 img = self.img.get3DArr(w=w, t=t)
                 # get initial guess if no initial guess was given
                 if doXcorr:
-                    self.echo('makeing an initial guess for wave %i' % w)
+                    self.echo('makeing an initial guess for channel %i' % w)
                     ref = self.img.get3DArr(w=self.refwave, t=t)
                     prefyx = N.max(ref, 0)
                     pimgyx = N.max(img, 0)
@@ -422,7 +422,7 @@ class Chromagnon(object):#im.ImageManager):
                     ret[w,1:3] = yx
                     del ref, c
                 # create 2D projection image
-                self.echo('calculating shifts for wave %i' % w)
+                self.echo('calculating shifts for channel %i' % w)
                 xs = N.round_(self.refxs-ret[w,2]).astype(N.int)
                 if xs.max() >= self.img.nx:
                     xsbool = (xs < self.img.nx)
@@ -503,11 +503,12 @@ class Chromagnon(object):#im.ImageManager):
             if (doWave and w == self.refwave) or (not doWave and w != self.refwave):
                 continue
 
-            self.echo('3D cross correlation for wave %i' % w)
-            #img = self.get3DArrayAligned(w=w, t=t)
-            #zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
-            #self.alignParms[t,w,:3] += zyx
-            #print 'the result of the last correlation', zyx
+            self.echo('3D cross correlation for channel %i' % w)
+            img = self.get3DArrayAligned(w=w, t=t)
+            zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+            self.alignParms[t,w,:3] += zyx
+            print 'the result of the last correlation', zyx
+        self.echo('Finding affine parameters done!')
 
     ##-- non linear ----
     def findNonLinear2D(self, t=0, npxls=af.MIN_PXLS_YX, phaseContrast=True):
@@ -569,7 +570,7 @@ class Chromagnon(object):#im.ImageManager):
             # add final 3D corss correlation
             # this is not necessary if 3D cross correlation was done in global registration
             old="""
-            self.echo('The final cross correlation for wave %i' % w)
+            self.echo('The final cross correlation for channel %i' % w)
             img = self.get3DArrayRemapped(w=w, t=t)
 
             searchRad = self.max_shift_pxl * 2
@@ -589,7 +590,8 @@ class Chromagnon(object):#im.ImageManager):
                 self.alignParms[t,w,:3] += zyx
                 print 'the result of the last correlation', zyx
             del img, ref, c"""
-            
+
+        self.echo('Projection local alignment done')
         return arr2
 
     def findNonLinear3D(self, t=0, npxls=32, phaseContrast=True):
@@ -980,7 +982,6 @@ class Chromagnon(object):#im.ImageManager):
         if not out:
             out = os.path.extsep.join((self.img.filename, 'local', 'ome', 'tif'))
 
-        
         try:
             return chromformat.makeNonliearImg(self, out, gridStep)
         except OSError:#WindowsError:

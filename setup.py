@@ -151,6 +151,9 @@ elif sys.platform == 'win32' and sys.argv[1] == 'py2exe':
                 #'optimize':0, # No optimization possible for javabridge is added as data_files
                 # instead call this script as
                 # >>> python -OO setup.py py2exe --> pyo did not work for javabridge and others
+                #'unbuffered': True,
+                'custom_boot_script': os.path.join(os.path.dirname(chrodir), 'PriCommon', 'win_runtime.py'),
+                'dist_dir': folder,
                'excludes': excludes,
                'skip_archive': True, # to make javabridge importable
                "dll_excludes": ["MSVCP90.dll", 'api-ms-win-core-string-obsolete-l1-1-0.dll', 'api-ms-win-core-largeinteger-l1-1-0.dll', 'api-ms-win-core-stringansi-l1-1-0.dll', 'api-ms-win-core-privateprofile-l1-1-1.dll', 'api-ms-win-core-rtlsupport-l1-2-0.dll', "api-ms-win-core-libraryloader-l1-2-0.dll", 'api-ms-win-mm-time-l1-1-0.dll', 'api-ms-win-core-debug-l1-1-1.dll', 'api-ms-win-core-sidebyside-l1-1-0.dll', 'api-ms-win-core-kernel32-legacy-l1-1-1.dll', 'api-ms-win-core-timezone-l1-1-0.dll', 'api-ms-win-core-processenvironment-l1-2-0.dll', 'api-ms-win-core-util-l1-1-0.dll', 'api-ms-win-core-atoms-l1-1-0.dll', 'api-ms-win-core-winrt-error-l1-1-1.dll', 'api-ms-win-core-delayload-l1-1-1.dll', 'api-ms-win-core-shlwapi-obsolete-l1-2-0.dll', 'api-ms-win-core-localization-obsolete-l1-3-0.dll', "api-ms-win-core-string-l1-1-0.dll", "api-ms-win-core-libraryloader-l1-2-2.dll", "api-ms-win-core-registry-l1-1-0.dll", "api-ms-win-core-string-l2-1-0.dll", "api-ms-win-core-profile-l1-1-0.dll", "api-ms-win-core-processthreads-l1-1-2.dll", "api-ms-win-core-file-l1-2-1.dll", "api-ms-win-core-heap-l1-2-0.dll","api-ms-win-core-heap-l2-1-0.dll","api-ms-win-core-localization-l1-2-1.dll","api-ms-win-core-sysinfo-l1-2-1.dll","api-ms-win-core-synch-l1-2-0.dll","api-ms-win-core-errorhandling-l1-1-1.dll", "api-ms-win-core-registry-l2-2-0.dll", "api-ms-win-security-base-l1-2-0.dll","api-ms-win-core-handle-l1-1-0.dll","api-ms-win-core-io-l1-1-1.dll","api-ms-win-core-com-l1-1-1.dll","api-ms-win-core-memory-l1-1-2.dll","libzmq.pyd","geos_c.dll","api-ms-win-core-string-l1-1-0.dll","api-ms-win-core-string-l2-1-0.dll","api-ms-win*.dll","api-ms-win-core-libraryloader-l1-2-1.dll","api-ms-win-eventing-provider-l1-1-0.dll","api-ms-win-core-libraryloader-l1-2-2.dll","api-ms-win-core-version-l1-1-1.dll","api-ms-win-core-version-l1-1-0.dll", 'crypt32.dll']}
@@ -160,8 +163,8 @@ elif sys.platform == 'win32' and sys.argv[1] == 'py2exe':
 
     extra_options = dict(
          setup_requires=['py2exe'],
-         #console=[{'script': mainscript, 'dest_base': 'Chromagnon'}],
-         windows=[{'script': mainscript, 'dest_base': 'Chromagnon'}],
+         console=[{'script': mainscript, 'dest_base': 'Chromagnon'}],
+         #windows=[{'script': mainscript, 'dest_base': 'Chromagnon'}],
          data_files=data_files,
          options={'py2exe': OPTIONS},
               )
@@ -188,7 +191,7 @@ setup(
     **extra_options
 )
 
-if sys.argv[1].startswith('py2'):
+if sys.argv[1].startswith('py2app'):
     # rename the dist folder
     os.rename('dist', folder)
 

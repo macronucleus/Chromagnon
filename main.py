@@ -9,7 +9,9 @@ __version__ = '0.50'
 
 import sys, os
 
+#old="""
 #### javabridge for py2exe
+# following workaround should be put before importing anything involved.
 INIT = False
 import imp
 def main_is_frozen():
@@ -36,11 +38,16 @@ def init_java_home():
                 os.environ['JDK_HOME'] = jdk
             if not os.getenv('JAVA_HOME'):
                 os.environ['JAVA_HOME'] = jdk
+
+            #if sys.platform.startswith('win') and cwd not in os.getenv('PATH'):
+            #    os.environ['PATH'] = cwd + ';' + os.environ['PATH']
+            #    print 'path set at ', cwd
+                
             INIT = True
         else:
             print 'this is not frozen'
 
-init_java_home()
+init_java_home()#"""
 #from PriCommon import bioformatsIO
 #print bioformatsIO.locate.find_jdk()
 
@@ -360,16 +367,8 @@ class BatchPanel(wx.Panel):
             
         if dlg.ShowModal() == wx.ID_OK:
             fn = dlg.GetPath()
-            an = aligner.Chromagnon(fn)
-            if an.img.hdr.type == aligner.IDTYPE:
+            if chromformat.is_chromagnon(fn, True):
                 self._setInitGuess(fn)
-                old="""
-                self.initGuess.clearAll()
-                self.initGuess.addFile(fn)
-                self.clearInitguessButton.Enable(1)
-                C.saveConfig(initguess=fn)"""
-                #self.initGuess.SetValue(fn)
-                #self.initGuess.SetForegroundColour(wx.BLACK)
             else:
                 G.openMsg(parent=self, msg='The file is not a valid chromagnon file', title="Warning")
             an.close()
