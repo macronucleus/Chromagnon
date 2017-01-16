@@ -702,6 +702,7 @@ def makeNonliearImg(holder, out, gridStep=10):
         writer.setFromReader(holder.creader)
     if holder.mapyx.ndim == 5:
         writer.nz = 1
+    writer.dtype = N.float32
 
     for t in xrange(holder.nt):
         for w in xrange(holder.nw):

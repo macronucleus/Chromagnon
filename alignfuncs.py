@@ -1082,10 +1082,6 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
     yx_acc = N.zeros(tmp_shape, N.float32)#(2,) + tuple(shape//wins[-1]), N.float32) #2**series, 2**series), N.float32)
     
     for i, win in enumerate(wins):
-        old="""
-        win = int(win)
-        if win % 2:
-            win -= 1"""
         if echofunc:
             echofunc('--current window size: %i' % win)
         yxc, regions, arr2 = iterNonLinear(arr, ref, npxl=win, affine=affine, initGuess=currentGuess, threshold=threshold, phaseContrast=phaseContrast, niter=niter, maxErr=maxErr, cthre=cthre, echofunc=echofunc)
@@ -1120,7 +1116,7 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
 
     if initGuess is not None:
         yxs += initGuess
-        
+
     return yxs, regions, arr2#, thre, yx_acc
 
 

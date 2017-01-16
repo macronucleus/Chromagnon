@@ -67,7 +67,7 @@ if sys.argv[1] in ('py2exe', 'py2app'):
 # ------- options ----------------------
 
 
-excludes = ['matplotlib', 'pylab', 'PIL', 'Tkinter', 'Tkconstants', 'tcl',  'doctest', 'pydoc', 'pdb', 'email', 'OMXlab', 'tenohira', 'packages']
+excludes = ['matplotlib', 'pylab', 'PIL', 'Tkinter', 'Tkconstants', 'tcl',  'doctest', 'pydoc', 'pdb', 'email', 'OMXlab', 'OMXlab2', 'tenohira', 'packages']
 
 
 # ------- Platform ----------------------
@@ -83,7 +83,7 @@ if sys.platform == 'darwin' and sys.argv[1] == 'py2app':
 
     # fftw3 and numpy
     ll = os.listdir(libdir)
-    libs = ['libfftw3', 'libmkl']
+    libs = ['libfftw3', 'libmkl_avx', 'libmkl_core', 'libmkl_intel', 'libmkl_mc']
     frameworks = []
     for lib in libs:
         pat = re.compile('%s.*?dylib' % lib)

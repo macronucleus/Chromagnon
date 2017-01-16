@@ -522,15 +522,8 @@ class Chromagnon(object):#im.ImageManager):
 
         # preparing the initial mapyx
         # mapyx is not inherited to avoid too much distortion
-        self.mapyx = N.empty((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
+        self.mapyx = N.zeros((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
 
-        # mapyx is inherited 20160727
-        canceled = """ 20160830
-        if self.mapyx is None:
-            self.mapyx = N.empty((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
-        elif self.mapyx.ndim == 6:
-            self.mapyx = N.mean(self.mapyx, axis=2)"""
-            
         if N.all((N.array(self.mapyx.shape[-2:]) - self.img.shape[-2:]) >= 0):
             slcs = imgGeo.centerSlice(self.mapyx.shape[-2:], win=self.img.shape[-2:], center=None)
             self.mapyx = self.mapyx[slcs] # Ellipsis already added #[Ellipsis]+slcs]
@@ -557,9 +550,12 @@ class Chromagnon(object):#im.ImageManager):
                 del img
             else:
                 imgyx = N.squeeze(self.img.get3DArr(w=w, t=t))
-            
+
             affine = self.alignParms[t,w]
 
+            imgyx = imgyx.astype(N.float32)
+            self.refyx = self.refyx.astype(N.float32)
+            
             yxs, regions, arr2 = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, cthre=self.cthre, echofunc=self.echofunc)
 
             self.mapyx[t,w] = yxs
@@ -865,14 +861,9 @@ class Chromagnon(object):#im.ImageManager):
             raise RuntimeError, 'This method must be called after calling "findNonLinear2D"'
         
         arr = self.img.get3DArr(w=w, t=t)
-        
-        #self.img.close() # to avoid the error (too many open files) on Mac with multiprocessing
+            
         arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
-        #self.img = im.load(os.path.join(self.dirname, self.file))
-        #self.restoreDimFromExtra()
-        
-        #arr = arr[self._zIdx]
-        arr = arr[self.cropSlice]#_yxSlice]
+        arr = arr[self.cropSlice]
         
         return arr
 
@@ -943,22 +934,13 @@ class Chromagnon(object):#im.ImageManager):
                 
                 if w == self.refwave and self.nt == 1:
                     arr = self.img.get3DArr(w=w, t=t)
-                    #arr = arr[self._zIdx]
-                    arr = arr[self.cropSlice]#_yxSlice]
+                    arr = arr[self.cropSlice]
                 elif self.mapyx is None:
                     self.echo('Applying affine transformation to the target image, t: %i, w: %i' % (t, w))
-                    if 0:#1:#target_is_mrc:
-                        des.close()
                     arr = self.get3DArrayAligned(w=w, t=t)
                 else:
                     self.echo('Remapping local alignment, t: %i, w: %i' % (t, w))
-                    if 0:#1:#target_is_mrc:
-                        des.close()
                     arr = self.get3DArrayRemapped(w=w, t=t)
-
-                if 0:#1 and des.closed():#target_is_mrc and des.closed():
-                    des.init()
-                    des.openFile()
 
                 if min0:
                     arr = N.where(arr > 0, arr, 0)
