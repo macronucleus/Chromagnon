@@ -506,6 +506,8 @@ class Chromagnon(object):#im.ImageManager):
             self.echo('3D cross correlation for channel %i' % w)
             img = self.get3DArrayAligned(w=w, t=t)
             zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+            if len(zyx) == 2:
+                zyx = N.array([0] + list(zyx))
             self.alignParms[t,w,:3] += zyx
             print 'the result of the last correlation', zyx
         self.echo('Finding affine parameters done!')
@@ -922,9 +924,10 @@ class Chromagnon(object):#im.ImageManager):
 
         return output file name
         """
-        base, ext = os.path.splitext(self.img.filename)
+        if not fn:
+            base, ext = os.path.splitext(self.img.filename)
 
-        fn = base + self.img_suffix + self.img_ext
+            fn = base + self.img_suffix + self.img_ext
         min0 = self.min_is_zero()
                 
         des = self.prepSaveFile(fn)

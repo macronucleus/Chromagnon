@@ -371,7 +371,7 @@ class BatchPanel(wx.Panel):
                 self._setInitGuess(fn)
             else:
                 G.openMsg(parent=self, msg='The file is not a valid chromagnon file', title="Warning")
-            an.close()
+            #an.close()
 
     def _setInitGuess(self, fn):
         self.initGuess.clearAll()
