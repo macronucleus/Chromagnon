@@ -31,6 +31,7 @@ __version__ = main.__version__
 # 4. Compatible with OpenCV3.3
 # 5. Fixed instability when opening viewer on Linux
 # 6. Fixed "nan" pixels in uint8 image after local alignment
+# 0.53 Fixed compatibility of old chromagnon file and 2D images.
 
 # v0.4
 # 1. Compatible with SIR images after discarding below 0.
