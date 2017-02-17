@@ -657,7 +657,8 @@ def summarizeAlignmentData(fns, outfn='', refwave=1):
                     if wave != r.refwave:
                         alignParms = r.alignParms[t,w].copy()
                         alignParms[:3] *= r.pxlsiz
-                        wtr.writerow([r.file, t, wave] + list(alignParms[t,w]))
+                        wtr.writerow([r.file, t, wave] + list(alignParms))
+    return outfn
 
 def makeNonliearImg(holder, out, gridStep=10):
     """

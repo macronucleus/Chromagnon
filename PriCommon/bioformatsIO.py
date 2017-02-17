@@ -2,9 +2,18 @@
 from . import generalIO, microscope, fntools
 import numpy as N
 
-import javabridge
-import bioformats
-import unicodedata
+try:
+    import javabridge
+    import bioformats
+    import unicodedata
+    ## to use structured_annotations, I needed to change some code in omexml.py
+    from mybioformats import omexml as ome
+
+except ImportError:
+    print 'bioformats unavailable'
+    class bioformats(object):
+        READABLE_FORMATS = WRITABLE_FORMATS = []
+
 import os, copy
 
 WRITABLE_FORMATS = ('dv', 'ome.tif')
@@ -69,8 +78,7 @@ if 'czi' not in bioformats.READABLE_FORMATS:
     _READABLE_FORMATS.sort()
     bioformats.READABLE_FORMATS = tuple(_READABLE_FORMATS)
 
-## to use structured_annotations, I needed to change some code in omexml.py
-from mybioformats import omexml as ome
+READABLE_FORMATS = tuple(set(bioformats.READABLE_FORMATS + mrcIO.READABLE_FORMATS))
 
 # at this moment, "series" data sets are not supported...
 

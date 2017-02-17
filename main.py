@@ -1,15 +1,14 @@
-#!/usr/bin/env priithon
+#!/usr/bin/env pythonw
 
 ### main.py #####################################################################
 # This is the main GUI window for alignment software
 # 
 # Load image file, make calibration file and then apply calibration to image file
 ##################################################################################
-__version__ = '0.50'
+__version__ = '0.54'
 
 import sys, os
 
-#old="""
 #### javabridge for py2exe
 # following workaround should be put before importing anything involved.
 INIT = False
@@ -33,30 +32,22 @@ def init_java_home():
                 jdk = os.path.join(cwd, 'jdk')
             elif sys.platform.startswith('darwin'):
                 jdk = os.path.join(os.path.dirname(cwd), 'Resources', 'jdk')
-            print 'jdk is', jdk
+            #print 'jdk is', jdk
             if not os.getenv('JDK_HOME'):
                 os.environ['JDK_HOME'] = jdk
             if not os.getenv('JAVA_HOME'):
                 os.environ['JAVA_HOME'] = jdk
-
-            #if sys.platform.startswith('win') and cwd not in os.getenv('PATH'):
-            #    os.environ['PATH'] = cwd + ';' + os.environ['PATH']
-            #    print 'path set at ', cwd
                 
             INIT = True
-        else:
-            print 'this is not frozen'
 
-init_java_home()#"""
-#from PriCommon import bioformatsIO
-#print bioformatsIO.locate.find_jdk()
+init_java_home()
 
 import wx, threading
 from PriCommon import guiFuncs as G, bioformatsIO, commonfuncs as C, listbox
 from PriCommon.ndviewer import main as aui
 from Priithon.all import U, N, Mrc
 ## for py2exe, here the relative import was impossible to run this script as __main__
-from chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder#, listbox
+from chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder
 
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
@@ -83,7 +74,6 @@ def main(sysarg=None, title="Chromagnon v%s" % __version__):
     start up the GUI
     return the frame object
     """
-    #if sys.platform in ('linux2', 'win32'):
     aui.initglut()
     
     frame = wx.Frame(None, title=title, size=(FRAMESIZE_X, FRAMESIZE_Y))
@@ -162,7 +152,7 @@ class BatchPanel(wx.Panel):
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemSelected, self.listRef)
         self.listRef.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
         
-        G.newSpaceH(box, LISTSPACE)#10)
+        G.newSpaceH(box, LISTSPACE)
 
         self.listTgt = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
@@ -196,7 +186,7 @@ class BatchPanel(wx.Panel):
         
         self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
         
-        self.localChoice = LOCAL_CHOICE#['None', 'Projection']#, 'Section-wise']
+        self.localChoice = LOCAL_CHOICE
         label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'))
 
         #------ initial guess -------
@@ -257,7 +247,7 @@ class BatchPanel(wx.Panel):
             h = chromformat.ChromagnonReader(fn)
         else:
             try:
-                h = bioformatsIO.load(fn)#aligner.Chromagnon(fn)
+                h = bioformatsIO.load(fn)
             except ValueError:
                 dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
                 if dlg.ShowModal() == wx.ID_OK:
@@ -278,11 +268,6 @@ class BatchPanel(wx.Panel):
         self.refselected = [i for i in range(self.listRef.GetItemCount()) if self.listRef.IsSelected(i)]
         self.tgtselected = [i for i in range(self.listTgt.GetItemCount()) if self.listTgt.IsSelected(i)]
         self.initselected = [i for i in range(self.initGuess.GetItemCount()) if self.initGuess.IsSelected(i)]
-
-        #if self.refselected or self.tgtselected:
-        #    self.viewButton.Enable(1)
-        #elif not self.refselected and not self.tgtselected:
-        #    self.viewButton.Enable(0)
 
         if self.refselected:
             self.refClearButton.Enable(1)
@@ -371,7 +356,6 @@ class BatchPanel(wx.Panel):
                 self._setInitGuess(fn)
             else:
                 G.openMsg(parent=self, msg='The file is not a valid chromagnon file', title="Warning")
-            #an.close()
 
     def _setInitGuess(self, fn):
         self.initGuess.clearAll()
@@ -383,19 +367,8 @@ class BatchPanel(wx.Panel):
         """
         cealr initial guess
         """
-        #self.initGuess.SetValue('')
         self.initGuess.clearAll()
         self.clearInitguessButton.Enable(0)
-
-        old='''
-    def checkReferences(self, evt=None):
-        """
-        return indices of reference if they are chromagnon files.
-        """
-        boolean = [index for index in self.listRef.columnkeys if self.listRef.getFile(index)[1].endswith(aligner.PARM_EXT)]
-
-        return boolean'''
-        
             
     def checkGo(self, evt=None):
         """
@@ -414,20 +387,13 @@ class BatchPanel(wx.Panel):
         if listtype == 'ref':
             inds = self.refselected
             ll = self.listRef
-            #stillselected = self.tgtselected
         else:
             inds = self.tgtselected
             ll = self.listTgt
-            #stillselected = self.refselected
 
         [ll.clearRaw(i) for i in inds[::-1]]
         self.checkGo()
         self.OnItemSelected()
-
-        #if stillselected:
-        #    self.viewButton.Enable(1)
-        #else:
-        #    self.viewButton.Enable(0)
 
     def buttonsEnable(self, enable=0):
         """
@@ -497,7 +463,6 @@ class BatchPanel(wx.Panel):
 
         else:
             tid = self.th._get_my_tid()
-            #stopit.async_raise(tid, threads.MyError)
             threads.async_raise(tid, threads.MyError)
 
 
@@ -507,7 +472,7 @@ class BatchPanel(wx.Panel):
         """
         # prepare viewer
         if not self.aui:
-            self.aui = aui.MyFrame(parent=self)#None)
+            self.aui = aui.MyFrame(parent=self)
             self.aui.Show()
 
 
@@ -515,15 +480,6 @@ class BatchPanel(wx.Panel):
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
         else:
             newpanel = aui.ImagePanel(self.aui, target)
-        # draw
-        old="""
-        if isinstance(target, basestring):
-            an = aligner.Chromagnon(target)
-        else:
-            an = target
-
-        an.close()"""
-        #newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
         if isinstance(target, basestring):
             name = os.path.basename(target)

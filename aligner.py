@@ -6,13 +6,9 @@ from . import alignfuncs as af, cutoutAlign, chromformat
 from Priithon.all import Mrc
 from scipy import ndimage as nd
 
-
 if __name__ == '__main__':
     from PriCommon import ppro26 as ppro
     NCPU = ppro.NCPU
-    #elif os.name == 'posix':
-    #from PriCommon import ppro as ppro
-    #NCPU = ppro.NCPU
 else:
     NCPU = 1
 
@@ -27,13 +23,13 @@ ZMAG_CHOICE = ['Auto', 'Always', 'Never']
 
 # file extention
 PARM_EXT='chromagnon'
-IMG_SUFFIX='_ALN'#'ALN.dv'
+IMG_SUFFIX='_ALN'
 WRITABLE_FORMATS = im.WRITABLE_FORMATS
 
 # chromagnon file format
 IDTYPE = 101
 
-class Chromagnon(object):#im.ImageManager):
+class Chromagnon(object):
 
     def __init__(self, fn):
         """
@@ -62,7 +58,6 @@ class Chromagnon(object):#im.ImageManager):
         >>> an.saveAlignedImage()
 
         """
-        #im.ImageManager.__init__(self, fn)
         self.img = im.load(fn)
         
         self.copyAttr()
@@ -93,7 +88,7 @@ class Chromagnon(object):#im.ImageManager):
         self.byteorder = '<'
         self.setCCthreshold()
         self.setMaxShift()
-        self.setZmagSwitch()#setForceZmag()
+        self.setZmagSwitch()
 
     def close(self):
         if hasattr(self, 'img') and hasattr(self.img, 'close'):
@@ -106,9 +101,8 @@ class Chromagnon(object):#im.ImageManager):
         self.ny = self.img.ny
         self.nx = self.img.nx
         self.dtype = self.img.dtype
-        #self.hdr = self.img.hdr
-        self.dirname = os.path.dirname(self.img.filename)#path)
-        self.file = self.path = os.path.basename(self.img.filename)#path)
+        self.dirname = os.path.dirname(self.img.filename)
+        self.file = self.path = os.path.basename(self.img.filename)
 
         self.t = self.img.t
         self.w = self.img.w
@@ -152,13 +146,9 @@ class Chromagnon(object):#im.ImageManager):
                 des.hdr.d[:] = self.extrainfo['pixsiz']
 
             else:
-                #self.hdr.NumTimes = self.img.hdr.NumTimes = self.img.nt = self.nt = self.extrainfo['nt']
                 self.hdr.NumTimes = self.img.nt = self.nt = self.extrainfo['nt']
-                #self.hdr.NumWaves = self.img.hdr.NumWaves = self.img.nw = self.nw = self.extrainfo['nw']
                 self.hdr.NumWaves = self.img.nw = self.nw = self.extrainfo['nw']
-                #self.hdr.wave[:self.hdr.NumWaves] = self.extrainfo['waves']
                 self.img.wave[:self.img.nw] = self.extrainfo['waves']
-                #self.img.nz = self.nz = self.hdr.Num[-1] // (self.hdr.NumTimes * self.hdr.NumWaves)
                 self.img.nz = self.nz = self.hdr.Num[-1] // (self.hdr.NumTimes * self.hdr.NumWaves)
                 if self.t > self.nt:
                     self.t = self.nt // 2
@@ -173,7 +163,7 @@ class Chromagnon(object):#im.ImageManager):
 
         self.get3DArr = self.img.get3DArr
                 
-    def setMaxError(self, val=MAXERROR):#0.001):
+    def setMaxError(self, val=MAXERROR):
         """
         if pixel size is set, then val is um
         otherwise, in pixel
@@ -205,13 +195,6 @@ class Chromagnon(object):#im.ImageManager):
         self.max_shift_pxl = um / N.mean(self.img.pxlsiz[1:])#:2])
         if self.max_shift_pxl > min((self.img.nx, self.img.ny)):
             self.max_shift_pxl = min((self.img.nx, self.img.ny))
-
-    old=""""
-    def setForceZmag(self, value=False):
-        if value:
-            self.if_failed = 'simplex'
-        else:
-            self.if_failed = 'terminate'      """ 
 
     def setZmagSwitch(self, value='Auto'):
         self.zmagSwitch = value
@@ -329,10 +312,8 @@ class Chromagnon(object):#im.ImageManager):
         # take into account for the PSF distortion due to chromatic aberration
         elif self.img.nw > 2:
             # the middle channel should have the intermediate PSF shape
-            #waves = [mrcIO.getWaveFromHdr(self.img.hdr, w) for w in range(self.img.nw)]
             waves = [self.img.getWaveFromIdx(w) for w in range(self.img.nw)]
             waves.sort()
-            #candidates = [mrcIO.getWaveIdxFromHdr(self.img.hdr, wave) for wave in waves[1:-1]]
             candidates = [self.img.getWaveIdx(wave) for wave in waves[1:-1]]
 
             # find out channels with enough signal
@@ -433,7 +414,7 @@ class Chromagnon(object):#im.ImageManager):
 
                 # try quadratic cross correlation
                 zdif = max(self.refzs) - min(self.refzs)
-                if (self.zmagSwitch != ZMAG_CHOICE[2]) and ((zdif > 5 and self.img.nz > 30) or self.zmagSwitch == ZMAG_CHOICE[1]):#!= #'terminate':
+                if (self.zmagSwitch != ZMAG_CHOICE[2]) and ((zdif > 5 and self.img.nz > 30) or self.zmagSwitch == ZMAG_CHOICE[1]):
                     initguess = N.zeros((5,), N.float32)
                     initguess[:2] = ret[w,:2][::-1]
                     initguess[2:] = ret[w,3:6]
@@ -441,9 +422,9 @@ class Chromagnon(object):#im.ImageManager):
                     if zdif > 5 and self.img.nz > 10 and self.zmagSwitch == ZMAG_CHOICE[1]:#'simplex':
                         if_failed = 'force_simplex'
                     else:
-                        if_failed = 'terminate'#self.if_failed
+                        if_failed = 'terminate'
                     
-                    check = af.iteration(imgyz, self.refyz, maxErr=self.maxErrZ, niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=if_failed)#'force_simplex')#self.if_failed)
+                    check = af.iteration(imgyz, self.refyz, maxErr=self.maxErrZ, niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=if_failed)
                     if check is not None:
                         ty2,tz,_,_,mz = check
                         ret[w,0] = tz
@@ -926,8 +907,10 @@ class Chromagnon(object):#im.ImageManager):
         """
         if not fn:
             base, ext = os.path.splitext(self.img.filename)
-
-            fn = base + self.img_suffix + self.img_ext
+            if ext in im.READABLE_FORMATS:
+                fn = base + self.img_suffix + self.img_ext
+            else:
+                fn = self.img.filename + self.img_suffix
         min0 = self.min_is_zero()
                 
         des = self.prepSaveFile(fn)
@@ -936,6 +919,7 @@ class Chromagnon(object):#im.ImageManager):
             for w in range(self.img.nw):
                 
                 if w == self.refwave and self.nt == 1:
+                    self.echo('Copying reference image, t: %i, w: %i' % (t, w))
                     arr = self.img.get3DArr(w=w, t=t)
                     arr = arr[self.cropSlice]
                 elif self.mapyx is None:

@@ -32,6 +32,7 @@ __version__ = main.__version__
 # 5. Fixed instability when opening viewer on Linux
 # 6. Fixed "nan" pixels in uint8 image after local alignment
 # 0.53 Fixed compatibility of old chromagnon file and 2D images.
+# 0.54 i) compatibility to arbitary file names for mrc.
 
 # v0.4
 # 1. Compatible with SIR images after discarding below 0.
