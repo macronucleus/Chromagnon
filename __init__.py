@@ -33,6 +33,12 @@ __version__ = main.__version__
 # 6. Fixed "nan" pixels in uint8 image after local alignment
 # 0.53 Fixed compatibility of old chromagnon file and 2D images.
 # 0.54 i) compatibility to arbitary file names for mrc.
+# 0.54 ii) Fixed a wrong code in chromagnon reader. 20170327
+# 0.54 iii) Fixed ziess's float wavelength (generalIO.getWaveIdx and chromformat)
+# 0.54 iv) Fixed reftime in aligner.getshift()
+# 0.54 v) FindRefwave added to time alignment (thread.py)
+# 0.54 vi) time alignment is done only when nw==1 (changes in thread.py, aligner.py)
+# 0.54 vii) setmaxerr pixsiz index was wrong.
 
 # v0.4
 # 1. Compatible with SIR images after discarding below 0.

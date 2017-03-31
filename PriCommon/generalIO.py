@@ -192,6 +192,22 @@ class GeneralReader(object):
         else:
             raise ValueError, 'no such wave exists %s' % wave
 
+    def getWaveIdx(self, wave):
+        """
+        return index
+        """
+        # 20170331 with Horikoshi san (Hiroshima U)
+        # Zeiss czi file may contain wavelength like
+        # [697.245, 592.1879475, 520.9980515000001, 442.26000000000005]
+        # This information seems to keep updating over time.
+        # This is a work around...
+        wave = int(round(wave))
+        waves = [int(round(w)) for w in self.wave[:self.nw]]
+        if wave in waves:
+            return waves.index(wave)
+        else:
+            raise ValueError, 'no such wave exists %s' % wave
+
     def getWaveFromIdx(self, w):
         """
         return wavelength (nm)

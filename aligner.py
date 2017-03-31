@@ -172,8 +172,8 @@ class Chromagnon(object):
         """
         self.maxErr = val
 
-        self.maxErrYX = self.maxErr / N.mean(self.img.pxlsiz[:2])
-        self.maxErrZ = self.maxErr / self.img.pxlsiz[2]
+        self.maxErrYX = self.maxErr / N.mean(self.img.pxlsiz[1:])
+        self.maxErrZ = self.maxErr / self.img.pxlsiz[0]
 
     def setMaxIter(self, val=MAXITER):
         """
@@ -256,7 +256,7 @@ class Chromagnon(object):
                         param2[:,w,d] = nd.zoom(param[:,w,d], self.img.nt / float(param.shape[0]))
             param = param2
         
-        self.alignParms[:] = param
+        self.alignParms[:] = param[:self.img.nt]
 
         self.fixAlignParmWithCurrRefWave()
 
@@ -403,7 +403,7 @@ class Chromagnon(object):
                     ret[w,1:3] = yx
                     del ref, c
                 # create 2D projection image
-                self.echo('calculating shifts for channel %i' % w)
+                self.echo('calculating shifts for time %i channel %i' % (t, w))
                 xs = N.round_(self.refxs-ret[w,2]).astype(N.int)
                 if xs.max() >= self.img.nx:
                     xsbool = (xs < self.img.nx)
@@ -484,7 +484,7 @@ class Chromagnon(object):
             if (doWave and w == self.refwave) or (not doWave and w != self.refwave):
                 continue
 
-            self.echo('3D cross correlation for channel %i' % w)
+            self.echo('3D cross correlation for time %i channel %i' % (t, w))
             img = self.get3DArrayAligned(w=w, t=t)
             zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
             if len(zyx) == 2:
@@ -759,7 +759,7 @@ class Chromagnon(object):
         
     ### applying alignment parameters ####
 
-    def getShift(self, w=0, t=0, refwave=None):
+    def getShift(self, w=0, t=0, refwave=None, reftime=0):
         """
         return shift at the specified wavelength and time frame
         """
@@ -767,7 +767,7 @@ class Chromagnon(object):
             refwave = self.refwave
 
         ret = self.alignParms[t,w].copy()
-        ref = self.alignParms[t,refwave]
+        ref = self.alignParms[reftime,refwave]
 
         ret[:4] -= ref[:4]
         if len(ref) >= 5:

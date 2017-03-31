@@ -135,25 +135,28 @@ class ThreadWithExc(threading.Thread):
                         # mapyx should not be inherited...
                         an.mapyx = None
                     
-                    if (alignChannels and nts[index] <= 1) or (alignChannels and not alignTimeFrames):
+                    #if (alignChannels and nts[index] <= 1) or (alignChannels and not alignTimeFrames):
+                    if (alignChannels and an.nw > 1) or (alignChannels and not alignTimeFrames):
                         an.findBestChannel()
                         self.echo('Calculating...')
-                        try:
-                            an.findAlignParamWave()
-                        except alignfuncs.AlignError: # in xcorr or else
-                            self.echo('Calculation failed, skipping')
-                            errs.append(index)
-                            continue
-                        if local in self.localChoice[1:]:
-                            #an.setCCthreshold(cthre)
-                            arr = an.findNonLinear2D()
-                            del arr
-                        if local in self.localChoice[2:]:
-                            arr = an.findNonLinear3D()
-                            del arr
+                        for t in xrange(an.nt):
+                            try:
+                                an.findAlignParamWave(t=t)
+                            except alignfuncs.AlignError: # in xcorr or else
+                                self.echo('Calculation failed, skipping')
+                                errs.append(index)
+                                continue
+                            if local in self.localChoice[1:]:
+                                #an.setCCthreshold(cthre)
+                                arr = an.findNonLinear2D(t=t)
+                                del arr
+                            if local in self.localChoice[2:]:
+                                arr = an.findNonLinear3D(t=t)
+                                del arr
                         
-                    elif alignTimeFrames:
-                        an.findBestTimeFrame()
+                    elif an.nt > 1:#alignTimeFrames:
+                        an.findBestChannel()
+                        an.findBestTimeFrame(an.refwave)
                         an.findAlignParamTime(doWave=False)
 
                     fn = an.saveParm()

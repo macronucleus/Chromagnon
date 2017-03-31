@@ -448,15 +448,15 @@ class ChromagnonReader(object):
             for t in xrange(self.nt):
                 for w in xrange(self.nw):
                     row = self.reader.next()
-                    self.wave.append(self.eval(row[1]))
-                    #print self.eval(row[1])
+                    if t == 0:
+                        self.wave.append(int(round(self.eval(row[1]))))
                     self.alignParms[t,w] = [eval(v) for v in row[2:]]
-            self.refwave = self.wave[refwave]
+            self.refwave = int(round(self.wave[refwave]))
 
         else:
             self.nt = self.reader.nt
             self.nw = self.reader.nw
-            self.wave = self.reader.wave
+            self.wave = [int(round(w)) for w in self.reader.wave]
             self.pxlsiz = self.reader.pxlsiz
             self.roi_size = self.reader.roi_size
             self.dtype = self.reader.dtype
@@ -471,7 +471,7 @@ class ChromagnonReader(object):
                 for w in xrange(self.reader.nw):
                     for i, key in enumerate(DIMSTRS):
                         self.alignParms[t,w,i] = eval(self.reader.ome.get_structured_annotation('t%03d_w%i_' %(t,w) + key))
-            self.refwave = self.reader.wave[refwave]
+            self.refwave = int(round(self.reader.wave[refwave]))
 
     def eval(self, val):
         try:
@@ -496,8 +496,8 @@ class ChromagnonReader(object):
             self.rdr.nz = self.nz
 
         # wavelength difference
-        self.pwaves = list(self.wave[:self.nw])
-        self.twaves = list(self.rdr.wave[:self.rdr.nw])
+        self.pwaves = [int(round(w)) for w in self.wave[:self.nw]]
+        self.twaves = [int(round(w)) for w in self.rdr.wave[:self.rdr.nw]]
         self.tids = [self.twaves.index(wave) for wave in self.pwaves if wave in self.twaves]
         self.pids = [self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
 
@@ -520,7 +520,6 @@ class ChromagnonReader(object):
 
         # obtain affine parms
         self.readParmWave()
-
 
         if hasattr(self.holder, 'setAlignParam'):
             self.holder.setAlignParam(self.alignParms)
@@ -637,7 +636,8 @@ class ChromagnonReader(object):
         self.refwave = self.getWaveFromIdx(refwave)
         idx = self.getWaveIdx(refwave)
 
-        self.alignParms -= self.alignParms[:,idx]
+        self.alignParms[...,:4] -= self.alignParms[:,idx,:4]
+        self.alignParms[...,4:] /= self.alignParms[:,idx,4:]
 
 def summarizeAlignmentData(fns, outfn='', refwave=1):
     """
