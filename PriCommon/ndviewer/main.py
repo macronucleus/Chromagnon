@@ -140,17 +140,29 @@ class ImagePanel(wx.Panel):
                         v.setImage(j, img.transpose(1,0), 0)
 
         # draw lines
+        for v in self.viewers:
+            v.viewGpx = []
+            if v.useCropbox:
+                lowerBound = self.doc.roi_start.take(v.dims) #cropbox_l.take(v.dims) + ld
+                upperBound = self.doc.roi_size.take(v.dims) + lowerBound #cropbox_u.take(v.dims) + ld
+                v.viewGpx.append(GL.graphix_cropbox(lowerBound, upperBound))
+
         pps = self._mgr.GetAllPanes()
         if not any([pp.name == 'ZY' for pp in pps]) or not self.orthogonal_toggle.GetValue():
             for v in self.viewers:
-                v.updateGlList(None, RefreshNow)
+                if v.viewGpx:
+                    v.updateGlList([ g.GLfunc for g in v.viewGpx ], RefreshNow)
+                else:
+                    v.updateGlList(None, RefreshNow)
                 v.useHair = False
                 v.dragSide = 0
         else:
                 #if self.orthogonal_toggle.GetValue():
             for v in self.viewers:
-                g = GL.graphix_slicelines(v)
-                v.updateGlList([ g.GLfunc ], RefreshNow)
+                v.viewGpx.append(GL.graphix_slicelines(v))
+                v.updateGlList([ g.GLfunc for g in v.viewGpx ], RefreshNow)
+                #g = GL.graphix_slicelines(v)
+                #v.updateGlList([ g.GLfunc ], RefreshNow)
                 v.useHair = True
                 #else:
                 #for v in self.viewers:

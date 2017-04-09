@@ -26,7 +26,7 @@ Menu_ZoomIn      = wx.NewId()
 Menu_Reload       = wx.NewId()
 #Menu_chgOrig     = wx.NewId()
 Menu_Save = wx.NewId()
-#Menu_SaveScrShot = wx.NewId()
+Menu_SaveScrShot = wx.NewId()
 #Menu_SaveClipboard = wx.NewId()
 #Menu_Assign = wx.NewId()
 Menu_noGfx = wx.NewId()
@@ -34,7 +34,6 @@ Menu_aspectRatio = wx.NewId()
 #Menu_rotate = wx.NewId()
 #Menu_grid        = wx.NewId()    ## shortcut 'g' for toggling grid display
 Menu_ColMap = [wx.NewId() for i in range(8)]
-
 
 
 class GLViewerCommon(wxgl.GLCanvas):
@@ -67,7 +66,8 @@ class GLViewerCommon(wxgl.GLCanvas):
         self.moreGlLists_dict = {} # map 'name' to list of idx in moreGlLists
         # a given idx can be part of multiple 'name' entries
         # a given name entry can contain a given idx only once
-        self.m_moreGlLists_NamedIdx = {} # map str to int or None -- this is helpful for reusing Idx for "changing" gllists
+        self.moreGlLists_nameBlacklist = set()
+        self.moreGlLists_NamedIdx = {} # map str to int or None -- this is helpful for reusing Idx for "changing" gllists
                                          # if name (type str) wasn't used before, it defaults to None (20080722)
 
         self.moreGlListReuseIdx=None
@@ -154,147 +154,163 @@ class GLViewerCommon(wxgl.GLCanvas):
         _at = wx.AcceleratorTable(self.accelTableList)
         self.SetAcceleratorTable(_at)
 
-    ## may not need this
-#     def setPixelGrid(self, ev=None):
-#         do = 0
-#         if   self.pixelGrid_state == 0:
-#             self.pixelGrid_state = 1
-#             self.pixelGridSpacing = 1
-#             do = 1
-#         elif self.pixelGrid_state == 1:
-#             self.pixelGrid_state = 2
-#             self.pixelGridSpacing = 10
 
-#             self.newGLListRemove( self.pixelGrid_Idx )
-#             self.pixelGrid_Idx = None
-#             do = 1
-#         elif self.pixelGrid_state == 2:
-#             self.pixelGrid_state = 0
+    def newGLListNow(self, name=None, idx=None) : # , i):
+        """
+        call this immediately before you call a bunch of gl-calls
+        issue newGLListDone() when done
+        OR newGLListAbort() when there is problem and
+            the glist should get cleared
 
-#             self.newGLListRemove( self.pixelGrid_Idx )
-#             self.pixelGrid_Idx = None
+        create new or append to dict entry 'name' when done
+            if name is a list (! not tuple !) EACH list-items is used
+            a tuple is interpreted as "z-sect-tuple" and means that this gllist 
+                gets automacically en-/dis-abled with z-slider entering/leaving that section
+                (see on splitNDcommon::OnZZSlider)
+        if idx is not None:  reuse and overwrite existing gllist
+        if idx is of type str: on first use, same as None; but on subsequent uses, reuse and overwrite 
+        """
+        self.moreGlListReuseIdx = idx
+        self.SetCurrent(self.context)
+        if isinstance(idx, basestring):
+            idx = self.moreGlLists_NamedIdx.get(idx) # Never raises an exception if k is not in the map, instead it returns x. x is optional; when x is not provided and k is not in the map, None is returned. 
+            if idx is None:
+                self.curGLLIST = glGenLists( 1 )
+            else:
+                try:
+                    self.curGLLIST = self.moreGlLists[idx]
+                except IndexError: ## vgRemoveAll might have been called
+                    self.curGLLIST = glGenLists( 1 )
+                    del self.moreGlLists_NamedIdx[self.moreGlListReuseIdx] # will get reset in newGLListDone()
+                else:
+                    if self.curGLLIST is None:   # glList was deleted Y.vgRemove
+                        self.curGLLIST = glGenLists( 1 )
 
-#         if do:
-#             self.newGLListNow()
-#             glColor3f(1.0, 0.0, 0.0)
-#             glBegin(GL_LINES)
-#             ny = self.pic_ny
-#             nx = self.pic_nx
-#             if self.originLeftBottom == 8:
-#                 nx = (nx-1)*2
-#             for y in range(0,ny+1, self.pixelGridSpacing):
-#                 glVertex2d(0, y)
-#                 glVertex2d(nx, y)
-#             for x in range(0,nx+1, self.pixelGridSpacing):
-#                 glVertex2d(x, 0)
-#                 glVertex2d(x, ny)
-#             glEnd()
-#             self.pixelGrid_Idx = self.newGLListDone(enable=1, refreshNow=1)
+        elif idx is None or self.moreGlLists[idx] is None:
+            self.curGLLIST = glGenLists( 1 )
+        else:
+            self.curGLLIST = self.moreGlLists[idx]
 
-
-
-    ## may not need  (only used in self.setPixelGrid() )
-#     def newGLListNow(self, name=None, idx=None) : # , i):
-#         '''call this immediately before you call a bunch of gl-calls
-#            issue newGLListDone() when done
-#            OR newGLListAbort() when there is problem and
-#                the glist should get cleared
-
-#            create new or append to dict entry 'name' when done
-#               is name is a list (! not tuple !) EACH list-items is used
-
-#            if idx is not None:  reuse and overwrite existing gllist
-#            '''
-#         self.SetCurrent()
-#         if idx is not None:
-#             self.moreGlListReuseIdx = idx
-#             if self.moreGlLists[idx] is None:
-#                 self.curGLLIST = glGenLists( 1 )
-#             else:
-#                 self.curGLLIST = self.moreGlLists[idx]
-#         else:
-#             self.moreGlListReuseIdx = None
-#             self.curGLLIST = glGenLists( 1 )
-#         self.curGLLISTname  = name
-#         glNewList( self.curGLLIST, GL_COMPILE )
-
-    ## may not need
-#     def newGLListAbort(self):
-#         glEndList()
-#         glDeleteLists(self.curGLLIST, 1)
-
-    ## may not need
-#     def newGLListDone(self, enable=True, refreshNow=True):
-#         glEndList()
-#         if self.moreGlListReuseIdx is not None:
-#             idx = self.moreGlListReuseIdx
-#             self.moreGlLists[idx] = self.curGLLIST # left side might have been None
-#             self.moreGlLists_enabled[idx] = enable
-#         else:
-#             idx = len(self.moreGlLists)
-#             self.moreGlLists.append( self.curGLLIST )
-#             self.moreGlLists_enabled.append( enable )
+        self.curGLLISTname  = name
+        glNewList( self.curGLLIST, GL_COMPILE )
         
-#         if type(self.curGLLISTname) != list:
-#             self.curGLLISTname = [ self.curGLLISTname ]
-#         for curGLLname in self.curGLLISTname:
-#             if curGLLname is not None:
-#                 try:
-#                     l = self.moreGlLists_dict[curGLLname]
-#                     try:
-#                         l.index(idx)  # don't do anything if curGLList is already in
-#                     except ValueError:
-#                         l.append(idx)
-#                 except KeyError:
-#                     self.moreGlLists_dict[curGLLname] = [idx]
+    def newGLListAbort(self):
+        glEndList()
+        glDeleteLists(self.curGLLIST, 1)
+        if isinstance(self.moreGlListReuseIdx, basestring):
+            try:
+                del self.moreGlLists_NamedIdx[self.moreGlListReuseIdx] # CHECK
+            except KeyError:
+                pass # was not in dict yet
+        self.moreGlListReuseIdx = None
+        
+    def newGLListDone(self, enable=True, refreshNow=True):
+        glEndList()
+        if isinstance(self.moreGlListReuseIdx, basestring):
+            idx = self.moreGlLists_NamedIdx.get(self.moreGlListReuseIdx)
+        else:
+            idx = self.moreGlListReuseIdx
 
-#         if refreshNow:
-#             self.Refresh(0)
-#         return idx
+        if idx is not None:
+            self.moreGlLists[idx] = self.curGLLIST # left side might have been None
+            self.moreGlLists_enabled[idx] = enable
+        else:
+            idx = len(self.moreGlLists)
+            self.moreGlLists.append( self.curGLLIST )
+            self.moreGlLists_enabled.append( enable )
+        
+        self.newGLListNameAdd(idx, self.curGLLISTname)
 
-    ## may not need
-#     def newGLListRemove(self, idx, refreshNow=True):
-#         '''
-#         instead of 'del' just set entry to None
-#         this is to prevent, shifting of all higher idx
-#         self.moreGlLists_dict is clean properly
-#         '''
-#         if idx<0:
-#             idx += len(self.moreGlLists)
+        # remember named idx for future re-use
+        if isinstance(self.moreGlListReuseIdx, basestring):
+            self.moreGlLists_NamedIdx[self.moreGlListReuseIdx] = idx
+        self.moreGlListReuseIdx = None
 
-#         if self.moreGlLists[idx]: # could be None - # Note: Zero is not a valid display-list index.
-#             glDeleteLists(self.moreGlLists[idx], 1)
-#         #20070712 del self.moreGlLists[idx]
-#         #20070712 del self.moreGlLists_enabled[idx]
-#         self.moreGlLists[idx] = None
-#         self.moreGlLists_enabled[idx] = None
+        if refreshNow:
+            self.Refresh(0)
+        return idx
 
-#         #remove idx from 'name' dict entry
-#         #   remove respective dict-name if it gets empty
-#         _postposeDelList = [] # to prevent this error:dictionary changed size during iteration
-#         for name,idxList in self.moreGlLists_dict.iteritems():
-#             try:
-#                 idxList.remove(idx)
-#                 if not len(idxList):
-#                     _postposeDelList.append(name)
-#             except ValueError:
-#                 pass
-#         for name in _postposeDelList:
-#             del self.moreGlLists_dict[name]
+    def newGLListNameAdd(self, idx, name):
+        if type(name) != list:
+            name = [ name ]
 
-#         if refreshNow:
-#             self.Refresh(0)
+        # make sure cur idx is in each name-list; create new name-list or append to existing, as needed 
+        for aName in name:
+            if aName is not None:
+                try:
+                    l = self.moreGlLists_dict[aName]
+                    try:
+                        l.index(idx)  # don't do anything if aName is already in
+                    except ValueError:
+                        l.append(idx)
+                except KeyError:
+                    self.moreGlLists_dict[aName] = [idx]
 
-    ## may not need
-#     def newGLListEnable(self, idx, on=True, refreshNow=True):
-#         '''
-#         ignore moreGlList items that are None !
-#         '''
-#         if self.moreGlLists_enabled[idx] is not None:
-#             self.moreGlLists_enabled[idx] = on
-#         if refreshNow:
-#             self.Refresh(0)
 
+    def newGLListRemove(self, idx, refreshNow=True):
+        """
+        instead of 'del' just set entry to None
+        this is to prevent, shifting of all higher idx
+        20090107: but do 'del' for last entry - no trailing Nones
+
+        self.moreGlLists_dict is cleaned properly
+        """
+        #20070712 changed! not 'del' - instead set entry to None
+        #20070712    ---- because decreasing all idx2 for idx2>idx is complex !!!
+        #untrue note;  --- old:
+        #untrue note; be careful: this WOULD change all indices (idx) of GLLists
+        #untrue note; following idx
+        #untrue note!!: if you can not accept that: you should call
+        #untrue note!!:   newGLListEnable(idx, on=0)
+
+#       if self.moreGlLists_texture[idx] is not None:
+#           glDeleteTextures( self.moreGlLists_texture[idx] )
+#           del self.moreGlLists_img[idx]
+
+        if isinstance(idx, basestring):
+            idx=self.moreGlLists_NamedIdx[idx]
+        elif idx<0:
+            idx += len(self.moreGlLists)
+
+        if self.moreGlLists[idx]: # could be None - # Note: Zero is not a valid display-list index.
+            glDeleteLists(self.moreGlLists[idx], 1)
+        #20070712 del self.moreGlLists[idx]
+        #20070712 del self.moreGlLists_enabled[idx]
+        if idx == len(self.moreGlLists)-1: # 20090107
+            del self.moreGlLists[idx]
+            del self.moreGlLists_enabled[idx]
+        else:
+            self.moreGlLists[idx] = None
+            self.moreGlLists_enabled[idx] = None
+        self.moreGlLists_nameBlacklist.discard(idx)
+
+        #remove idx from 'name' dict entry
+        #   remove respective dict-name if it gets empty
+        _postposeDelList = [] # to prevent this error:dictionary changed size during iteration
+        for name,idxList in self.moreGlLists_dict.iteritems():
+            try:
+                idxList.remove(idx)
+                if not len(idxList):
+                    _postposeDelList.append(name)
+            except ValueError:
+                pass
+        for name in _postposeDelList:
+            del self.moreGlLists_dict[name]
+
+        if refreshNow:
+            self.Refresh(0)
+
+    def newGLListEnable(self, idx, on=True, refreshNow=True):
+        """
+        ignore moreGlList items that are None !
+        """
+        if isinstance(idx, basestring):
+            idx=self.moreGlLists_NamedIdx[idx]
+        if self.moreGlLists_enabled[idx] is not None:
+            self.moreGlLists_enabled[idx] = on
+        if refreshNow:
+            self.Refresh(0)
+            
     ## may not need
 #     def newGLListEnableByName(self, name, on=True, refreshNow=True):
 #         '''
@@ -345,6 +361,24 @@ class GLViewerCommon(wxgl.GLCanvas):
 #         if refreshNow:
 #             self.Refresh(0)
         
+    def newGLListRemoveAll(self, refreshNow=True):
+        """
+        this really removes all GLList stuff
+        idx values will restart at 0
+        here nothing gets "only" set to None
+        """
+        for li in self.moreGlLists:
+            if li:  # Note: Zero is not a valid display-list index.
+                glDeleteLists(li, 1)
+        self.moreGlLists = []
+        self.moreGlLists_enabled = []
+        #self.moreMaster_enabled = 1
+        self.moreGlLists_dict.clear()
+        self.moreGlLists_nameBlacklist.clear()
+        self.moreGlLists_NamedIdx.clear()
+
+        if refreshNow:
+            self.Refresh(0)
 
     def OnNoGfx(self, evt):
         #fails on windows:
@@ -522,20 +556,20 @@ class GLViewerCommon(wxgl.GLCanvas):
 #         Y.shellMessage("### screenshot saved to clipboard'\n")
 
     ## don't need
-#     def OnSaveScreenShort(self, event=None):
-#         '''always flipY'''
-#         from Priithon.all import U, FN
-#         fn = FN(1, verbose=0)
-#         if not fn:
-#             return
+    def OnSaveScreenShort(self, event=None):
+        '''always flipY'''
+        from Priithon.all import U, FN
+        fn = FN(1, verbose=0)
+        if not fn:
+            return
 
-#         flipY=1
-#         if flipY:
-#             U.saveImg(self.readGLviewport(copy=1)[:, ::-1], fn)
-#         else:
-#             U.saveImg(self.readGLviewport(copy=1), fn)
+        flipY=1
+        if flipY:
+            U.saveImg(self.readGLviewport(copy=1)[:, ::-1], fn)
+        else:
+            U.saveImg(self.readGLviewport(copy=1), fn)
         
-#         from usefulX2 import shellMessage
+#        from usefulX2 import shellMessage
 #         shellMessage("### screenshot saved to '%s'\n"%fn)
 
     ## don't need
@@ -632,79 +666,80 @@ set image aspect ratio (y/x factor for display)
 
 
     ## don't need
-#     def readGLviewport(self, clip=False, flipY=True, copy=True):
-#         '''returns array with r,g,b values from "what-you-see"
-#             shape(3, height, width)
-#             type=UInt8
+    def readGLviewport(self, clip=False, flipY=True, copy=True):
+        '''returns array with r,g,b values from "what-you-see"
+            shape(3, height, width)
+            type=UInt8
 
-#             if clip: clip out the "green background"
-#             if copy == 0 returns non-contiguous array!!!
+            if clip: clip out the "green background"
+            if copy == 0 returns non-contiguous array!!!
 
-#         '''
-#         self.SetCurrent()
-#         glPixelStorei(GL_PACK_ALIGNMENT, 1)
+        '''
+        self.SetCurrent(self.context)
+        glPixelStorei(GL_PACK_ALIGNMENT, 1)
         
-#         get_cm = glGetInteger(GL_MAP_COLOR)
-#         get_rs = glGetDoublev(GL_RED_SCALE)
-#         get_gs = glGetDoublev(GL_GREEN_SCALE)
-#         get_bs = glGetDoublev(GL_BLUE_SCALE)
+        get_cm = glGetInteger(GL_MAP_COLOR)
+        get_rs = glGetDoublev(GL_RED_SCALE)
+        get_gs = glGetDoublev(GL_GREEN_SCALE)
+        get_bs = glGetDoublev(GL_BLUE_SCALE)
             
-#         get_rb = glGetDoublev(GL_RED_BIAS)
-#         get_gb = glGetDoublev(GL_GREEN_BIAS)
-#         get_bb = glGetDoublev(GL_BLUE_BIAS)
+        get_rb = glGetDoublev(GL_RED_BIAS)
+        get_gb = glGetDoublev(GL_GREEN_BIAS)
+        get_bb = glGetDoublev(GL_BLUE_BIAS)
 
-#         glPixelTransferi(GL_MAP_COLOR, False)
+        glPixelTransferi(GL_MAP_COLOR, False)
 
-#         glPixelTransferf(GL_RED_SCALE,   1)
-#         glPixelTransferf(GL_GREEN_SCALE, 1)
-#         glPixelTransferf(GL_BLUE_SCALE,  1)
+        glPixelTransferf(GL_RED_SCALE,   1)
+        glPixelTransferf(GL_GREEN_SCALE, 1)
+        glPixelTransferf(GL_BLUE_SCALE,  1)
             
-#         glPixelTransferf(GL_RED_BIAS,   0)
-#         glPixelTransferf(GL_GREEN_BIAS, 0)
-#         glPixelTransferf(GL_BLUE_BIAS,  0)
+        glPixelTransferf(GL_RED_BIAS,   0)
+        glPixelTransferf(GL_GREEN_BIAS, 0)
+        glPixelTransferf(GL_BLUE_BIAS,  0)
 
-#         b=glReadPixels(0,0, self.w, self.h,
-#                        GL_RGB,GL_UNSIGNED_BYTE)
+        b=glReadPixels(0,0, self.w, self.h,
+                       GL_RGB,GL_UNSIGNED_BYTE)
         
-#         bb=N.ndarray(buffer=b, shape=(self.h,self.w,3),
-#                    dtype=N.uint8) #, aligned=1)
+        bb=N.ndarray(buffer=b, shape=(self.h,self.w,3),
+                   dtype=N.uint8) #, aligned=1)
 
-#         cc = N.transpose(bb, (2,0,1))
+        cc = N.transpose(bb, (2,0,1))
 
-#         if clip:
-#             x0,y0, s,a = int(self.x0), int(self.y0),self.scale,self.aspectRatio
-#             if hasattr(self, "m_imgArr"):
-#                 ny,nx = self.imgArr.shape
-#             else:
-#                 ny,nx = self.imgList[0][2].shape
-#             nx,ny = int(nx*s +.5), int(ny*s*a + .5)
-#             x1,y1 = x0+ nx, y0+ny
+        if clip:
+            x0,y0, s,a = int(self.x0), int(self.y0),self.scale,self.aspectRatio
+            if hasattr(self, "m_imgArr"):
+                ny,nx = self.imgArr.shape
+            else:
+                ny,nx = self.imgList[0][2].shape
+            nx,ny = int(nx*s +.5), int(ny*s*a + .5)
+            x1,y1 = x0+ nx, y0+ny
 
-#             x0 = N.clip(x0, 0, self.w)
-#             x1 = N.clip(x1, 0, self.w)
-#             y0 = N.clip(y0, 0, self.h)
-#             y1 = N.clip(y1, 0, self.h)
-#             nx,ny = x1-x0, y1-y0
-#             cc=cc[:,y0:y1,x0:x1]
-#         #else:
-#         #    y0,x0 = 0,0
-#         #    ny,nx = y1,x1 = self.h, self.w
+            x0 = N.clip(x0, 0, self.w)
+            x1 = N.clip(x1, 0, self.w)
+            y0 = N.clip(y0, 0, self.h)
+            y1 = N.clip(y1, 0, self.h)
+            nx,ny = x1-x0, y1-y0
+            cc=cc[:,y0:y1,x0:x1]
+        #else:
+        #    y0,x0 = 0,0
+        #    ny,nx = y1,x1 = self.h, self.w
 
-#         if flipY:
-#             cc = cc[:,::-1] # flip y
+        if flipY:
+            cc = cc[:,::-1] # flip y
             
-#         if copy:
-#             cc = cc.copy()
+        if copy:
+            cc = cc.copy()
 
-#         glPixelTransferi(GL_MAP_COLOR, get_cm)
+        glPixelTransferi(GL_MAP_COLOR, get_cm)
 
-#         glPixelTransferf(GL_RED_SCALE,   get_rs)
-#         glPixelTransferf(GL_GREEN_SCALE, get_gs)
-#         glPixelTransferf(GL_BLUE_SCALE,  get_bs)
+        glPixelTransferf(GL_RED_SCALE,   get_rs)
+        glPixelTransferf(GL_GREEN_SCALE, get_gs)
+        glPixelTransferf(GL_BLUE_SCALE,  get_bs)
             
-#         glPixelTransferf(GL_RED_BIAS,   get_rb)
-#         glPixelTransferf(GL_GREEN_BIAS, get_gb)
-#         glPixelTransferf(GL_BLUE_BIAS,  get_bb)
+        glPixelTransferf(GL_RED_BIAS,   get_rb)
+        glPixelTransferf(GL_GREEN_BIAS, get_gb)
+        glPixelTransferf(GL_BLUE_BIAS,  get_bb)
 
-#         glPixelStorei(GL_PACK_ALIGNMENT, 4) # reset default
-#         return cc
+        glPixelStorei(GL_PACK_ALIGNMENT, 4) # reset default
+        return cc
+

@@ -7,7 +7,7 @@ try:
     import bioformats
     import unicodedata
     ## to use structured_annotations, I needed to change some code in omexml.py
-    from mybioformats import omexml as ome
+    from PriCommon.mybioformats import omexml as ome
 
 except ImportError:
     print 'bioformats unavailable'

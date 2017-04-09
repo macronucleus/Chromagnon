@@ -11,6 +11,7 @@ from setuptools import setup
 from glob import glob
 from shutil import rmtree, copytree
 
+#---------- prepare to build the distribution packages ---------------
 if sys.argv[1] in ('py2exe', 'py2app'):
     if sys.argv[1] == 'py2exe':
         suff = 'Win'
@@ -18,7 +19,7 @@ if sys.argv[1] in ('py2exe', 'py2app'):
         suff = 'Mac'
     
     import chromagnon as ch
-    version = ch.main.__version__
+    version = ch.__version__
     chrodir = os.path.dirname(ch.main.__file__)
     folder = 'ChromagnonV%s%s' % (version.replace('.', ''), suff)
     
@@ -171,7 +172,15 @@ elif sys.platform == 'win32' and sys.argv[1] == 'py2exe':
 
 # --------------- python setup.py sdist/install ------------------    
 else:
+    try:
+        import cv2
+    except ImportError:
+        raise ImportError, 'Please install opencv-python MANUALLY by yourself before installing Chromagnon'
+    
     mainscript = os.path.join('chromagnon', 'main.py')
+    h = open('chromagnon/version.py')
+    line = h.readline()
+    exec(line)
     
     packages = ['chromagnon', 'Priithon', 'Priithon.plt', 'PriCommon', 'PriCommon.ndviewer', 'PriCommon.mybioformats']
       
@@ -200,3 +209,4 @@ if sys.platform.startswith('darwin') and sys.argv[1] == 'py2app':
     # ont mac, JDK files are simply copied
     target = os.path.join(folder, 'Chromagnon.app', 'Contents', 'Resources', 'jdk')
     copytree(jdk, target)
+    

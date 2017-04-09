@@ -882,7 +882,8 @@ def getSphericalAbbe(arr3D, kmin=2, kmax=60, plot=False):
     afz = getFourierZprofile(arr3D)
 
     # get z profile around the reasonable frequency
-    aa = N.average(N.abs(afz[:,kmin:kmax]), axis=1)
+    aa = N.abs(N.average(afz[:,kmin:kmax], axis=1))
+    # previously it was N.average(N.abs(afz[:,kmin:kmax]), axis=1), but that seems wrong...
 
     # findMax
     inds = N.indices(aa.shape, dtype=N.float64)

@@ -20,7 +20,6 @@ class graphix:
 from OpenGL import GL
 from OpenGL import GLUT
 
-old="""
 class graphix_cropbox(graphix):
     '''
     The 3D crop box;s 2D projection on this viewer
@@ -39,7 +38,7 @@ class graphix_cropbox(graphix):
         GL.glVertex2f(self.lowerbounds[1], self.upperbounds[0])
         GL.glVertex2f(self.upperbounds[1], self.upperbounds[0])
         GL.glVertex2f(self.upperbounds[1], self.lowerbounds[0])
-        GL.glEnd()"""
+        GL.glEnd()
 
 class graphix_slicelines(graphix):
     '''

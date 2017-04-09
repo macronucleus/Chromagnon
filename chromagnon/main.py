@@ -5,7 +5,7 @@
 # 
 # Load image file, make calibration file and then apply calibration to image file
 ##################################################################################
-__version__ = '0.54'
+
 
 import sys, os
 
@@ -47,7 +47,7 @@ from PriCommon import guiFuncs as G, bioformatsIO, commonfuncs as C, listbox
 from PriCommon.ndviewer import main as aui
 from Priithon.all import U, N, Mrc
 ## for py2exe, here the relative import was impossible to run this script as __main__
-from chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder
+from chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
 
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
@@ -69,7 +69,7 @@ FILTER = '*.dv*'
 LOCAL_CHOICE = ['None', 'Projection']
 
 #----------- Execute this function to start
-def main(sysarg=None, title="Chromagnon v%s" % __version__):
+def _main(sysarg=None, title="Chromagnon v%s" % version.version):
     """
     start up the GUI
     return the frame object
@@ -83,6 +83,16 @@ def main(sysarg=None, title="Chromagnon v%s" % __version__):
     wx.Yield()
 
     return frame
+
+def main(sysarg=None, title="Chromagnon v%s" % version.version):
+    if wx.GetApp():
+        _main(sysarg=sysarg, title=title)
+    else:
+        sys.app = wx.App()
+        _main(sysarg=sysarg, title=title)
+        sys.app.MainLoop()
+        
+    bioformatsIO.uninit_javabridge()
 
 #------------ GUI -------------------
 class BatchPanel(wx.Panel):
@@ -501,9 +511,16 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
     
     if len(sys.argv) == 1:
-
-        from Priithon import PriApp
-        PriApp._maybeExecMain()
+        main()
+        old="""
+        if wx.GetApp():
+            main()
+        else:
+            sys.app = wx.App()
+            main()
+            sys.app.MainLoop()"""
+        #from Priithon import PriApp
+        #PriApp._maybeExecMain()
 
     else:
         import argparse, glob
@@ -554,4 +571,4 @@ if __name__ == '__main__':
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, ref, fns, parms)
         th.start()
-    bioformatsIO.uninit_javabridge()
+        bioformatsIO.uninit_javabridge()

@@ -11,7 +11,9 @@ dataTypeMaxValue_table = {
     N.float32: 1
     }
 BACKGROUND=(0.2,0.2,0.2,0) # color
-    
+CROPBOX = False
+
+
 class GLViewer(GLViewerCommon):
     def __init__(self, parent, dims=(1,2), size=wx.DefaultSize, style=0, originLeftBottom=None):
         '''
@@ -44,6 +46,8 @@ class GLViewer(GLViewerCommon):
         self.cropboxDragging = False
         self.dragSide = 0
         self.useHair = True
+        self.useCropbox = CROPBOX
+        self.viewGpx = [] # an container for cropbox drawing
 
         wx.EVT_PAINT(self, self.OnPaint)
         wx.EVT_MOUSE_EVENTS(self, self.OnMouse)
@@ -104,7 +108,7 @@ class GLViewer(GLViewerCommon):
         self.menu.Append(Menu_ZoomCenter,"zoom &center")
         #self.menu.Append(Menu_chgOrig, "c&hange Origin")
         self.menu.Append(Menu_Reload, "reload") # 
-        ## self.menu.AppendMenu(wx.NewId(), "save", self.menu_save)
+        self.menu.Append(Menu_SaveScrShot, 'save')#, self.menu_save) #wx.NewId(), "save", self.menu_save)
         self.menu.Append(Menu_aspectRatio, "change aspect ratio")
         self.menu.Append(Menu_noGfx, "hide all gfx\tb", '',wx.ITEM_CHECK)
             
@@ -114,7 +118,7 @@ class GLViewer(GLViewerCommon):
         wx.EVT_MENU(self, Menu_Reload,      self.OnReload)
         #wx.EVT_MENU(self, Menu_chgOrig,      self.OnChgOrig)
         ## wx.EVT_MENU(self, Menu_Save,      self.OnSave)
-        ##wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
+        wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
         ##wx.EVT_MENU(self, Menu_SaveClipboard,    self.OnSaveClipboard)
         ## wx.EVT_MENU(self, Menu_Assign,      self.OnAssign)
         wx.EVT_MENU(self, Menu_aspectRatio,      self.OnAspectRatio)
@@ -202,6 +206,11 @@ class GLViewer(GLViewerCommon):
         elif img.dtype.type == N.uint16:
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
                          GL_LUMINANCE,GL_UNSIGNED_SHORT, None)
+        elif img.dtype.type in (N.float64,
+                                N.int32, N.uint32, N.int64, N.uint64,):
+                                #N.complex64, N.complex128):
+            glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
+                         GL_LUMINANCE,GL_FLOAT, None)
         else:
             self.error = "unsupported data mode"
             raise ValueError, self.error
@@ -740,6 +749,11 @@ class GLViewer(GLViewerCommon):
         pass
 
     def doOnMouse(self, xeff, yeff, xyEffVal):
+        ly = self.mydoc.roi_start[self.dims[0]] #cropbox_l[self.dims[0]]
+        uy = self.mydoc.roi_size[self.dims[0]] + ly #cropbox_u[self.dims[0]]
+        lx = self.mydoc.roi_start[self.dims[1]] #cropbox_l[self.dims[1]]
+        ux = self.mydoc.roi_size[self.dims[1]] + lx #cropbox_u[self.dims[1]]
+        
         sliceIdx = [self.mydoc.z, self.mydoc.y, self.mydoc.x]
         horizontal_line = sliceIdx[self.dims[0]]
         vertical_line   = sliceIdx[self.dims[1]]
@@ -752,13 +766,40 @@ class GLViewer(GLViewerCommon):
         x = xeff
         y = yeff
         
-        if not (self.dragSide and self.cropboxDragging) and self.useHair: ## once drag starts, don't change the drag side
-            if abs(y - horizontal_line) <=1:
+        if not (self.dragSide and self.cropboxDragging) and (self.useHair or self.useCropbox): ## once drag starts, don't change the drag side
+
+            self.vclose = False
+            self.hclose = False
+            if abs(x-lx) <=2 and abs(y-uy) <=2 and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENWSE))
+                self.dragSide = 2
+            elif abs(x-ux) <=2 and abs(y-ly) <=2 and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENWSE))
+                self.dragSide = 6
+            elif abs(x-lx) <=2 and abs(y-ly) <=2 and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENESW))
+                self.dragSide = 8
+            elif abs(x-ux) <=2 and abs(y-uy) <=2 and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENESW))
+                self.dragSide = 4
+            elif lx < x < ux and ( abs(y-ly) <=2 or abs(y-uy) <=2) and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENS))
+                if abs(y - ly) < abs(y - uy):
+                    self.dragSide = 7
+                else:
+                    self.dragSide = 3
+            elif ly < y < uy and ( abs(x-lx) <=2 or abs(x-ux) <=2 ) and self.useCropbox:
+                self.SetCursor(wx.StockCursor(wx.CURSOR_SIZEWE))
+                if abs(x - lx) <=2 < abs(x - ux):
+                    self.dragSide = 1
+                else:
+                    self.dragSide = 5
+            elif abs(y - horizontal_line) <=1 and self.useHair:
                 self.SetCursor(wx.StockCursor(wx.CURSOR_SIZENS))
                 self.dragSide = 9
                 self.hclose = True
                 self.vclose = False
-            elif abs(x - vertical_line) <=1:
+            elif abs(x - vertical_line) <=1 and self.useHair:
                 self.SetCursor(wx.StockCursor(wx.CURSOR_SIZEWE))
                 self.dragSide = 10
                 self.vclose = True
@@ -768,13 +809,33 @@ class GLViewer(GLViewerCommon):
                 self.SetCursor(self.defaultCursor)
                 self.vclose = False
                 self.hclose = False
-            else:
-                self.vclose = False
-                self.hclose = False
+            ## else:
+            ##     self.vclose = False
+            ##     self.hclose = False
 
         viewer2update = -1 ## only when dragging sectioning lines is a viewer# (0,1,2) needed
         if self._onMouseEvt.LeftIsDown():
             if self.cropboxDragging:
+                if self.dragSide == 1:
+                    self.mydoc.roi_start[self.dims[1]] = x if 0 <= x < ux else ( 0 if x <0 else ux-1 )
+                elif self.dragSide == 5:
+                    self.mydoc.roi_size[self.dims[1]] = x - lx if lx < x < pic_nx else ( pic_nx - lx if x >=pic_nx else lx+1)
+                elif self.dragSide == 3:
+                    self.mydoc.roi_size[self.dims[0]] = y - ly if ly < y < pic_ny else (pic_ny - ly if y >= pic_ny else ly+1) 
+                elif self.dragSide == 7:
+                    self.mydoc.roi_start[self.dims[0]] = y if 0 <= y < uy else (0 if y <0 else uy -1) #cropbox_l[self.dims[0]] = y if 0 <= y < uy else (0 if y <0 else uy -1)
+                elif self.dragSide == 2:
+                    self.mydoc.roi_start[self.dims[1]] = x if 0 <= x < ux else ( 0 if x <0 else ux-1 ) #cropbox_l[self.dims[1]] = x if 0 <= x < ux else ( 0 if x <0 else ux-1 )
+                    self.mydoc.roi_size[self.dims[0]] = y -ly if ly < y < pic_ny else (pic_ny - ly if y >= pic_ny else ly+1) #cropbox_u[self.dims[0]] = y if ly < y < pic_ny else (pic_ny if y >= pic_ny else ly+1)
+                elif self.dragSide == 4:
+                    self.mydoc.roi_size[self.dims[1]] = x - lx if lx < x < pic_nx else ( pic_nx - lx if x >=pic_nx else lx+1) #cropbox_u[self.dims[1]] = x if lx < x < pic_nx else ( pic_nx if x >=pic_nx else lx+1)
+                    self.mydoc.roi_size[self.dims[0]] = y - ly if ly < y < pic_ny else (pic_ny - ly if y >= pic_ny else ly+1) #cropbox_u[self.dims[0]] = y if ly < y < pic_ny else (pic_ny if y >= pic_ny else ly+1)
+                elif self.dragSide == 6:
+                    self.mydoc.roi_size[self.dims[1]] = x -lx if lx < x < pic_nx else ( pic_nx - lx if x >=pic_nx else lx+1) #cropbox_u[self.dims[1]] = x if lx < x < pic_nx else ( pic_nx if x >=pic_nx else lx+1)
+                    self.mydoc.roi_start[self.dims[0]] = y if 0 <= y < uy else (0 if y <0 else uy -1) #cropbox_l[self.dims[0]] = y if 0 <= y < uy else (0 if y <0 else uy -1)
+                elif self.dragSide == 8:
+                    self.mydoc.cropbox_l[self.dims[1]] = x if 0 <= x < ux else ( 0 if x <0 else ux-1 )
+                    self.mydoc.cropbox_l[self.dims[0]] = y if 0 <= y < uy else (0 if y <0 else uy -1)
                 if self.dragSide == 9:  ## horizontal sectioning line
                     v = y if 0<=y<pic_ny else (0 if y < pic_ny//2 else pic_ny-1)
                     viewer2update = self.dims[0]
