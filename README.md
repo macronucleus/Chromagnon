@@ -24,7 +24,7 @@ The source
 The source codes are written in pure python and works on the following platforms and dependencies.
 
 Platforms successfully tested:
-* MacOSX64bit (10.9.5-10.11.6)
+* MacOSX64bit (10.9.5-10.12.5)
 * Windows64bit (XP-10)
 * Linux Ubuntu(16)
 
@@ -33,13 +33,10 @@ Dependencies:
 * opencv
 * numpy
 * scipy
-* wxpython
+* wxpython (3.0)
 * pyopengl
 * fftw3 with FFTW3.3.4
 * javabridge
 * bioformats
-
-Run the following command on the terminal to run Chromagnon.
->> pythonw ~/chromagnon/main.py
 
 Authored and maintained by Atsushi Matsuda.

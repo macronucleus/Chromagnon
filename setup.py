@@ -18,9 +18,9 @@ if sys.argv[1] in ('py2exe', 'py2app'):
     elif sys.argv[1] == 'py2app':
         suff = 'Mac'
     
-    import chromagnon as ch
+    import Chromagnon as ch
     version = ch.__version__
-    chrodir = os.path.dirname(ch.main.__file__)
+    chrodir = os.path.dirname(ch.chromagnon.__file__)
     folder = 'ChromagnonV%s%s' % (version.replace('.', ''), suff)
     
     #---------- remove previous build ---------------
@@ -42,11 +42,11 @@ if sys.argv[1] in ('py2exe', 'py2app'):
 
     # conda
     home = os.path.expanduser('~')
-    script = os.path.join('py', 'chromagnon', 'main.py')
+    script = os.path.join('py', 'Chromagnon', 'chromagnon.py')
 
     if sys.platform == 'darwin':
         mini = 'miniconda'
-        mainscript = os.path.join(home, 'Dropbox', script)
+        mainscript = os.path.join(home, 'codes', script)
 
     elif sys.platform == 'win32':
         mini = 'Miniconda2'
@@ -170,27 +170,58 @@ elif sys.platform == 'win32' and sys.argv[1] == 'py2exe':
          options={'py2exe': OPTIONS},
               )
 
-# --------------- python setup.py sdist/install ------------------    
+# --------------- python setup.py sdist/install ------------------
+# Normally unix-like platforms will use "setup.py install"
+
 else:
     try:
         import cv2
     except ImportError:
         raise ImportError, 'Please install opencv-python MANUALLY by yourself before installing Chromagnon'
-    
-    mainscript = os.path.join('chromagnon', 'main.py')
-    h = open('chromagnon/version.py')
+
+    # http://stackoverflow.com/questions/2159211/use-distribute-setuptools-to-create-symlink-or-run-script
+    from setuptools.command.install import install
+    class CustomInstallCommand(install):
+        """Customized setuptools install command - prints a friendly greeting."""
+        def run(self):
+            print "Hello, developer, how are you? :)"
+            install.run(self)
+            #post-processing code
+            if sys.platform == 'linux':
+                os.command('ln -s %s/Priithon %s/PriCommon/Priithon')
+
+    mainscript = os.path.join('Chromagnon', 'chromagnon.py')
+    #mainscript = '.'.join(('chromagnon', 'main'))
+    h = open('Chromagnon/version.py')
     line = h.readline()
     exec(line)
     
-    packages = ['chromagnon', 'Priithon', 'Priithon.plt', 'PriCommon', 'PriCommon.ndviewer', 'PriCommon.mybioformats']
-      
-    extra_options = dict(
-        install_requires=['numpy', 'scipy', 'wxpython', 'pyopengl', 'javabridge', 'lxml', 'python-bioformats'],# 'opencv-python'], # HELPME: opencv is not found by setuptools
-        packages=packages,
-         # Normally unix-like platforms will use "setup.py install"
-         # and install the main script as such
-         scripts=[mainscript],
-     )
+    packages = ['Chromagnon', 'Chromagnon.Priithon', 'Chromagnon.Priithon.plt', 'Chromagnon.PriCommon', 'Chromagnon.PriCommon.ndviewer', 'Chromagnon.PriCommon.mybioformats']
+
+    if sys.platform.startswith('linux'):
+        extra_options = dict(
+            install_requires=['numpy', 'scipy', 'wxpython==3.0', 'pyopengl', 'javabridge', 'lxml', 'python-bioformats'],# 'opencv-python'], # HELPME: opencv is not found by setuptools
+            packages=packages,
+            #scripts=[mainscript], #--> PriCommon not found from main.py also not pythonw
+            entry_points = {
+                           'gui_scripts': ['chromagnon=chromagnon:main']},
+            # -> pythonw is not used?
+            cmdclass={
+            'install': CustomInstallCommand}
+            )
+    else:
+        extra_options = dict(
+            install_requires=['numpy', 'scipy', 'wxpython==3.0', 'pyopengl', 'javabridge', 'lxml', 'python-bioformats'],# 'opencv-python'], # HELPME: opencv is not found by setuptools
+            packages=packages,
+            scripts=[mainscript], #--> PriCommon not found from main.py also not pythonw
+            #entry_points = {
+            #               'gui_scripts': ['chromagnon=%s:main' % mainscript]}
+            # -> pythonw is not used?
+            cmdclass={
+            'install': CustomInstallCommand}
+            )
+
+    # ln -s ../Priithon PriCommon/Priithon
 
 # -------- Execute -----------------
 setup(

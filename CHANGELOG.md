@@ -7,6 +7,13 @@ v0.5 (Jan. 2017)
 4. Fixed instability when opening viewer on Linux
 5. Warning message for init guess was changed slightly
 6. Added `setup.py`
+7. Changed the package name `chromagnon` to `Chromagnon`, and the
+   module name `main.py` to `chromagnon.py` to be compatible with
+   "script" scheme on Mac and Windows installation from the source.
+8. Changed directory structure to include Priithon and PriCommon
+inside Chromagnon
+9. Added entry_points or scripts to `setup.py`
+10. Removed grid view for local alignment.
 
 v0.4 (Sep. 2016)
 ----
