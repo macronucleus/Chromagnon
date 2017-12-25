@@ -1,12 +1,7 @@
 #!/usr/bin/env priithon
 from __future__ import with_statement
 import os, sys, tempfile
-
-try: # inside package
-    from ..Priithon import Mrc
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import Mrc
-    
+from Priithon.all import Mrc
 from packages import priismCommands, byteSwap
 
 PRINTOUT=False

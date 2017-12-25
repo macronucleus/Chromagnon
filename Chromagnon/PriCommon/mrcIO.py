@@ -1,8 +1,4 @@
-try: # inside package
-    from ..Priithon import Mrc
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import Mrc
-    
+from Priithon import Mrc
 import numpy as N
 from . import generalIO
 
@@ -64,9 +60,12 @@ class MrcReader(generalIO.GeneralReader):
             self.hdr = hdr
 
 
-    def getArr(self, t=0, z=0, w=0):
-        i = self.findFileIdx(t, z, w)
+    #def getArr(self, t=0, z=0, w=0):
+    #    i = self.findFileIdx(t, z, w)
 
+    #        return self.fp.readSec(i)
+
+    def readSec(self, i):
         return self.fp.readSec(i)
 
 

@@ -1,7 +1,10 @@
 
 import os, threading, exceptions, time, sys
 import wx
-from . import alignfuncs, chromformat, aligner
+try:
+    from . import alignfuncs, chromformat, aligner
+except ValueError:
+    import alignfuncs, chromformat, aligner
 from PriCommon import bioformatsIO, flatConv
 
 
@@ -21,6 +24,7 @@ EVT_ECHO_ID = wx.NewId()
 EVT_INITGUESS_ID = wx.NewId()
 EVT_SETFLAT_ID = wx.NewId()
 EVT_CLOSE_PAGE_ID = wx.NewId()
+EVT_PROGRESS_ID = wx.NewId()
 
 # Dine events
 def BindEvent(win, func, evt_id):
@@ -50,6 +54,7 @@ class ThreadWithExc(threading.Thread):
         self.targets = targets
         self.parms = parms
         self.img_suffix = aligner.IMG_SUFFIX
+        self.logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
         
     def _get_my_tid(self):
         """determines this (self's) thread id
@@ -71,12 +76,6 @@ class ThreadWithExc(threading.Thread):
                 self._thread_id = tid
                 return tid
 
-    def echo(self, msg):
-        if self.notify_obj:
-            wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
-        else:
-            print msg
-            
     def run(self):
         """
         This function execute the series of processes
@@ -94,6 +93,8 @@ class ThreadWithExc(threading.Thread):
         if initGuess and not os.path.isfile(initGuess):
             raise ValueError, 'The initial guess is not a valid Chromagnon file'
         local = parms[2]
+
+
         #cthre = parms[3]
         #forceZmag = parms[3]
         maxShift = parms[3]
@@ -102,6 +103,7 @@ class ThreadWithExc(threading.Thread):
         self.img_suffix = parms[6]
         nts = parms[7]
         self.img_ext = parms[8]
+        min_pxls_yx = parms[9]
         
         saveAlignParam = True
         alignChannels = True
@@ -115,13 +117,19 @@ class ThreadWithExc(threading.Thread):
 
         kwds = {}
 
+        #if self.notify_obj:
+        #    wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [0]))
+        self.progress(0)
+
         try:
             # calibration
             for index, fn in enumerate(fns):
                 clk0 = time.clock()
                # an = aligner.Chromagnon(fn)
                 # calculation
-                if not chromformat.is_chromagnon(fn):#hasattr(an.img, 'hdr') or an.img.hdr.type != aligner.IDTYPE:
+                if not chromformat.is_chromagnon(fn):
+                    tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
+                    self.log('\n**Measuring shifts in %s at %s' % (os.path.basename(fn), tstf))
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
@@ -129,6 +137,9 @@ class ThreadWithExc(threading.Thread):
                     an = self.getAligner(fn, index, what='ref')
                     an.setZmagSwitch(zmag)#setForceZmag(forceZmag)
                     an.setMaxShift(maxShift)
+
+                    pgen = self.progressValues(target=False, an=an, alignChannels=alignChannels, alignTimeFrames=alignTimeFrames, local=local)
+                    an.setProgressfunc(pgen)
                     
                     if initGuess:
                         an.loadParm(initGuess)
@@ -136,9 +147,10 @@ class ThreadWithExc(threading.Thread):
                         an.mapyx = None
                     
                     #if (alignChannels and nts[index] <= 1) or (alignChannels and not alignTimeFrames):
-                    if (alignChannels and an.nw > 1) or (alignChannels and not alignTimeFrames):
+                    if (an.nw > 1 and an.nt == 1):#(alignChannels and an.nw > 1):# or (alignChannels and not alignTimeFrames):
                         an.findBestChannel()
-                        self.echo('Calculating...')
+                        self.echo('Calculating channel alignment...')
+                        
                         for t in xrange(an.nt):
                             try:
                                 an.findAlignParamWave(t=t)
@@ -146,24 +158,30 @@ class ThreadWithExc(threading.Thread):
                                 self.echo('Calculation failed, skipping')
                                 errs.append(index)
                                 continue
+                            
                             if local in self.localChoice[1:]:
                                 #an.setCCthreshold(cthre)
-                                arr = an.findNonLinear2D(t=t)
-                                del arr
+                                #arr = an.findNonLinear2D(t=t, npxls=min_pxls_yx)
+                                #del arr
+                                an.findNonLinear2D(t=t, npxls=min_pxls_yx)
+                                
                             if local in self.localChoice[2:]:
-                                arr = an.findNonLinear3D(t=t)
+                                arr = an.findNonLinear3D(t=t, npxls=min_pxls_yx)
                                 del arr
+                            
                         
                     elif an.nt > 1:#alignTimeFrames:
+                        self.echo('Calculating timelapse alignment...')
                         an.findBestChannel()
                         an.findBestTimeFrame(an.refwave)
+                        
                         an.findAlignParamTime(doWave=False)
 
                     fn = an.saveParm()
-                    if not initGuess and self.notify_obj:
-                        wx.PostEvent(self.notify_obj, MyEvent(EVT_INITGUESS_ID, [fn]))
+                    #if not initGuess and self.notify_obj:
+                    #    wx.PostEvent(self.notify_obj, MyEvent(EVT_INITGUESS_ID, [fn]))
                         
-                    initGuess = fn
+                    #initGuess = fn
                         #fn = initGuess = an.saveParm()
                         #self.initGuess.SetValue(initGuess)
                         #self.initGuess.SetForegroundColour(wx.BLUE)
@@ -172,15 +190,11 @@ class ThreadWithExc(threading.Thread):
                     clk1 = time.clock()
                     print 'Done seconds', (clk1-clk0)
                     
-                    if 0:#local in self.localChoice[1:]:
-                        an.loadParm(fn)
-                        #nonlinear = bioformatsIO.load(an.saveNonlinearImage())
-                        nonlinear = an.saveNonlinearImage()
-                        if self.notify_obj:
-                            wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
-                        #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fn]))
-                        #else:
-                        #wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fns[index], fn]))
+                    #if local in self.localChoice[1:]:# and not wx.__version__.startswith('2.8'):
+                     #   an.loadParm(fn)
+                        #nonlinear = an.saveNonlinearImage()
+                        #if self.notify_obj:
+                        #    wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
 
                     an.close()
                 
@@ -194,11 +208,18 @@ class ThreadWithExc(threading.Thread):
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
                     
                     target = targets[index]
-                    an = self.getAligner(target, index, what='target')
-                    an.loadParm(fn)
+                    tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
+                    self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
 
-                    if cutout:
-                        an.setRegionCutOut()
+                    an = self.getAligner(target, index, what='target')
+                    
+                    pgen = self.progressValues(target=True, an=an)
+                    an.setProgressfunc(pgen)
+                    self.progress(0)
+
+                    an.loadParm(fn)
+                    #if cutout:
+                    an.setRegionCutOut(cutout)
 
                     old='''
                     import sys
@@ -226,6 +247,9 @@ class ThreadWithExc(threading.Thread):
                     donetgt.append(index)
 
                     an.close()
+                    #if self.notify_obj:
+                        #wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [prange.pop(0)]))
+                    #pgen.next()
 
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
@@ -243,13 +267,17 @@ class ThreadWithExc(threading.Thread):
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
                 target = targets[index]
+                self.log('\n**Applying to %s' % os.path.basename(target))
+                
                 an = self.getAligner(target, index, what='target')
+                pgen = self.progressValues(target=True, an=an)
+                an.setProgressfunc(pgen)
+                self.progress(0)
 
                 if len(fns):
                     an.loadParm(fn)
 
-                if cutout:
-                    an.setRegionCutOut()
+                an.setRegionCutOut(cutout)
 
                 out = an.saveAlignedImage()
 
@@ -259,6 +287,8 @@ class ThreadWithExc(threading.Thread):
 
                 if self.notify_obj:
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
+                    #wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [prange.pop(0)]))
+                   # pgen.next()
 
 
                 #out = aligner.Chromagnon(out)
@@ -269,6 +299,7 @@ class ThreadWithExc(threading.Thread):
         except MyError:
             if self.notify_obj:
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_ABORT_ID, []))
+                wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [0]))
             else:
                 pass
         except:
@@ -277,13 +308,19 @@ class ThreadWithExc(threading.Thread):
             if self.notify_obj:
                 import traceback, sys
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_ERROR_ID, sys.exc_info()))#formatted]))
+                #wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [0]))
+                self.progress(0)
             else:
                 pass
         else:
             if self.notify_obj:
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_DONE_ID, [doneref, donetgt, errs]))
+                #wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [0]))
+                self.progress(0)
             else:
                 pass
+        finally:
+            self.logh.close()
         #bioformatsIO.uninit_javabridge()
 
     def getAligner(self, fn, index, what='ref'):
@@ -303,6 +340,54 @@ class ThreadWithExc(threading.Thread):
         an.setEchofunc(self.echo)
         return an
 
+    
+    def echo(self, msg):
+        if self.notify_obj:
+            wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
+            self.log(msg, prefix='    ')
+        else:
+            print msg
+
+    def log(self, msg, prefix=''):
+        self.logh.write('%s%s\n' % (prefix, msg))
+
+    def progressValues(self, target=False, an=None, alignChannels=None, alignTimeFrames=None, local=None):
+        import numpy as N
+        
+        prange = []
+        if not target:
+            if (alignChannels and an.nw > 1) or (alignChannels and not alignTimeFrames):
+                prange += [0.5+0.5*round(an.nz/50)]
+                prange += [1] * (an.nw-1) * an.nt
+                prange += [round(an.nz/10) or 0.5] * (an.nw-1) * an.nt
+                if local in self.localChoice[1:]:
+                    prange += [1] * (an.nw-1) * an.nt
+
+                #prange += [round(an.nz/25)] * an.nw * an.nt * ntargets
+            elif an.nt > 1:
+                prange += [0.5+0.5*round(an.nz/50)]
+
+                prange += [(1+round(an.nz/10))]*(an.nt-1)
+
+                #prange += [round(an.nz/25)] * an.nw * an.nt * ntargets
+
+        else:
+            prange += [1] * an.nw * an.nt
+            
+        pratio = 100 / sum(prange)
+        prange = [p*pratio for p in prange]
+        prange = list(N.cumsum(prange)) + [100]*100 # [100] for safety...
+        #print 'prange', prange
+        return self.progressGen(prange)
+
+    def progressGen(self, vals):
+        for val in vals:
+            yield self.progress(val)
+
+    def progress(self, val):
+        if self.notify_obj:
+            return wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [val]))
+        #print 'pval', val
             
 class GUImanager(wx.EvtHandler):
     def __init__(self, panel, name=None):
@@ -331,6 +416,8 @@ class GUImanager(wx.EvtHandler):
         BindEvent(self, self.OnSetFlat, EVT_SETFLAT_ID)
 
         BindEvent(self, self.OnClosePage, EVT_CLOSE_PAGE_ID)
+
+        BindEvent(self, self.OnProgress, EVT_PROGRESS_ID)
 
 
         self.OnStart()
@@ -436,7 +523,10 @@ class GUImanager(wx.EvtHandler):
 
     def OnClosePage(self, evt):
         self.panel.aui.imEditWindows.DeletePage(evt.data[0])
-        
+
+    def OnProgress(self, evt):
+        self.panel.progress.SetValue(evt.data[0])
+
 
 class ThreadFlat(ThreadWithExc):
     '''A thread class that supports raising exception in the thread from
@@ -501,7 +591,7 @@ class ThreadFlat(ThreadWithExc):
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.RED]))
 
                 base, ext = os.path.splitext(target)
-                out = ''.join((base, parms[1], os.path.extsep, parms[2]))
+                out = ''.join((base, parms[1], parms[2]))
                 out = flatConv.flatConv(target, flatFile, out=out)#None, suffix=parms[1])
 
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))

@@ -468,11 +468,7 @@ class ImgSeqWriter(generalIO.GeneralWriter):
             self._setSuffix()
 
     def setDimFromMrcHdr(self, hdr):
-        try: # inside package
-            from ..Priithon import Mrc
-        except ValueError: # Attempted relative import beyond toplevel package
-            from Priithon import Mrc
-        #from Priithon.all import Mrc
+        from Priithon.all import Mrc
         self.wave = hdr.wave
         self.nw = hdr.NumWaves
         self.nt = hdr.NumTimes

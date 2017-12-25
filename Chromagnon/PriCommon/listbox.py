@@ -127,7 +127,13 @@ class BasicFileListCtrl(wx.ListCtrl,
 
         # column 2
 
-        nw = [str(w) for w in h.wave[:h.nw]]
+        nw = []
+        for w in h.wave[:h.nw]:
+            if w % 1:
+                nw.append(str(int(round(w))))
+            else:
+                nw.append(str(w))
+        #nw = [str(w) for w in h.wave[:h.nw]]
         wstr = ','.join(nw)
         self.SetStringItem(index, 2, wstr)
 
@@ -257,8 +263,13 @@ class FileListCtrl(BasicFileListCtrl):
         self.SetStringItem(index, 1, ff)
 
         # column 2
-
-        nw = [str(w) for w in h.wave[:h.nw]]
+        nw = []
+        for w in h.wave[:h.nw]:
+            if w % 1:
+                nw.append(str(int(round(w))))
+            else:
+                nw.append(str(w))
+        #nw = [str(w) for w in h.wave[:h.nw]]
         wstr = ','.join(nw)
         self.SetStringItem(index, 2, wstr)
 

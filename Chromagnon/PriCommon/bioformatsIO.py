@@ -7,7 +7,7 @@ try:
     import bioformats
     import unicodedata
     ## to use structured_annotations, I needed to change some code in omexml.py
-    from .mybioformats import omexml as ome
+    from PriCommon.mybioformats import omexml as ome
 
 except ImportError:
     print 'bioformats unavailable'
@@ -78,7 +78,7 @@ if 'czi' not in bioformats.READABLE_FORMATS:
     _READABLE_FORMATS.sort()
     bioformats.READABLE_FORMATS = tuple(_READABLE_FORMATS)
 
-READABLE_FORMATS = tuple(set(bioformats.READABLE_FORMATS + mrcIO.READABLE_FORMATS))
+READABLE_FORMATS = tuple([os.path.extsep + ee for ee in set(bioformats.READABLE_FORMATS + mrcIO.READABLE_FORMATS)])
 
 # at this moment, "series" data sets are not supported...
 
@@ -815,7 +815,7 @@ class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
                 nz, ny, nx = rdr.roi_size
             else:
                 nz, ny, nx = rdr.nz, rdr.ny, rdr.nx
-            self.setDim(nx, ny, nx, rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
+            self.setDim(nx, ny, nz, rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
             #raise RuntimeError
         
         self.metadata = rdr.metadata

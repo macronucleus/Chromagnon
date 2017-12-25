@@ -140,10 +140,7 @@ class MyCanvasBase(glcanvas.GLCanvas):
         pass # Do nothing, to avoid flashing on MSW.
 
     def OnSize(self, event):
-        try:
-            self.m_w, self.m_h = self.GetClientSizeTuple()
-        except AttributeError:
-            self.m_w, self.m_h = 10, 10
+        self.m_w, self.m_h = self.GetClientSizeTuple()
         if self.m_w <=0 or self.m_h <=0:
             #print "debug: HistogramCanvas.OnSize: self.m_w <=0 or self.m_h <=0", self.m_w, self.m_h
             return

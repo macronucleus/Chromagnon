@@ -1332,7 +1332,7 @@ def lowPassGaussFilter(a, sigma=5):
 
     nx = s[0] # FIXME HACK
     sigma=1/(2.*N.pi*sigma)*nx
-    g = gaussianArr(tuple(s[:-1]) + (s2[-1]+1,),
+    g = gaussianArr(tuple(s[:-1]) + (int(s2[-1])+1,),
                     sigma, peakVal=1, orig=0, wrap=(1,)*(a.ndim-1)+(0,))
 
     af = rfft(a)

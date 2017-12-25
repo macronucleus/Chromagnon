@@ -88,8 +88,8 @@ class GammaPopup(wx.Frame):
 
 
 class GLViewer(GLViewerCommon):
-    def __init__(self, parent, imgArr, size=wx.DefaultSize, originLeftBottom=None):
-        GLViewerCommon.__init__(self, parent, size, originLeftBottom)
+    def __init__(self, parent, imgArr, size=wx.DefaultSize, originLeftBottom=None):#, depth=32):
+        GLViewerCommon.__init__(self, parent, size, originLeftBottom)#, depth=depth)
 
         self.m_viewComplexAsAbsNotPhase = True
         #20071114 self.m_imgToDo = imgArr

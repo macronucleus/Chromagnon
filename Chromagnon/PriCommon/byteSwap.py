@@ -1,8 +1,6 @@
 #!/usr/bin/env priithon
-try: # inside package
-    from ..Priithon import Mrc
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import Mrc
+
+from Priithon.all import Mrc
 import OMXlab as O
 import os
 

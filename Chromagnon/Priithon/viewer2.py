@@ -14,8 +14,8 @@ dataTypeMaxValue_table = {
     N.float32: 1
     }
 class GLViewer(GLViewerCommon):
-    def __init__(self, parent, size=wx.DefaultSize, originLeftBottom=None):
-        GLViewerCommon.__init__(self, parent, size, originLeftBottom)
+    def __init__(self, parent, size=wx.DefaultSize, originLeftBottom=None):#, depth=32):
+        GLViewerCommon.__init__(self, parent, size, originLeftBottom)#, depth=depth)
         
         ###self.m_imgChanged = True
         self.m_imgsGlListChanged = False

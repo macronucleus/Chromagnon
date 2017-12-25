@@ -274,9 +274,26 @@ class spv(spvCommon):
 
         self.putZSlidersIntoTopBox(self.upperPanel, self.boxAtTop)
         sizer.AddSizer(self.boxAtTop, 0, wx.GROW|wx.ALL, 2)
-        
+
         import viewer
         v = viewer.GLViewer(self.upperPanel, self.img, originLeftBottom=originLeftBottom)
+
+        test="""
+        # wx.glcanvas not running on xcygwin
+        # https://github.com/mkeeter/kokopelli/commit/823a93438d9c5f75e16d19339a9ab96e5d971b0c
+        from wx import glcanvas
+        v = None
+        for d in [32, 24, 16, 8]:
+            try:
+                v = viewer.GLViewer(self.upperPanel, self.img, originLeftBottom=originLeftBottom, depth=d)
+            except Exception, e:
+                print d, e
+                #continue
+            else:
+                break
+        if v is None:
+            raise RuntimeError, 'depth of this display not found for open gl'"""
+            
         self.viewer = v
         
         self.viewer.Bind(wx.EVT_IDLE, self.OnIdle)

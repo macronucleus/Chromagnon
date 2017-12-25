@@ -11,7 +11,10 @@ import sys, os
 import wx
 from PriCommon import guiFuncs as G, commonfuncs as C, flatConv, listbox, bioformatsIO
 from PriCommon.ndviewer import main as aui
-from . import chromformat, aligner, chromeditor, threads
+try:
+    from . import chromformat, aligner, chromeditor, threads
+except ValueError:
+    import chromformat, aligner, chromeditor, threads
 
 #----------- Global constants
 
@@ -149,7 +152,7 @@ class BatchPanel(wx.Panel):
         label, self.flatimg_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('flatimg_suffix_txt', '_'+flatConv.EXT.upper()), tip='A suffix for the output file name', sizeX=100)
 
         choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
-        label, self.outextch = G.makeListChoice(self, box, '', choices, defValue=confdic.get('flat_format', aligner.WRITABLE_FORMATS[0]), tip='Choose image file formats; for reading with ImageJ, dv is recommended.')
+        label, self.outextch = G.makeListChoice(self, box, '', choices, defValue=confdic.get('flat_format', choices[0]), tip='Choose image file formats; for reading with ImageJ, dv is recommended.')
         
         # \n
         box = G.newSpaceV(sizer)
@@ -394,10 +397,10 @@ class BatchPanel(wx.Panel):
             target_is_image = True
 
         if target_is_image:
-            newpanel = aui.ImagePanel(self.aui, an)
+            newpanel = aui.ImagePanel(self.aui, an.img)
 
         else:
-            an.close()
+            #an.close()
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
         if isinstance(target, basestring):

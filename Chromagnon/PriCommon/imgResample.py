@@ -1,16 +1,16 @@
+from Priithon.all import U, N
 try:
-    from ..Priithon.all import U, N
-except ValueError:
-    from Priithon.all import U, N
-    
-import __main__
-if hasattr(__main__, '__file__'): # not interactive
-    import multiprocessing as mp
-    NCPU=mp.cpu_count()
-    from . import ppro26 as ppro
-else: # interactive mode
+    from Priithon.all import Y
+    if not hasattr(Y, 'view'):
+        import multiprocessing as mp
+        NCPU=mp.cpu_count()
+        from . import ppro26 as ppro
+    else:
+        mp = None
+        NCPU = 1
+except ImportError:
     mp = None
-    NCPU = 1
+    NCPU=1
 
 try:
     import cv
@@ -21,6 +21,8 @@ except ImportError:
         cv = cv2
     except:
         pass
+    
+import scipy.ndimage.interpolation as ndii
 
 METHODS = {'0nearest': 0,
            '1bilinear': 1,
@@ -591,7 +593,7 @@ def remap(img, mapy, mapx, interp=2):
 
     return N.asarray(cdes)
 
-def logpolar(img, center=None, mag=1):
+def logpolar_cv(img, center=None, mag=1):
     des = N.empty_like(img)
     if center is None:
         center = N.divide(img.shape, 2)
@@ -603,3 +605,58 @@ def logpolar(img, center=None, mag=1):
     cv.LogPolar(cimg, cdes, tuple(center), mag)#, cv.CV_WARP_FILL_OUTLIERS)
 
     return N.array(cdes)
+
+
+# http://www.lfd.uci.edu/~gohlke/code/imreg.py.html
+
+# Copyright (c) 2011-2014, Christoph Gohlke
+# Copyright (c) 2011-2014, The Regents of the University of California
+# Produced at the Laboratory for Fluorescence Dynamics
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in the
+#   documentation and/or other materials provided with the distribution.
+# * Neither the name of the copyright holders nor the names of any
+#   contributors may be used to endorse or promote products derived
+#   from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+def logpolar(image, center=None, angles=None, radii=None):
+    """Return log-polar transformed image and log base."""
+    shape = image.shape
+    if center is None:
+        center = shape[0] / 2, shape[1] / 2
+    if angles is None:
+        angles = shape[0]
+    if radii is None:
+        radii = shape[1]
+    theta = N.empty((angles, radii), dtype=N.float64)
+    theta.T[:] = -N.linspace(0, N.pi, angles, endpoint=False)
+    #d = radii
+    d = N.hypot(shape[0]-center[0], shape[1]-center[1])
+    log_base = 10.0 ** (N.log10(d) / (radii))
+    radius = N.empty_like(theta)
+    radius[:] = N.power(log_base, N.arange(radii,
+                                                   dtype=N.float64)) - 1.0
+    x = radius * N.sin(theta) + center[0]
+    y = radius * N.cos(theta) + center[1]
+    output = N.empty_like(x)
+    ndii.map_coordinates(image, [x, y], output=output)
+    return output, log_base

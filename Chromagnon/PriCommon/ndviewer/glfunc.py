@@ -61,8 +61,6 @@ class graphix_slicelines(graphix):
         pic_ny, pic_nx = shapes.max(0)
         #print pic_ny, pic_nx, x0, y0
 
-        self.cropbox_rightside = glview.pic_nx
-        self.cropbox_upperside = glview.pic_ny
         try:
             self.lowerbounds = [-glview.y0 /glview.scale, -glview.x0 / glview.scale]
             self.upperbounds = [(glview.h-glview.y0) /glview.scale, (glview.w-glview.x0) / glview.scale]
@@ -70,7 +68,12 @@ class graphix_slicelines(graphix):
             self.lowerbounds = [0, 0]
             self.upperbounds = [glview.h /glview.scale, glview.w / glview.scale]
 
-
+        try:
+            self.cropbox_rightside = glview.pic_nx
+            self.cropbox_upperside = glview.pic_ny
+        except:
+            self.cropbox_rightside = 0
+            self.cropbox_upperside = 0
 
     def GLfunc(self):
         GL.glColor(self.color)

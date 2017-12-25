@@ -52,7 +52,10 @@ except:
     from Chromagnon.PriCommon.ndviewer import main as aui
     from Chromagnon.Priithon.all import U, N, Mrc
 ## for py2exe, here the relative import was impossible to run this script as __main__
-from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+try:
+    from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+except:
+    import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
 
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
@@ -60,10 +63,11 @@ C.CONFPATH = 'Chromagnon.conf'
 LISTSIZE_X=sum([val for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')])
 LISTSPACE=10
 FRAMESIZE_X= LISTSIZE_X * 2 + LISTSPACE
-FRAMESIZE_Y=250
+FRAMESIZE_Y=220#250
 
 if sys.platform.startswith('win'):
     LIST_Y=140
+    FRAMESIZE_Y += 10
 elif sys.platform.startswith('darwin'):
     LIST_Y=155
 else:
@@ -71,7 +75,7 @@ else:
 
 FILTER = '*.dv*'
 
-LOCAL_CHOICE = ['None', 'Projection']
+LOCAL_CHOICE = ['None', 'Projection']#, 'Section-wise']
 
 #----------- Execute this function to start
 def _main(sysarg=None, title="Chromagnon v%s" % version.version):
@@ -90,14 +94,17 @@ def _main(sysarg=None, title="Chromagnon v%s" % version.version):
     return frame
 
 def main(sysarg=None, title="Chromagnon v%s" % version.version):
+    
     if wx.GetApp():
-        _main(sysarg=sysarg, title=title)
+        frame = _main(sysarg=sysarg, title=title)
     else:
         sys.app = wx.App()
-        _main(sysarg=sysarg, title=title)
+        frame = _main(sysarg=sysarg, title=title)
         sys.app.MainLoop()
         
-    bioformatsIO.uninit_javabridge()
+        bioformatsIO.uninit_javabridge()
+
+    return frame
 
 #------------ GUI -------------------
 class BatchPanel(wx.Panel):
@@ -202,21 +209,31 @@ class BatchPanel(wx.Panel):
         self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
         
         self.localChoice = LOCAL_CHOICE
-        label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'))
+        label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
 
-        #------ initial guess -------
-        self.label = G.makeTxt(self, box, ' ')
+        self.min_pxls_label, self.min_pxls_choice = G.makeListChoice(self, box, 'min window size', af.MIN_PXLS_YXS, defValue=confdic.get('min_pxls_yx', af.MIN_PXLS_YXS[1]), tip='Minimum number of pixel to divide as elements of local alignment')
 
-        # \n
-        box = G.newSpaceV(sizer)
+        self.OnLocalListChose()
+
+        self.progress = wx.Gauge(self, -1, 100, size=(100,-1))
+        box.Add(self.progress)
         
-        self.initguessButton = G.makeButton(self, box, self.OnChooseInitGuess, title='Initial guess', tip='', enable=True)
+        self.label = G.makeTxt(self, box, ' ')
 
         _col_sizes=[(key, val) for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')]
         _col_sizes.sort()
 
         LISTSIZE_X2 = sum([val for key, val in _col_sizes[:3]])
         LIST_Y2 = 30
+        
+        old="""
+        #------ initial guess -------
+        # \n
+        box = G.newSpaceV(sizer)
+        
+        self.initguessButton = G.makeButton(self, box, self.OnChooseInitGuess, title='Initial guess', tip='', enable=True)
+
+
         self.initGuess = listbox.BasicFileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
                                  | wx.BORDER_NONE
@@ -237,13 +254,15 @@ class BatchPanel(wx.Panel):
 
         
         self.clearInitguessButton = G.makeButton(self, box, self.OnClearInitGuess, title='Clear', tip='', enable=True)
-        self.clearInitguessButton.Enable(0)
+        self.clearInitguessButton.Enable(0)"""
 
         #------ flat fielder --------
 
         self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
         self.flatButton.SetToolTipString('Open a graphical interphase to flat field images')
-        flatsize = self.initguessButton.GetSize()[0] + LISTSIZE_X2 + self.clearInitguessButton.GetSize()[0] + self.flatButton.GetSize()[0]
+
+        #flatsize = self.initguessButton.GetSize()[0] + LISTSIZE_X2 + self.clearInitguessButton.GetSize()[0] + self.flatButton.GetSize()[0]
+        flatsize = self.goButton.GetSize()[0] + self.zmaglabel.GetSize()[0] + self.zmagch.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
 
         G.newSpaceH(box, FRAMESIZE_X-flatsize)
 
@@ -282,7 +301,7 @@ class BatchPanel(wx.Panel):
         """
         self.refselected = [i for i in range(self.listRef.GetItemCount()) if self.listRef.IsSelected(i)]
         self.tgtselected = [i for i in range(self.listTgt.GetItemCount()) if self.listTgt.IsSelected(i)]
-        self.initselected = [i for i in range(self.initGuess.GetItemCount()) if self.initGuess.IsSelected(i)]
+        #self.initselected = [i for i in range(self.initGuess.GetItemCount()) if self.initGuess.IsSelected(i)]
 
         if self.refselected:
             self.refClearButton.Enable(1)
@@ -294,10 +313,10 @@ class BatchPanel(wx.Panel):
         else:
             self.tgtClearButton.Enable(0)
 
-        if self.initselected:
-            self.clearInitguessButton.Enable(1)
-        else:
-            self.clearInitguessButton.Enable(0)
+        #if self.initselected:
+        #    self.clearInitguessButton.Enable(1)
+        #else:
+        #    self.clearInitguessButton.Enable(0)
             
         if evt:
             self.currentItem = [rt, evt.m_itemIndex] # for doubleclick
@@ -345,6 +364,10 @@ class BatchPanel(wx.Panel):
                 fns = [fns]
 
             ll.addFiles(fns)
+            if listtype != 'ref':
+                if any([nw > 5 for nw in ll.nws]) and self.outextch.GetStringSelection() == (os.path.extsep + aligner.WRITABLE_FORMATS[0]):
+                    self.outextch.SetStringSelection(os.path.extsep + aligner.WRITABLE_FORMATS[1])
+                    G.openMsg(parent=self, msg='Since number of wavelength in some image file is more than 5,\nthe output file format was changed to ome.tiff.', title="Output file format change")
             
             self.lastpath = os.path.dirname(fns[0])
             if listtype == 'ref':
@@ -414,10 +437,20 @@ class BatchPanel(wx.Panel):
         """
         enable or disable buttons that should not be hit while running the program
         """
-        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.initguessButton, self.clearInitguessButton]
+        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb]#, self.initguessButton, self.clearInitguessButton]
 
         [button.Enable(enable) for button in buttons]
 
+    #old="""
+    def OnLocalListChose(self, evt=None):
+        local = self.localListChoice.GetStringSelection()
+        if local == self.localChoice[0]:
+            self.min_pxls_label.Enable(0)
+            self.min_pxls_choice.Enable(0)
+        else:
+            self.min_pxls_label.Enable(1)
+            self.min_pxls_choice.Enable(1)#"""
+        
     def OnGo(self, ev=None):
         """
         run or cancel the alignment program
@@ -433,10 +466,12 @@ class BatchPanel(wx.Panel):
 
 
             # other parameters
+            old="""
             if self.initGuess.columnkeys:
                 initguess = os.path.join(*self.initGuess.getFile(0)[:2])
             else:
-                initguess = ''
+                initguess = ''"""
+            initguess = ''
 
             form = self.outextch.GetStringSelection()
             if not form:
@@ -452,7 +487,9 @@ class BatchPanel(wx.Panel):
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
                      [nt for nt in self.listRef.nts], # copy
-                     form] 
+                     form,
+                     int(self.min_pxls_choice.GetStringSelection())] 
+                         #af.MIN_PXLS_YX]
 
             # check the user-inputs
             try:
@@ -468,7 +505,7 @@ class BatchPanel(wx.Panel):
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
-            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], initguess=initguess)
+            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], initguess=initguess, min_pxls_yx=parms[9])
 
             # run program
             gui = threads.GUImanager(self, __name__)
@@ -491,7 +528,7 @@ class BatchPanel(wx.Panel):
             self.aui.Show()
 
 
-        if isinstance(target, basestring) and target.endswith('chromagnon'):
+        if isinstance(target, basestring) and chromformat.is_chromagnon(target):#target.endswith('chromagnon'):
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
         else:
             newpanel = aui.ImagePanel(self.aui, target)
@@ -500,6 +537,7 @@ class BatchPanel(wx.Panel):
             name = os.path.basename(target)
         else:
             name = target.file
+
         if sys.platform in ('linux2', 'win32'):
             wx.CallAfter(self.aui.imEditWindows.addPage, newpanel, name, select=True)
         else:

@@ -1,9 +1,6 @@
 ### Here all kinds of fitting
 
-try: # inside package
-    from ..Priithon.all import N, U
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import N, U
+from Priithon.all import N, U
 import imgFilters, imgGeo
 import exceptions
 
@@ -476,6 +473,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
         slc = [Ellipsis] + [slice(int(d), int(d)+shape[i]) for i, d in enumerate(dif)]
         # This slice is float which shift array when cutting out!!
 
+        s2 = tuple([int(ss) for ss in s2]) # numpy array cannot use used for slice
         inds = N.indices(s2, N.float32)
         ind_shape = inds.shape
         nz = N.product(ind_shape[:-2])

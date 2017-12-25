@@ -3655,3 +3655,10 @@ def smooth1d(x,window_len=10,window='hanning'):
 
     y=N.convolve(w/float(w.sum()),s,mode='same')
     return y[window_len-1:-window_len+1]
+
+def saveCSV(fn, listlike, mode='w'):
+    import csv
+    with open(fn, mode) as h:
+        w = csv.writer(h)
+        w.writerows(listlike)
+    

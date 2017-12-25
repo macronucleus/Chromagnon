@@ -1,10 +1,6 @@
 #!/usr/bin/env python
-try: # inside package
-    from ..Priithon.all import N, U, Y, F, Mrc
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import N, U, Y, F, Mrc
-    
-#from Priithon.all import N, U, Y, F, Mrc
+
+from Priithon.all import N, U, Y, F, Mrc
 from scipy import optimize
 import mrcIO, imgFit
 import os
@@ -407,7 +403,7 @@ def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
         shift = 0#[0] * len(shapeS)
     shapeL = shape#N.add(shapeS, center+shift)
     start, stop = (shapeL - shapeS)/2., (shapeL + shapeS)/2.
-    slc = [slice(start[d], stop[d], None) for d in range(img.ndim)]
+    slc = [slice(int(round(start[d])), int(round(stop[d])), None) for d in range(img.ndim)]
     #print slc, shapeS, shapeL
 
     # shift if necessary
@@ -495,6 +491,7 @@ def paddingFourier(arr, shape, value=0, interpolate=True):
     subpx_shift = halfS % 1
     if interpolate and N.sometrue(subpx_shift):
         arr = U.nd.shift(arr, subpx_shift)
+    halfS = [int(s) for s in halfS]
 
     # create empty list for slices
     nds = arr.ndim - 1
@@ -522,7 +519,7 @@ def paddingFourier(arr, shape, value=0, interpolate=True):
     # cutout and paste
     for slc in slcs:
         for s in slc:
-            s.append(slice(shapeS[-1]))
+            s.append(slice(int(shapeS[-1])))
             #print s
             canvas[s] = arr[s]
     return canvas
@@ -568,6 +565,24 @@ def resolutionLimit(wave_nm, NA, n):
     returns diffraction limit in um
     """
     return (0.61 * wave_nm) / (n * NA) 
+
+def zoomFourier(arr, factor):
+    shape = N.array(arr.shape)
+    target = [int(s) for s in shape * factor]
+    #target[-1] //= 2
+    #target[-1] += 1
+    af = F.fft(arr)
+    ap = paddingFourier(af, target)
+    afp = F.ifft(ap)
+    factor = target / shape
+    return N.real(afp) * N.product(factor)
+
+def paddingFourier(af, shape, value=0):
+    afo = N.fft.fftshift(af)
+    afp = F.getPadded(afo, shape, pad=value)
+    return N.fft.ifftshift(afp)
+
+
 
 #--- Make Gaussian arr -----------------------------
 def gaussianArrND(shape=(256,256), sigma=2., peakVal=None, orig=None, rot=0):
@@ -865,57 +880,6 @@ def shiftZ(af):
     bf[:(nz-cz)] = af[cz:]
     return bf
     
-def getFourierZprofile(arr3D):
-    """
-    arr3D: image array
-
-    return 
-    """
-    af = F.rfft(arr3D)
-    nk = min(arr3D.shape[-2:])
-    afr = radialAverage2D(af, center=(0,0), useMaxShape=True)
-    afz = shiftZ(afr[:,:nk])
-    return afz
-    
-def getSphericalAbbe(arr3D, kmin=2, kmax=60, plot=False):
-    """
-    compare frequency above and below the focus
-
-    return amplitude var(above)/var(below)
-    """
-    afz = getFourierZprofile(arr3D)
-
-    # get z profile around the reasonable frequency
-    aa = N.abs(N.average(afz[:,kmin:kmax], axis=1))
-    # previously it was N.average(N.abs(afz[:,kmin:kmax]), axis=1), but that seems wrong...
-
-    # findMax
-    inds = N.indices(aa.shape, dtype=N.float64)
-    v, _0, _1, z = U.findMax(aa)
-    parm, check = imgFit.fitGaussianND(aa, [z], window=len(aa))
-    if check == 5:
-        raise RuntimeError, 'Peak not found check=%i' % check
-
-    gg = imgFit.yGaussianND(parm, inds, 3)
-    amg = aa - gg
-
-    z0 = parm[2]
-    mask = (parm[-1] * 3) / 2. # sigma * 3 / 2
-    ms0 = N.ceil(z0 - mask)
-    ms1 = N.ceil(z0 + mask)
-    amg[ms0:ms1] = 0
-    
-    below = N.var(amg[:ms0])
-    above = N.var(amg[ms1:])
-
-    if plot:
-        Y.ploty(N.array((aa, gg, amg)))
-        print 'below: ', below
-        print 'above: ', above
-        print ms0, ms1, z0
-
-    return above / (above + below)#above / below
-
 
 ## polar transform
 

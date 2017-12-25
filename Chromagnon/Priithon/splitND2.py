@@ -122,7 +122,7 @@ class spv(spvCommon):
 
 
     def __init__(self, data, colorAxis=-3, title='', size=None,
-                 originLeftBottom=None, parent=None):
+                 originLeftBottom=None, parent=None, frameParent=None):
         """
         splitter window for multi-color viewerer
         combines a "topBox" - zslider, OnMouse info,
@@ -192,7 +192,7 @@ class spv(spvCommon):
         self.id = n
 
         if parent is None:
-            parent=self.makeFrame(size, title)
+            parent=self.makeFrame(size, title, frameParent)
             needShow=True
         else:
             needShow=False
@@ -306,7 +306,7 @@ class spv(spvCommon):
         # wx.CallAfter( gc.collect )
 
     # FIXME size=(width+20,height+100+40*self.nColors))
-    def makeFrame(self, size, title):
+    def makeFrame(self, size, title, frameParent=None):
         """
         create frame
         if dataOrig has "Mrc" attribute, append "<filename> to given title
@@ -335,7 +335,7 @@ class spv(spvCommon):
             title += "<%s>" % self.dataOrig.Mrc.filename
         
         title2 = "%d) %s" %(self.id, title)
-        frame = wx.Frame(None, -1, title2, size=(width+20,height+100+40*self.nColors))
+        frame = wx.Frame(frameParent, -1, title2, size=(width+20,height+100+40*self.nColors))
         from usefulX import shellMessage
         shellMessage("# window: %s\n"% title2)
         self.title  = title

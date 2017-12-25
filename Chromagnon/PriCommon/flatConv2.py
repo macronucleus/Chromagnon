@@ -1,11 +1,7 @@
 #!/usr/bin/env priithon
 
 import os
-try: # inside package
-    from ..Priithon import Mrc
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon import Mrc
-
+from Priithon import Mrc
 import numpy as N
 #import OMXlab2 as O
 import guiFuncs as G, imgfileIO, mrcIO

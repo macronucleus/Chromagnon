@@ -1,10 +1,13 @@
 from __future__ import with_statement
 from PriCommon.ndviewer import main as aui
-from PriCommon import guiFuncs as G, mrcIO, commonfuncs as C
+from PriCommon import guiFuncs as G, mrcIO, commonfuncs as C, microscope
 import wx, wx.lib.mixins.listctrl as listmix
 import os, sys, csv
 from Priithon import Mrc
-from . import aligner, alignfuncs as af, chromformat
+try:
+    from . import aligner, alignfuncs as af, chromformat
+except ValueError:
+    import aligner, alignfuncs as af, chromformat
 import numpy as N
 
 SIZE_COL0=70
@@ -59,7 +62,28 @@ class ChromagnonPanel(wx.Panel):
         if self.clist.map_str != 'None':
             G.makeTxt(self, box, 'Local: ')
             self.local_label = G.makeTxt(self, box, self.clist.map_str)
+            
+            # \n
+            box = G.newSpaceV(sizer)
+            
             self.viewLocalButton = G.makeButton(self, box, self.onViewLocal, title='View', tip='View local distortion as a image')
+
+            choice = [str(wave) for wave in self.clist.wave if wave != self.clist.wave[self.clist.refwave]]
+            label, self.wavechoice = G.makeListChoice(self, box, 'wavelength', choice, defValue=choice[0])
+
+            self.originalFileButton = G.makeButton(self, box, self.onChooseOriginalFile, title='original image file', tip='')
+
+            default = os.path.splitext(fn)[0]
+            if not os.path.isfile(default):
+                default = ''
+            label, self.originalFileTxt = G.makeTxtBox(self, box, '', defValue=default, tip='', sizeX=200)
+
+            choice = [str(factor) for factor in (1,5,10,15,20)]
+            label, self.factorchoice = G.makeListChoice(self, box, 'magnification', choice, defValue=choice[2])
+
+            self.color_name = ['black'] + [colstr for colstr in microscope.COLOR_NAME]
+            label, self.colorchoice = G.makeListChoice(self, box, 'arrow color', self.color_name, defValue=self.color_name[-1])
+            
             # \n
             box = G.newSpaceV(sizer)
             G.makeTxt(self, box, "The file is a .ome.tif file, and the alignment parameters are stored in it's metadata.")
@@ -98,7 +122,7 @@ class ChromagnonPanel(wx.Panel):
         # \n
         box = G.newSpaceV(sizer)
 
-        self.saveButton = G.makeButton(self, box, self.onSave, title='Save as...', tip='Save editted parameter into a chromagnon file')#, enable=False)
+        self.saveButton = G.makeButton(self, box, self.onExport, title='Save as...', tip='Save editted parameter into a chromagnon file')#, enable=False)
 
         #self.exportButton = G.makeButton(self, box, self.onExport, title='Export as .csv', tip='Save editted parameter into a comma separated file')
 
@@ -109,31 +133,124 @@ class ChromagnonPanel(wx.Panel):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected, self.clist)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemSelected, self.clist)
 
-        
-    def onViewLocal(self, evnt=None, gridStep=10):
+    def onViewLocal(self, evnt=None, gridStep=60, t=0, w=None, originalFn=None, **kwds):
         """
         save a '.local' file and opens new image viewer
         """
+        import wx, tempfile
+        from PriCommon import imgfileIO
+        from Priithon.all import Y
+        #from Priithon.all import Y
+        #import matplotlib.pyplot as plt
+
+        if w is None:
+            wave = int(self.wavechoice.GetStringSelection())
+            w = self.clist.wave.index(wave)
+            
+
+        if originalFn is None:
+            originalFn = self.originalFileTxt.GetValue()
+
+        factor = int(self.factorchoice.GetStringSelection())
+        colstr = self.colorchoice.GetStringSelection()
+        colortable = [(0,0,0)] + microscope.COLOR_TABLE
+        col = colortable[self.color_name.index(colstr)]
+        
         parent = self.GetParent()
         book = parent.GetTopLevelParent()
 
         mapyx = self.clist.mapyx
         name = self.clist.basename + '.Local'
 
-        if hasattr(parent.doc, 'saveNonlinearImage'):
-            parent.doc.mapyx = mapyx
-            out = parent.doc.saveNonlinearImage(gridStep=gridStep)
+        if originalFn:
+            try:
+                img = imgfileIO.load(originalFn)
+            except:
+                G.openMsg(self, 'Is this file really a image file?', title='Error')
+                return
+            if N.any(N.array(img.shape[-2:]) != N.array(self.clist.mapyx.shape[-2:])):
+                print 
+                G.openMsg(self, 'Please choose original image file BEFORE alignment', title='Error')
+                return
+            a = N.zeros(self.clist.mapyx.shape[-3:], img.dtype)
+            b = img.get3DArr(w=self.clist.refwave, t=t)
+            if self.clist.mapyx.ndim == 5:
+                b = N.max(b, 0)
+            a[0] = b
 
+            b = img.get3DArr(w=w, t=t)
+            if self.clist.mapyx.ndim == 5:
+                b = N.max(b, 0)
+
+            a[1] = af.applyShift(b, self.clist.alignParms[t,w])
+            
+            hdr = mrcIO.makeHdrFromRdr(img)
         else:
-            out = os.path.extsep.join((self.fn, 'local'))
-            self.clist.mapyx = mapyx
-            out = chromformat.makeNonliearImg(self.clist, out, gridStep)
-            
+            a = N.zeros(self.clist.mapyx.shape[-3:], N.uint8)
+            hdr = Mrc.makeHdrArray()
+            mrcIO.init_simple(hdr, Mrc.dtype2MrcMode(a.dtype.type), a.shape)
+        hdr.Num[-1]=2
+        hdr.NumWaves = 2
+        hdr.NumTimes = 1
+        hdr.wave[0] = self.clist.wave[self.clist.refwave]
+        hdr.wave[1] = self.clist.wave[w]
+
+        out = os.path.join(tempfile.gettempdir(), 'Chromagnon.local')
+
+        wtr = mrcIO.MrcWriter(out, hdr)
+        wtr.writeArr(a)
+        wtr.close()
+        
         an = aligner.Chromagnon(out)
-        newpanel = aui.ImagePanel(book, an)
+        newpanel = aui.ImagePanel(book, an.img)
         book.imEditWindows.AddPage(newpanel, name, select=True)
+        v = newpanel.viewers[0]
+        wx.Yield()
+
+        inds = N.indices(mapyx.shape[-2:], N.float32)
+        slcs1 = [slice(gridStep//2, -gridStep//2, gridStep) for d in xrange(2)]
+
+        #for w in xrange(self.clist.nw):
+        vs = []
+        for d in xrange(2):
+            slcs = [slice(d,d+1)] + slcs1
+            vs.append(inds[slcs].ravel())
+        iis = N.array(zip(*vs))
+
+        vs = []
+        for d in xrange(2):
+            slcs = [slice(t,t+1), slice(w,w+1), slice(d,d+1)] + slcs1
+            vs.append(mapyx[slcs].ravel())
+        yxs = N.array(zip(*vs))
+
+        wave = self.clist.wave[w]
+        #col = microscope.LUT(wave)
+        #col = (1,1,1)
+        wx.CallAfter(Y.vgAddArrows, v, iis, iis+yxs, color=col, factor=factor, width=2, **kwds)
             
-    
+    def onChooseOriginalFile(self, ev):
+        """
+        get image file
+        """
+        confdic = C.readConfig()
+        lastpath = confdic.get('lastpath', '')
+        wildcard = confdic.get('localfnpat', '*')
+        #parent = self.GetTopLevelParent()
+        if os.name == 'posix':
+            dlg = G.FileSelectorDialog(self, lastpath, wildcard)
+        else:
+            dlg = wx.FileDialog(self, 'Choose a file', defaultDir=lastpath)
+
+        if dlg.ShowModal() == wx.ID_OK:
+            fn = dlg.GetPath()
+        else:
+            return
+
+        self.originalFileTxt.SetValue(fn)
+
+        C.saveConfig(lastpath=os.path.dirname(fn), localfnpat=dlg.fnPat)
+
+        
     def OnTSliderBox(self, evt):
         """
         called when enter is pressed in the t slider text box
@@ -309,9 +426,11 @@ class ChromagnonList(wx.ListCtrl,
         if not hasattr(self, 'mapyx'):
             self.map_str = 'None'
         else:
-            maxval = self.mapyx.max()
+            maxval = [self.mapyx[:,w].max() for w in xrange(self.nw)]
             if self.nz == 1:
-                self.map_str = 'Projection (max shift %.3f pixel)' % maxval
+                self.map_str = 'Projection (max shift '#%.3f pixel)' % maxval
+                addstrs = ['%i %.3f' % (self.wave[w], maxval[w]) for w in xrange(self.nw)]
+                self.map_str += ', '.join(addstrs) + '(pixels))'
             else:
                 self.map_str = 'Section-wise'
 

@@ -1,5 +1,6 @@
 import os
 import wx
+from Priithon import viewerRubberbandMode
 
 SIZER_KWDS={'flag': wx.ALIGN_CENTRE|wx.ALL|wx.GROW, 'border': 0}
 
@@ -202,7 +203,7 @@ def askMsg(parent=None, msg='', title=''):
 
 
 class FileSelectorDialog(wx.Dialog):
-    def __init__(self, parent=None, direc=None, wildcard='*', multiple=True):
+    def __init__(self, parent=None, direc=None, wildcard='*', multiple=True, showHiddenFiles=False):
         """
         file selector dialog with unix-style wildcard
 
@@ -214,6 +215,7 @@ class FileSelectorDialog(wx.Dialog):
         >>> dlg = FileSelectorDialog()
         >>> if dlg.ShowModal() == wx.ID_OK:
         >>>     fns = dlg.GetPaths()
+        >>> dlg.Destroy()
         """
 
         if not direc:
@@ -221,6 +223,7 @@ class FileSelectorDialog(wx.Dialog):
         self.direc=os.path.abspath(direc)
         self.fnPat = wildcard
         self.multiple = multiple
+        self.showHiddenFiles = showHiddenFiles
 
         wx.Dialog.__init__(self, parent, -1, title='')
 
@@ -345,6 +348,9 @@ class FileSelectorDialog(wx.Dialog):
             ddDirs = []
 
         ddFiles = sorted( [f1 for f1 in glob.glob1(d,f) if not os.path.isdir(os.path.join(d,f1))] )
+        if not self.showHiddenFiles:
+            ddDirs = [f1 for f1 in ddDirs if not f1.startswith('.')]
+            ddFiles = [f1 for f1 in ddFiles if not f1.startswith('.')]
 
         dd = ["../"] + ddDirs + ddFiles
 
@@ -371,3 +377,45 @@ class MyFileDropTarget(wx.FileDropTarget):
 
         self.myLFV.txt.SetValue(self.myLFV.getPath())
         self.myLFV.refreshList()
+
+class DummyRubberbandMode(viewerRubberbandMode.viewerRubberbandMode):
+    def __init__(self, id=-1, rubberWhat='box', color=(0,1,0), 
+                 gfxWhenDone='hide', roiName='1'):
+        """
+        id can be a viewerID
+               or a viewer.GLViewer object
+        rubberWhat should be one of:
+             'box'
+             'line'
+             'circle'
+             'ellipse'
+
+        gfxWhenDone should be one of: 'hide', 'remove', None
+        """
+        self.splitND = None
+        
+        self.id = id
+        self.rubberWhat = rubberWhat
+        self.color = color
+        self.gfxWhenDone = gfxWhenDone
+        self.roiName = roiName
+        self.gfxIdx = None
+
+    def getData(self, id=None):
+        pass
+    def getMask(self):
+        pass
+    def onLeft1(self, xEff, yEff, ev):
+        pass
+    def onLeft2(self, xEff, yEff, ev):
+        pass
+    def gfxUpdate(self):
+        pass
+    def gfxShow(self):
+        pass
+    def gfxHide(self):
+        pass
+    def gfxEnable(self, on=True):
+        pass
+    def gfxRemove(self):
+        pass

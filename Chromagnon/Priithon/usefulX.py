@@ -850,7 +850,7 @@ def saveSession(fn=None, autosave=False):
     print "# '%s' saved." %( fn, )
     
     
-def FN(save=0, verbose=1):
+def FN_seb(save=0, verbose=1):
     """use mouse to get filename
 
     if verbose is true: also print filename
@@ -866,6 +866,55 @@ def FN(save=0, verbose=1):
         print repr(fn)
     return fn
 
+_DIR = None
+_WILDCARD = '*'
+def FN(save=0):
+    if save:
+        return FN_seb(save, verbose=0)
+    else:
+        return FNs_am(multiple=False)
+
+def FNs(verbose=False):
+    fns = FNs_am()
+    if verbose:
+        print repr(fns)
+    return fns
+
+def FNs_am(multiple=True):
+    """
+    open fileselector dialog
+    return fns
+    """
+    global _DIR, _WILDCARD
+    try:
+        from PriCommon import guiFuncs as G
+        import os
+    except ImportError:
+        raise NotImplementedError, 'Please install PriCommon'
+
+    fns = None
+    with G.FileSelectorDialog(direc=_DIR, wildcard=_WILDCARD, multiple=multiple) as dlg:
+        if dlg.ShowModal():
+            fns = dlg.GetPaths()
+            if fns:
+                _DIR = os.path.dirname(fns[0])
+                _WILDCARD = dlg.fnPat
+                if not multiple:
+                    fns = fns[0]
+    return fns
+
+def view3(fns):
+    """
+    opens a memory efficient viewer with orthogonal view
+    """
+    try:
+        from PriCommon import ndviewer
+        import os
+    except ImportError:
+        raise NotImplementedError, 'Please install PriCommon'
+
+    return ndviewer.main.main(fns)
+        
 def DIR(verbose=1):
     """use mouse to get directory name
 
@@ -2545,7 +2594,7 @@ def vgMarkIn3D(v_id=-1, zyx = (None,200,200), kind='Cross',
     zPlusMinus - how many sections above/below z should be marked (at most)
     """
     v = viewers[v_id]
-    
+        
     nz = v.zshape[0]
 
     z,y,x = zyx

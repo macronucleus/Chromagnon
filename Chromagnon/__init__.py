@@ -1,8 +1,10 @@
 __author__ = "Atsushi Matsuda"
 
 
-
-from . import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
+try:
+    from . import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
+except:
+    import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
 
 reload(version)
 reload(cutoutAlign)

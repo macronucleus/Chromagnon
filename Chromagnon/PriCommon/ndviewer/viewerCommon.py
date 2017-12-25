@@ -110,10 +110,8 @@ class GLViewerCommon(wxgl.GLCanvas):
             #(wx.ACCEL_CTRL, ord('c'), Menu_SaveClipboard),
 
             (wx.ACCEL_NORMAL, wx.WXK_HOME, Menu_ZoomCenter),
-            #(wx.ACCEL_NORMAL, wx.WXK_NEXT, Menu_ZoomOut),   # 20170609 on Error on Windows
-            #(wx.ACCEL_NORMAL, wx.WXK_PRIOR,Menu_ZoomIn),
-            (wx.ACCEL_NORMAL, wx.WXK_PAGEUP, Menu_ZoomOut),  
-            (wx.ACCEL_NORMAL, wx.WXK_PAGEDOWN,Menu_ZoomIn),   
+            (wx.ACCEL_NORMAL, wx.WXK_NEXT, Menu_ZoomOut),  
+            (wx.ACCEL_NORMAL, wx.WXK_PRIOR,Menu_ZoomIn),   
 
             (wx.ACCEL_CTRL, wx.WXK_LEFT, 1051),
             (wx.ACCEL_CTRL, wx.WXK_RIGHT,1052),
@@ -132,10 +130,8 @@ class GLViewerCommon(wxgl.GLCanvas):
             (wx.ACCEL_ALT, ord('b'), Menu_noGfx),
 
             (wx.ACCEL_ALT, wx.WXK_HOME, Menu_ZoomCenter),
-            #(wx.ACCEL_ALT, wx.WXK_NEXT, Menu_ZoomOut),
-            #(wx.ACCEL_ALT, wx.WXK_PRIOR, Menu_ZoomIn)
-            (wx.ACCEL_ALT, wx.WXK_PAGEUP, Menu_ZoomOut),  
-            (wx.ACCEL_ALT, wx.WXK_PAGEDOWN,Menu_ZoomIn),
+            (wx.ACCEL_ALT, wx.WXK_NEXT, Menu_ZoomOut),
+            (wx.ACCEL_ALT, wx.WXK_PRIOR, Menu_ZoomIn)
 
             ]
         ## WXK_NEXT is page-down key

@@ -1,9 +1,8 @@
 
 import multiprocessing as mp
 
-#from Priithon.all import Y
-import __main__
-if hasattr(__main__, '__file__'):
+from Priithon.all import Y
+if not hasattr(Y, 'view'):
     NCPU=mp.cpu_count()
 else:
     NCPU = 1

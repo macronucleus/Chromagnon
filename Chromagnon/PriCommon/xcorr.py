@@ -3,16 +3,12 @@
 #from Data import data as D
 import os
 #exec('import %s as O' % os.path.basename(D.WORKDIR))
-try: # inside package
-    from ..Priithon.all import N, U, F
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon.all import N, U, F
-#from Priithon.all import N, U, F
+from Priithon.all import N, U, F
 from . import imgFilters, imgFit, imgGeo
 
 # cross-correlation
 PHASE=True
-NYQUIST=0.6
+NYQUIST=0.2#0.6
 
 
 def _findMaxXcor(c, win, gFit=True, niter=2):
@@ -150,11 +146,7 @@ def mexhatFilter(a, mexSize=1):#, trimRatio=0.9):
     global mexhatC, mexhatC_size, mexhatCf
 
     a = imgFilters.evenShapeArr(a)
-    try: # inside package
-        from ..Priithon.all import F as fftw
-    except ValueError: # Attempted relative import beyond toplevel package
-        from Priithon.all import F as fftw
-    #from Priithon.all import F as fftw
+    from Priithon.all import F as fftw
     try:
         if mexhatC.shape != a.shape:
             raise ValueError, 'go to except'
@@ -194,8 +186,15 @@ def phaseContrastFilter(a, inFourier=False, removeNan=True, nyquist=0.6):
         if GAUSS is not None and GAUSS[0] == nyquist and GAUSS[1].shape == afa.shape:
             nq, gf = GAUSS
         else:
-            sigma = af.shape[-1] * nyquist
-            gf = F.gaussianArr(afa.shape, sigma, peakVal=1, orig=0, wrap=(1,)*(afa.ndim-1)+(0,))#, dtype=afa.dtype.type)
+            #sigma = af.shape[-1] * nyquist
+            #gf = F.gaussianArr(afa.shape, sigma, peakVal=1, orig=0, wrap=(1,)*(afa.ndim-1)+(0,))#, dtype=afa.dtype.type)
+            gshape = N.array(af.shape)
+            if inFourier:
+                gshape[-1] *= 2
+            sigma = gshape * nyquist
+            gf = imgFilters.gaussianArrND(gshape, sigma, peakVal=1)
+            gf = N.fft.fftshift(gf)[Ellipsis, :af.shape[-1]]
+            
             GAUSS = (nyquist, gf)
         afa *= gf
 
@@ -207,13 +206,15 @@ def phaseContrastFilter(a, inFourier=False, removeNan=True, nyquist=0.6):
 
 #DATA=[]
 
-def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, removeEdge=0, gFit=True, win=11, ret=None, searchRad=None):
+def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=None, searchRad=None, npad=4):
     """
     sigma uses F.gaussianArr in the Fourier domain
     if ret is None:
         return zyx, xcf
     elif ret is 2:
         return s, v, zyx, xcf
+    elif ret is 3:
+        return zyx, xcf, a_phase_cotrast, b_phase_contrast
     elif ret:
         return v, zyx, xcf
     """
@@ -226,10 +227,14 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, removeEdge=0, gFit=True, w
     b = imgFilters.evenShapeArr(b)
     shape = N.array(a.shape)
 
+    # padding strange shape
+    #nyx = max(shape[-2:])
+    #pshape = N.array(a.shape[:-2] + (nyx,nyx))
+
     # apodize
-    a = apodize(a)
-    b = apodize(b)
-    
+    a = paddAndApo(a, npad)#, pshape) #apodize(a)
+    b = paddAndApo(b, npad)#, pshape) #apodize(b)
+
     # fourier transform
     af = F.rfft(a.astype(N.float32))
     bf = F.rfft(b.astype(N.float32))
@@ -244,14 +249,8 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, removeEdge=0, gFit=True, w
         bfa = bf
     del af, bf
 
-    # removing edge if gaussian is not sufficient
-    targetShape = shape - N.multiply(removeEdge, 2)
-    if removeEdge:
-        ap = imgFilters.cutOutCenter(F.irfft(afa), targetShape)
-        bp = imgFilters.cutOutCenter(F.irfft(bfa), targetShape)
-        afa = F.rfft(ap)
-        bfa = F.rfft(bp)
-        del ap, bp
+    #targetShape = shape + (npad * 2)
+    targetShape = shape + (npad * 2)
 
     # shift array
     delta = targetShape / 2.
@@ -270,7 +269,12 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, removeEdge=0, gFit=True, w
     v, zyx, s = _findMaxXcor(cc, win, gFit=gFit)
     zyx -= center
 
-    if ret == 2:
+    c = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
+    #c = imgFilters.cutOutCenter(c, shape, interpolate=False)
+
+    if ret == 3:
+        return zyx, c, F.irfft(afa), F.irfft(bfa)
+    elif ret == 2:
         return s, v, zyx, c
     elif ret:
         return v, zyx, c
@@ -314,6 +318,13 @@ def normalizedXcorr(a, b):
     c = F.convolve(a_, b_, conj=1)# / a.size
     
     return c
+
+def paddAndApo(img, npad=4, shape=None):
+    if shape is None:
+        shape = N.array(img.shape)
+    else:
+        shape = N.array(shape)
+    return imgFilters.paddingMed(img, shape + (npad * 2), smooth=npad)
 
 
 def apodize(img, napodize=10, doZ=True):

@@ -37,7 +37,10 @@ class FileDropTarget(wx.FileDropTarget):
             self.pyshell = pyshell
         else:
             import __main__
-            self.pyshell = __main__.shell
+            if hasattr(__main__, 'shell'):
+                self.pyshell = __main__.shell
+            else:
+                self.pyshell = None
 
     def OnDropFiles(self, x, y, filenames):
         if len(filenames) == 1:

@@ -1,9 +1,6 @@
 
 import os
-try: # inside package
-    from ..Priithon.all import Mrc, Y, N
-except ValueError: # Attempted relative import beyond toplevel package
-    from Priithon.all import Mrc, Y, N
+from Priithon.all import Mrc, Y, N
 from scipy import ndimage as nd
 import wx
 import mrcIO, imgResample, imgfileIO, fntools, guiFuncs as G
@@ -484,11 +481,7 @@ def vzslider(handler, idx=-1, nz=2, zaxis=0, title=None):
     return zs
 
 try:
-    try: # inside package
-        from ..Priithon import zslider
-    except ValueError: # Attempted relative import beyond toplevel package
-        from Priithon import zslider
-    #from Priithon import zslider
+    from Priithon import zslider
 
     class MyZSlider(zslider.ZSlider):
         """

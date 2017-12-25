@@ -2,10 +2,7 @@
 
 import os, sys
 import wx, wx.aui, wx.lib.scrolledpanel as scrolled
-try:
-    from ...Priithon import histogram, useful as U
-except ValueError:
-    from ..Priithon import histogram, useful as U
+from ..Priithon import histogram, useful as U
 
 import viewer2
 import glfunc as GL
@@ -69,6 +66,12 @@ class ImagePanel(wx.Panel):
         if self.doc:
             self.addImageXY()
 
+    def __del__(self):
+        self.doOnClose()
+
+    def doOnClose(self):
+        pass
+            
     def addImageXY(self):
         ## draw viewer
         ## each dimension is assgined a number: 0 -- z; 1 -- y; 2 -- x
@@ -158,8 +161,9 @@ class ImagePanel(wx.Panel):
                 else:
                     v.updateGlList(None, RefreshNow)
                 v.useHair = False
-                v.dragSide = 0
+                #v.dragSide = 0
         else:
+            #wx.Yield()
                 #if self.orthogonal_toggle.GetValue():
             for v in self.viewers:
                 v.viewGpx.append(GL.graphix_slicelines(v))
@@ -247,9 +251,21 @@ class ImagePanel(wx.Panel):
 
             #/n
             box = G.newSpaceV(sizer)
+            
+            autofocusButton = G.makeButton(self.sliderPanel, box, self.OnAutoFocus, title='Auto focus', tip='')
+            
+            #/n
+            box = G.newSpaceV(sizer)
 
             self.orthogonal_toggle = G.makeToggleButton(self.sliderPanel, box, self.onOrthogonal, title='Orthogonal projections')
 
+            #/n
+            box = G.newSpaceV(sizer)
+            self.saveScrButton = G.makeButton(self.sliderPanel, box, self.onSaveScr, title='Save screen')
+
+            self.choice_viewers = ['XY', 'XZ', 'ZY']
+            label, self.viewerch = G.makeListChoice(self.sliderPanel, box, 'viewer', self.choice_viewers, defValue=[self.choice_viewers[0]])
+            self.viewerch.Enable(0)
         
         # t slider
         if self.doc.nt > 1:  ## need a time slider
@@ -273,6 +289,56 @@ class ImagePanel(wx.Panel):
             self.tSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
 
 
+    def OnAutoFocus(self, evt=None):
+        """
+        please read Chromagnon.alignfuncs.findBestRefZs() for detail of the logic
+        """
+        if self.doc.nt > 1:
+            t = int(self.tSliderBox.GetValue())
+        else:
+            t = 0
+        ws = [w for w, hist in enumerate(self.hist_toggleButton) if hist.GetValue()]
+
+        ms = N.zeros((len(ws),self.doc.nz), N.float32)
+
+        # FFTW does not work with another program using it
+        # here is the workaround for Chromagnon
+        try:
+            batch = self.GetParent().GetParent().GetParent()
+            if hasattr(batch, 'th') and batch.th.isAlive():
+                for wi, w in enumerate(ws):
+                    arr = self.doc.get3DArr(t=t, w=w)
+                    for z in xrange(self.doc.nz):
+                        ms[wi,z] = N.prod(U.mmms(arr[z])[-2:]) # mean * std
+                v,_,w,z = U.findMax(ms)
+                self.zSliderBox.SetValue(str(z))
+                self.OnZSliderBox()
+                self.OnAutoScale()
+                        
+                G.openMsg(parent=self.parent, msg='A clumsy focusing method was used since another program was using FFTW.\nPlease wait for the better method until the other program is done.', title="Please wait")
+                return
+        except AttributeError: # no parent?
+            pass
+
+        # Frequency-based caluculation starts 
+        from Priithon.all import F
+        
+        ring = F.ringArr(self.doc.shape[-2:], radius1=self.doc.shape[-1]//10, radius2=self.doc.shape[-2]//4, orig=(0,0), wrap=1)
+
+
+        for wi, w in enumerate(ws):
+            arr = self.doc.get3DArr(t=t, w=w)
+            arr = arr / arr.mean()
+            for z in xrange(self.doc.nz):
+                af = F.rfft(N.ascontiguousarray(arr[z]))
+                ar = af * ring[:,:af.shape[-1]]
+                ms[wi,z] = N.sum(N.abs(ar))
+        v,_,w,z = U.findMax(ms)
+
+        self.zSliderBox.SetValue(str(z))
+        self.OnZSliderBox()
+        self.OnAutoScale()
+            
     def onOrthogonal(self, evt=None):
         """
         transform to the orthogonal viewer
@@ -282,17 +348,20 @@ class ImagePanel(wx.Panel):
             self.OnAddX()
             self.OnAddY()
             self.OnAddLastViewer()
+            self.viewerch.Enable(1)
         elif self.orthogonal_toggle.GetValue():
             self._mgr.GetPane('Image').Left().Position(1)
             self._mgr.GetPane('XZ').Show()
             self._mgr.GetPane('ZY').Show()
             self._mgr.Update()
+            self.viewerch.Enable(1)
         else:
             self._mgr.GetPane('Image').Right().Position(1)
             self._mgr.GetPane('ZY').Hide()
             self._mgr.GetPane('XZ').Hide()
             self._mgr.Update()
             self.updateGLGraphics(0, True)
+            self.viewerch.Enable(0)
 
     def OnAddY(self, evt=None):
         """
@@ -360,6 +429,22 @@ class ImagePanel(wx.Panel):
         self.autoFitHistL()
         self._mgr.Update()
 
+    def onSaveScr(self, evt=None):
+        from Priithon.all import Y
+        fn = Y.FN(save=1)#, verbose=0)
+        if not fn:
+            return
+        # choose viewers
+        if self.orthogonal_toggle.GetValue():
+            vstr = self.viewerch.GetStringSelection()
+            vid = self.choice_viewers.index(vstr)
+        else:
+            vid = 0
+        v = self.viewers[vid]
+        #refresh
+        self.hist[0].setBraces(self.hist[0].leftBrace, self.hist[0].rightBrace)
+        # save
+        Y.vSaveRGBviewport(v, fn)
         
     def initHists(self):
         ''' Initialize the histogram/aligner panel, and a bunch of empty lists;
@@ -610,7 +695,7 @@ class ImagePanel(wx.Panel):
 
 
         
-    def OnZSliderBox(self, event):
+    def OnZSliderBox(self, event=None):
         z = int(self.zSliderBox.GetValue())
         if z >= self.doc.nz:
             z = self.doc.nz - 1
@@ -884,19 +969,21 @@ class ImEditWindow(wx.aui.AuiNotebook):
             
         self.AddPage(*args, **kwds)
             
-def main(*fn):
+def main(fns, parent=None):
     """
     fn: a filename
     """
-    frame = MyFrame(size=FRAMESIZE, parent=None)
+    initglut()
+    
+    frame = MyFrame(size=FRAMESIZE, parent=parent)
     frame.Show()
 
-    if isinstance(fn, basestring):
-        fns = [fn]
-    elif type(fn) == tuple:
-        fns = fn
-    else:
-        raise ValueError
+    if isinstance(fns, basestring):
+        fns = [fns]
+    #elif type(fns) == tuple:
+    #    fns = fn
+    #else:
+    #    raise ValueError
 
     for fn in fns:
         panel = ImagePanel(frame, fn)

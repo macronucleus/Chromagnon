@@ -1,9 +1,8 @@
 import logging
-#try:
-#    from Priithon.all import Y
-#except ImportError:
-#    pass # not priithon
-import wx
+try:
+    from Priithon.all import Y
+except ImportError:
+    pass # not priithon
 
 THRESHOLD = logging.DEBUG
 LEVEL_DIC = {'debug': logging.DEBUG,
@@ -35,12 +34,8 @@ def debug(log, msg, level=logging.DEBUG):
     level = _getLevelName(level)
     exec('log.%s(msg)' % level)
     if log.getEffectiveLevel() <= level:
-        #try:
-        #    Y.refresh()
-        #except:
-        #    pass
         try:
-            wx.Yield()
+            Y.refresh()
         except:
             pass
     else:

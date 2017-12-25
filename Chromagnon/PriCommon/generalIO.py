@@ -15,7 +15,8 @@ class GeneralReader(object):
         self.series = 0
         self.imgseqs = IMGSEQ
         self.metadata = {}
-
+        self.useROI2getArr = False
+        
         self.mode = mode
 
         # current positions
@@ -276,7 +277,12 @@ class GeneralReader(object):
         """
         idx = self.findFileIdx(t=t, z=z, w=w)
 
-        return self.readSec(idx)
+        arr = self.readSec(idx)
+        if self.useROI2getArr:
+            arr = arr[Ellipsis,
+                          self.roi_start[-2]:self.roi_start[-2]+self.roi_size[-2],
+                          self.roi_start[-1]:self.roi_start[-1]+self.roi_size[-1]]
+        return arr
 
     def get3DArr(self, t=0, w=0, zs=None):
         """
@@ -285,11 +291,20 @@ class GeneralReader(object):
         return a 3D stack
         """
         if zs is None:
-            zs = range(self.roi_start[0], self.roi_start[0]+self.roi_size[0])#range(self.nz)
+            if self.useROI2getArr:
+                zs = range(self.roi_start[0], self.roi_start[0]+self.roi_size[0])
+            else:
+                zs = range(self.nz)
 
         nz = len(zs)
-        ny = self.roi_size[1]
-        nx = self.roi_size[2]
+
+        if self.useROI2getArr:
+            ny = self.roi_size[1]
+            nx = self.roi_size[2]
+        else:
+            ny = self.ny
+            nx = self.nx
+            
         arr = N.empty((nz, ny, nx), self.dtype)
         
         for i, z in enumerate(zs):
@@ -337,6 +352,16 @@ class GeneralReader(object):
              return [getWaveIdxFromHdr(self.hdr, w) for w in Range]
         else:
              return list(Range)
+
+    def asarray(self):
+        """
+        return numpy array as shape (nt, nw, nz, ny, nx)
+        """
+        img = N.empty((self.nt, self.nw, self.nz, self.ny, self.nx), self.dtype)
+        for t in xrange(self.nt):
+            for w in xrange(self.nw):
+                img[t,w] = self.get3DArr(t=t, w=w)
+        return img
 
 class GeneralWriter(GeneralReader):
     def __init__(self, fn, mode='wb'):

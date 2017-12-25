@@ -109,6 +109,7 @@ if sys.platform == 'darwin' and sys.argv[1] == 'py2app':
      )
 
 # -------- Windows -----------------------
+    ### use `pyinstaller Chromagnon.spec` instead of py2exe
     
 elif sys.platform == 'win32' and sys.argv[1] == 'py2exe':
     import py2exe

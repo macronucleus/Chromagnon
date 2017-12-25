@@ -5,7 +5,7 @@ MSOFFICE_VERSION=['2011', '2008', 'X'] # newer has the priority
 
 def openTable(fn):
     if sys.platform.startswith('linux'):
-        for prog in ['oocalc']:
+        for prog in ['oocalc', 'libreoffice --calc']:
             #pass # not working now
             error = os.system('%s %s' % (prog, fn))
             if not error:

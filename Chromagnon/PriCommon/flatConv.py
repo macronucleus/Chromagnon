@@ -281,11 +281,8 @@ if __name__ == '__main__':
     options, arguments = p.parse_args()
 
     if not arguments:
-        #from Priithon import PriApp
-        #PriApp._maybeExecMain()
-        sys.app = wx.App()
-        main(*sys.argv)
-        sys.app.MainLoop()
+        from Priithon import PriApp
+        PriApp._maybeExecMain()
     else:
         make = options.make
         del options.make

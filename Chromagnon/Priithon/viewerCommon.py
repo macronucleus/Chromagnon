@@ -53,8 +53,8 @@ Menu_ColMap = [wx.NewId() for i in range(8)]
 
 
 class GLViewerCommon(wxgl.GLCanvas):
-    def __init__(self, parent, size=wx.DefaultSize, originLeftBottom=None):
-        wxgl.GLCanvas.__init__(self, parent, -1, size=size, style=wx.WANTS_CHARS)
+    def __init__(self, parent, size=wx.DefaultSize, originLeftBottom=None):#, depth=32):
+        wxgl.GLCanvas.__init__(self, parent, -1, size=size, style=wx.WANTS_CHARS)#, attribList=[wxgl.WX_GL_DOUBLEBUFFER, wxgl.WX_GL_RGBA, wxgl.WX_GL_DEPTH_SIZE, depth])
         # wxWANTS_CHARS to get arrow keys on Windows
 
         self.error = None
@@ -728,7 +728,7 @@ class GLViewerCommon(wxgl.GLCanvas):
     def OnSaveScreenShort(self, event=None):
         """always flipY"""
         from Priithon.all import U, FN, Y
-        fn = FN(1, verbose=0)
+        fn = FN(1)#, verbose=0)
         if not fn:
             return
 
@@ -757,7 +757,7 @@ class GLViewerCommon(wxgl.GLCanvas):
 
     def OnSave(self, event=None):
         from Priithon.all import Mrc, U, Y
-        fn = Y.FN(1, verbose=0)
+        fn = Y.FN(1)#, verbose=0)
         if not fn:
             return
         if fn[-4:] in [ ".mrc",  ".dat" ]:
