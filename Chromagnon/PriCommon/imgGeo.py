@@ -89,7 +89,7 @@ def affine_index(indexarray, r, mag, tyx=(0,0), center=None):
 
     try:
         if len(mag) != 2:
-            raise ValueError, 'mag should be (y,x) or scaler'
+            raise ValueError('mag should be (y,x) or scaler')
     except TypeError:
         mag = [mag,mag]
 
@@ -136,7 +136,7 @@ def closeEnough(pos, pos0, r):
                 return N.array([N.alltrue(d < r) for d in diff])
             else:
                 r = N.average(r)
-                raise TypeError, 'go to except'
+                raise TypeError('go to except')
         else:
             return N.alltrue(diff < r)
     except TypeError:
@@ -265,16 +265,16 @@ def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
 
     try:
         if len(shape) < np:
-            raise ValueError, 'must be len(shape) >= len(pos)'
+            raise ValueError('must be len(shape) >= len(pos)')
     except TypeError:
         if np == 1:
             shape = [shape]
         else:
-            raise ValueError, 'must be len(shape) >= len(pos)'
+            raise ValueError('must be len(shape) >= len(pos)')
     try:
         len(r)
         if len(r) < np:
-            raise ValueError, 'must be len(r) >= len(pos)'
+            raise ValueError('must be len(r) >= len(pos)')
         r = N.round_(r)
     except (TypeError, ValueError):
         r = round(r)

@@ -29,7 +29,7 @@ reading files containing Fortran-style double-precision numbers
 """
 
 #from Scientific.IO.TextFile import TextFile
-from Scientific_IO_TextFile import TextFile
+from .Scientific_IO_TextFile import TextFile
 import string, numpy
 
 
@@ -46,7 +46,7 @@ def readArray(filename, comment='#', sep=None):
     data = []
     for line in TextFile(filename):
         if not line[0] in comment:
-            data.append(map(eval, string.split(line, sep)))
+            data.append(list(map(eval, string.split(line, sep))))
     a = numpy.array(data)
     if a.shape[0] == 1 or a.shape[1] == 1:
         a = numpy.ravel(a)
@@ -67,7 +67,7 @@ def readArray_conv(filename, fn, comment='#', dtype=None, sep=None):
     data = []
     for line in TextFile(filename):
         if not line[0] in comment:
-            data.append(map(fn, string.split(line, sep)))
+            data.append(list(map(fn, string.split(line, sep))))
     a = numpy.array(data)
     if a.shape[0] == 1 or a.shape[1] == 1:
         a = numpy.ravel(a)
@@ -78,7 +78,7 @@ def readFloatArray(filename, dtype=numpy.float64, sep=None): ## seb added type a
     data = []
     for line in TextFile(filename):
         if line[0] != '#':
-            data.append(map(string.atof, string.split(line, sep)))
+            data.append(list(map(string.atof, string.split(line, sep))))
     a = numpy.array(data, dtype=dtype) ## seb added type argument
     if a.shape[0] == 1 or a.shape[1] == 1:
         a = numpy.ravel(a)
@@ -89,7 +89,7 @@ def readIntegerArray(filename, dtype=numpy.int32, sep=None): ## seb added type a
     data = []
     for line in TextFile(filename):
         if line[0] != '#':
-            data.append(map(string.atoi, string.split(line, sep)))
+            data.append(list(map(string.atoi, string.split(line, sep))))
     a = numpy.array(data, dtype=dtype) ## seb added type argument
     if a.shape[0] == 1 or a.shape[1] == 1:
         a = numpy.ravel(a)
@@ -104,7 +104,7 @@ def writeArray(array, filename, mode='w', sep=' '):
     for line in array:
         #for element in line:
         #    file.write(`element` + sep)
-        file.write(sep.join([`element` for element in line]))
+        file.write(sep.join([repr(element) for element in line]))
         file.write('\n')
     file.close()
 
@@ -128,7 +128,7 @@ def writeDataSets(datasets, filename, separator = ''):
             d = d[:, numpy.newaxis]
         for point in d:
             for number in point:
-                file.write(`number` + ' ')
+                file.write(repr(number) + ' ')
             file.write('\n')
         if (i < nsets-1):
             file.write(separator + '\n')

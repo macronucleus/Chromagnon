@@ -1,10 +1,10 @@
 """provides the bitmap OpenGL panel for Priithon's ND 2d-section-viewer
 """
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
-from viewerCommon import *
+from .viewerCommon import *
 
 
 
@@ -34,9 +34,14 @@ class GammaPopup(wx.Frame):
         wx.EVT_SLIDER(self, self.slider.GetId(), self.OnSlider)
         wx.EVT_TEXT(self, self.txtctrl.GetId(), self.OnText)        
 
-        wx.EVT_KEY_DOWN(self, self.OnKeyDown)
-        wx.EVT_KEY_DOWN(self.txtctrl, self.OnKeyDown)
-        wx.EVT_KEY_DOWN(self.slider, self.OnKeyDown)
+        #20171225-PY2to3 deprecation warning use Append
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.txtctrl.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.slider.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        
+        #wx.EVT_KEY_DOWN(self, self.OnKeyDown)
+        #wx.EVT_KEY_DOWN(self.txtctrl, self.OnKeyDown)
+        #wx.EVT_KEY_DOWN(self.slider, self.OnKeyDown)
         self.updateGamma()
         self.txtctrl.SetFocus()
 
@@ -129,7 +134,9 @@ class GLViewer(GLViewerCommon):
         if not wx.Platform == '__WXMSW__': #20070525-black_on_black on Windows
             self.SetCursor(wx.CROSS_CURSOR)
 
-        wx.EVT_PAINT(self, self.OnPaint)
+        # 20171225-PY2to3 deprecation warning 
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        #wx.EVT_PAINT(self, self.OnPaint)
         
         #EVT_MIDDLE_DOWN(self, self.OnMiddleDown)
         self.MakePopupMenu()
@@ -161,7 +168,9 @@ class GLViewer(GLViewerCommon):
         self.m_menu_colmap.AppendRadioItem(Menu_ColMap[7],    "gamma...")
         #self.m_menu_save.Append(Menu_SaveND,  "save nd stack into file")
         for i in range(len(Menu_ColMap)):
-            wx.EVT_MENU(self, Menu_ColMap[i],      self.OnMenuColMap)
+            # 20171225-PY2to3 deprecation warning 
+            self.Bind(wx.EVT_MENU, self.OnMenuColMap, id=Menu_ColMap[i])
+            #wx.EVT_MENU(self, Menu_ColMap[i],      self.OnMenuColMap)
 
         self.m_menu = wx.Menu()
 
@@ -173,33 +182,56 @@ class GLViewer(GLViewerCommon):
         self.m_menu.Append(Menu_chgOrig, "c&hangeOrig\to")
         self.m_menu.Append(Menu_Reload, "reload\tr")
         #20051116 self.m_menu.Append(Menu_Color, "change ColorMap")
-        self.m_menu.AppendMenu(wx.NewId(), "color map\tc", self.m_menu_colmap)
+        if wx.version().startswith('3') and not wx.version().endswith('(phoenix)'):
+            self.m_menu.AppendMenu(wx.NewId(), "color map\tc", self.m_menu_colmap)
+            self.m_menu.AppendMenu(wx.NewId(), "save", self.m_menu_save)
+        else: # 4
+            self.m_menu.Append(wx.NewId(), "color map\tc", self.m_menu_colmap)
+            self.m_menu.Append(wx.NewId(), "save", self.m_menu_save)
 
-        
         #20050726 self.m_menu.Append(Menu_Save, "save2d")
-        self.m_menu.AppendMenu(wx.NewId(), "save", self.m_menu_save)
         #self.m_menu.Append(Menu_Save3d, "save3d")
         self.m_menu.Append(Menu_aspectRatio, "change aspect ratio")
         self.m_menu.Append(Menu_rotate, "display rotated...")
         self.m_menu.Append(Menu_noGfx, "hide all gfx\tb", '',wx.ITEM_CHECK)
 
-        wx.EVT_MENU(self, Menu_ZoomCenter, self.OnCenter)
-        wx.EVT_MENU(self, Menu_ZoomOut, self.OnZoomOut)
-        wx.EVT_MENU(self, Menu_ZoomIn, self.OnZoomIn)
-        wx.EVT_MENU(self, Menu_Zoom2x,     self.OnMenu)
+
+        #20171225-PY2to3 deprecation warning 
+        self.Bind(wx.EVT_MENU, self.OnCenter,          id=Menu_ZoomCenter)
+        self.Bind(wx.EVT_MENU, self.OnZoomOut,         id=Menu_ZoomOut)
+        self.Bind(wx.EVT_MENU, self.OnZoomIn,          id=Menu_ZoomIn)
+        self.Bind(wx.EVT_MENU, self.OnMenu,            id=Menu_Zoom2x)
+        self.Bind(wx.EVT_MENU, self.OnMenu,            id=Menu_Zoom_5x)
+        self.Bind(wx.EVT_MENU, self.doReset,           id=Menu_ZoomReset)
+        self.Bind(wx.EVT_MENU, self.OnColor,           id=Menu_Color)
+        self.Bind(wx.EVT_MENU, self.OnReload,          id=Menu_Reload)
+        self.Bind(wx.EVT_MENU, self.OnChgOrig,         id=Menu_chgOrig)
+        self.Bind(wx.EVT_MENU, self.OnSave,            id=Menu_Save)
+        self.Bind(wx.EVT_MENU, self.OnSaveScreenShort, id=Menu_SaveScrShot)
+        self.Bind(wx.EVT_MENU, self.OnSaveClipboard,   id=Menu_SaveClipboard)
+        self.Bind(wx.EVT_MENU, self.OnAssign,          id=Menu_Assign)
+        self.Bind(wx.EVT_MENU, self.OnAspectRatio,     id=Menu_aspectRatio)
+        self.Bind(wx.EVT_MENU, self.OnRotate,          id=Menu_rotate)
+        self.Bind(wx.EVT_MENU, self.OnNoGfx,           id=Menu_noGfx)
+
+        
+        #wx.EVT_MENU(self, Menu_ZoomCenter, self.OnCenter)
+        #wx.EVT_MENU(self, Menu_ZoomOut, self.OnZoomOut)
+        #wx.EVT_MENU(self, Menu_ZoomIn, self.OnZoomIn)
+        #wx.EVT_MENU(self, Menu_Zoom2x,     self.OnMenu)
         #wx.EVT_MENU(self, Menu_ZoomCenter, self.OnMenu)
-        wx.EVT_MENU(self, Menu_Zoom_5x,    self.OnMenu)
-        wx.EVT_MENU(self, Menu_ZoomReset,  self.doReset) # OnMenu)
-        wx.EVT_MENU(self, Menu_Color,      self.OnColor)
-        wx.EVT_MENU(self, Menu_Reload,      self.OnReload)
-        wx.EVT_MENU(self, Menu_chgOrig,      self.OnChgOrig)
-        wx.EVT_MENU(self, Menu_Save,      self.OnSave)
-        wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
-        wx.EVT_MENU(self, Menu_SaveClipboard,    self.OnSaveClipboard)
-        wx.EVT_MENU(self, Menu_Assign,      self.OnAssign)
-        wx.EVT_MENU(self, Menu_aspectRatio,      self.OnAspectRatio)
-        wx.EVT_MENU(self, Menu_rotate,      self.OnRotate)
-        wx.EVT_MENU(self, Menu_noGfx,      self.OnNoGfx)
+        #wx.EVT_MENU(self, Menu_Zoom_5x,    self.OnMenu)
+        #wx.EVT_MENU(self, Menu_ZoomReset,  self.doReset) # OnMenu)
+        #wx.EVT_MENU(self, Menu_Color,      self.OnColor)
+        #wx.EVT_MENU(self, Menu_Reload,      self.OnReload)
+        #wx.EVT_MENU(self, Menu_chgOrig,      self.OnChgOrig)
+        #wx.EVT_MENU(self, Menu_Save,      self.OnSave)
+        #wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
+        #wx.EVT_MENU(self, Menu_SaveClipboard,    self.OnSaveClipboard)
+        #wx.EVT_MENU(self, Menu_Assign,      self.OnAssign)
+        #wx.EVT_MENU(self, Menu_aspectRatio,      self.OnAspectRatio)
+        #wx.EVT_MENU(self, Menu_rotate,      self.OnRotate)
+        #wx.EVT_MENU(self, Menu_noGfx,      self.OnNoGfx)
 
     def InitGL(self):
         #        // Enable back face culling of polygons based upon their window coordinates.
@@ -207,7 +239,7 @@ class GLViewer(GLViewerCommon):
         #        // Enable two-dimensional texturing.
     
         #glClearColor(1.0, 1.0, 1.0, 0.0)
-        import PriConfig
+        from . import PriConfig
         glClearColor(*PriConfig.viewerBkgColor)
 #20050520       glEnable(GL_TEXTURE_2D)
         
@@ -287,7 +319,7 @@ class GLViewer(GLViewerCommon):
 
         else:
             self.error = "unsupported data mode"
-            raise ValueError, self.error
+            raise ValueError(self.error)
 
 
         cornerOffsetX = -.5
@@ -493,7 +525,7 @@ class GLViewer(GLViewerCommon):
         if self.error:
             return
         #//seb check PrepareDC(dc)
-        if not self.GetContext():
+        if 0:#not self.GetContext():
             testing="""
             print "OnPaint GetContext() error"
             return"""
@@ -527,7 +559,7 @@ class GLViewer(GLViewerCommon):
                 import traceback as tb
                 tb.print_exc(limit=None, file=None)
                 self.error = "error with self.defGlList()"
-                print "ERROR:", self.error
+                print("ERROR:", self.error)
             self.m_gllist_Changed = False
 
         if self.m_imgChanged:
@@ -565,10 +597,10 @@ class GLViewer(GLViewerCommon):
                     f = 1
                 except:
                     import sys
-                    print >>sys.stderr, "  ### ### cought exception in transfer function:  #### " 
+                    print("  ### ### cought exception in transfer function:  #### ", file=sys.stderr) 
                     import traceback
                     traceback.print_exc()
-                    print >>sys.stderr, "  ### ### cought exception in transfer function:  #### " 
+                    print("  ### ### cought exception in transfer function:  #### ", file=sys.stderr) 
                     data = self.m_imgArr
                     fBias = 0
                     f = 1
@@ -699,7 +731,7 @@ class GLViewer(GLViewerCommon):
                                 format,GL_UNSIGNED_SHORT, dataString)
             else:
                 self.error = "unsupported data mode"
-                raise ValueError, self.error
+                raise ValueError(self.error)
             
             self.m_imgChanged = False
 
@@ -779,7 +811,7 @@ class GLViewer(GLViewerCommon):
         elif o == 8:
             self.setOriginLeftBottom(1)
         else:
-            print "FixMe: OnChgOrig"
+            print("FixMe: OnChgOrig")
         
     def OnColor(self, event=None):
         #Windows: works all fine when accel-key used WITH ALT # print "DEBUG: OnColor", self
@@ -934,7 +966,7 @@ class GLViewer(GLViewerCommon):
         def s2c(s):
             mat = col_regex.match(s)
             if mat:
-                return N.array( map(int, mat.groups()),dtype=N.float32 ) / 255.
+                return N.array( list(map(int, mat.groups())),dtype=N.float32 ) / 255.
             else:
                 return N.array( self.colnames[s], dtype=N.float32 ) / 255.
 
@@ -1041,7 +1073,7 @@ class GLViewer(GLViewerCommon):
     
 def view(array, title=None, size=None, parent=None):
     if len(array.shape) != 2:
-        raise ValueError, "array must be of dimension 2"
+        raise ValueError("array must be of dimension 2")
 
     ### size = (400,400)
     if size is None:

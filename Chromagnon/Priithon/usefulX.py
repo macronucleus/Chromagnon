@@ -1,15 +1,15 @@
 """Priithon Y module: all functions to do with GUI
 """
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
+import six
 import wx
 import numpy as N
-import PriConfig
+from . import PriConfig
 
 _error =  _error0 = '' ## FIXME
-
 
 # try:
 #     _PriConfigPriithonDefaults
@@ -22,17 +22,17 @@ _error =  _error0 = '' ## FIXME
 #             exec "%s  = %s" % (k,repr(v))
 
 def _bugXiGraphics(doWorkaround=1):
-    import viewer
+    from . import viewer
     viewer.bugXiGraphics = doWorkaround
-    import viewer2
+    from . import viewer2
     viewer2.bugXiGraphics = doWorkaround
-    import mmviewer
+    from . import mmviewer
     mmviewer.bugXiGraphics = doWorkaround
 
 def _fixGuiExceptHook():
     import sys
     def guiExcept(exctype, value, tb):
-        import guiExceptionFrame
+        from . import guiExceptionFrame
         # global err_msg
         _app_ = wx.GetApp()
         if _app_.IsMainLoopRunning() and \
@@ -66,7 +66,7 @@ def _setAutosavePath():
     if dd:
         # prepend dir part
         if dd[0] != '/':
-            import useful as U
+            from . import useful as U
             dd = os.path.join(U.getHomeDir(), dd)
         
         PriConfig._autoSaveSessionPath = \
@@ -106,16 +106,88 @@ def editor(filename=None, retTextWindow=False):
                 filename = filename[:-1]
 
             if not os.path.isfile(filename):
-                raise ValueError, "cannot find .py file for %s"%filename
+                raise ValueError("cannot find .py file for %s"%filename)
         else:
-            raise ValueError, "no __file__ attribute found to help finding .py file for %s"%filename
+            raise ValueError("no __file__ attribute found to help finding .py file for %s"%filename)
 
     from wx import py
-    f = py.editor.EditorFrame(parent=None,#, would kill editor without cheking for save !! sys.app.GetTopWindow(),
-                                 title="Priithon Editor",
-                                 filename=filename)
+    # ------ fix for python3 -------------
+    class Document:
+        """Document class."""
+
+        def __init__(self, filename=None):
+            """Create a Document instance."""
+            self.filename = filename
+            self.filepath = None
+            self.filedir = None
+            self.filebase = None
+            self.fileext = None
+            if self.filename:
+                self.filepath = os.path.realpath(self.filename)
+                self.filedir, self.filename = os.path.split(self.filepath)
+                self.filebase, self.fileext = os.path.splitext(self.filename)
+
+        def read(self):
+            """Return contents of file."""
+            if self.filepath and os.path.exists(self.filepath):
+                f = open(self.filepath, 'r')#b')
+                try:
+                    return f.read()
+                finally:
+                    f.close()
+            else:
+                return ''
+
+        def write(self, text):
+            """Write text to file."""
+            try:
+                f = open(self.filepath, 'w')#b')
+                f.write(text)
+            finally:
+                if f:
+                    f.close()
+    py.document.Document = Document
+
+    class MyEditorFrame(py.editor.EditorFrame):
+        def __init__(self):
+            py.editor.EditorFrame.__init__(self,
+                                           parent=None,#, would kill editor without cheking for save !! sys.app.GetTopWindow(),
+                                           title="Priithon Editor",
+                                           filename=filename)
+        def bufferCreate(self, filename=None):
+            """Create new buffer."""
+            self.bufferDestroy()
+            buffer = py.editor.Buffer()
+            self.panel = panel = wx.Panel(parent=self, id=-1)
+            panel.Bind (wx.EVT_ERASE_BACKGROUND, lambda x: x)
+            editor = py.editor.Editor(parent=panel)
+            panel.editor = editor
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            sizer.Add(editor.window, 1, wx.EXPAND)
+            panel.SetSizer(sizer)
+            panel.SetAutoLayout(True)
+            sizer.Layout()
+            buffer.addEditor(editor)
+            buffer.open(filename)
+            self.setEditor(editor)
+            self.editor.setFocus()
+            self.SendSizeEvent()
+
+            # added 20180329
+            editor.GetColumn = editor.window.GetColumn
+            editor.CallTipShow = editor.window.CallTipShow
+            editor.buffer.confirmed = True # already confirmed by the dialog
+
+    # -----------------------------------
+    
+    #f = py.editor.EditorFrame(parent=None,#, would kill editor without cheking for save !! sys.app.GetTopWindow(),
+    #                             title="Priithon Editor",
+    #                             filename=filename)
+    f = MyEditorFrame()
+    
     if not filename: # we ALWAYS want bufferCreate - even when filename is "False"
         f.bufferCreate(filename)
+        
     f.Show()
     if retTextWindow:
         return f.editor.window
@@ -184,7 +256,7 @@ def load(imgFN=None):
 
        if imgFN is None  call Y.FN()  for you
     """
-    import useful as U
+    from . import useful as U
 
     if imgFN is None:
         imgFN = FN()
@@ -213,18 +285,18 @@ def viewInViewer(id, a, title=None, doAutoscale=1):
             view(a)
             return
         else:
-            raise RuntimeError, "viewer %d doesn't exist"%id
+            raise RuntimeError("viewer %d doesn't exist"%id)
 
-    from splitND import spv as spv_class
+    from .splitND import spv as spv_class
     if not isinstance(spv, spv_class):
-        raise RuntimeError, "viewer #%d is not a mono-color viewer" % id
+        raise RuntimeError("viewer #%d is not a mono-color viewer" % id)
 
     if isinstance(a, tuple):
         from Priithon.fftfuncs import mockNDarray
         a=mockNDarray(*a)
 
     if min(a.shape) < 1:
-        raise ValueError, "array shape contains zeros (%s)"%(a.shape,)
+        raise ValueError("array shape contains zeros (%s)"%(a.shape,))
     
     #multicolor = hasattr(spv, "ColorAxisOrig") # HACK FIXME
 
@@ -281,18 +353,18 @@ def viewInViewer2(id, a, colorAxis="smart", title=None, doAutoscale=1):
         else:
             raise ValueError("viewer %d doesn't exist"%id)
 
-    from splitND2 import spv as spv2_class
+    from .splitND2 import spv as spv2_class
     if not isinstance(spv, spv2_class):
-        raise RuntimeError, "viewer #%d is not a multi-color viewer" % id
+        raise RuntimeError("viewer #%d is not a multi-color viewer" % id)
 
     if isinstance(a, tuple):
         from Priithon.fftfuncs import mockNDarray
         a=mockNDarray(*a)
 
     if a.ndim < 3:
-        raise ValueError, "array ndim must be at least 3"
+        raise ValueError("array ndim must be at least 3")
     if min(a.shape) < 1:
-        raise ValueError, "array shape contains zeros (%s)"%(a.shape,)
+        raise ValueError("array shape contains zeros (%s)"%(a.shape,))
     
     #multicolor = hasattr(spv, "ColorAxisOrig") # HACK FIXME
 
@@ -302,22 +374,22 @@ def viewInViewer2(id, a, colorAxis="smart", title=None, doAutoscale=1):
         
         # use shortest "z-dimension" as color - use smaller axisIndex if two are of same length
         notShort = 1+ max(nonXYshape) # use this to have   axes of length 1  ignored
-        nonXYshape = map(lambda x:  x>1 and x or notShort, nonXYshape) # ignore axes of length 1
+        nonXYshape = [x>1 and x or notShort for x in nonXYshape] # ignore axes of length 1
         colorAxis = nonXYshape.index( min(nonXYshape) )
     if colorAxis < 0:
         colorAxis += a.ndim
     if colorAxis < a.ndim - 3:
-        a=N.transpose(a, range(colorAxis) + \
-                          range(colorAxis+1,a.ndim-2)+\
+        a=N.transpose(a, list(range(colorAxis)) + \
+                          list(range(colorAxis+1,a.ndim-2))+\
                           [colorAxis,a.ndim-2,a.ndim-1] )
     elif colorAxis == a.ndim - 2:
-        a=N.transpose(a, range(a.ndim-3) + [colorAxis, a.ndim-3, a.ndim-1] )
+        a=N.transpose(a, list(range(a.ndim-3)) + [colorAxis, a.ndim-3, a.ndim-1] )
 
     elif colorAxis == a.ndim - 1:
-        a=N.transpose(a, range(a.ndim-3) + [colorAxis, a.ndim-3, a.ndim-2] )
+        a=N.transpose(a, list(range(a.ndim-3)) + [colorAxis, a.ndim-3, a.ndim-2] )
 
     if a.shape[-3] > 8:
-        raise ValueError, "You should not use more than 8 colors (%s)"%a.shape[-3]
+        raise ValueError("You should not use more than 8 colors (%s)"%a.shape[-3])
 
 
     #print a.ndim-2, spv.zndim
@@ -348,7 +420,7 @@ def viewInViewer2(id, a, colorAxis="smart", title=None, doAutoscale=1):
             imgL =  a[tuple(spv.zsec)]
             spv.viewer.addImgL(imgL[spv.nColors:])
             # NOTE: the image data might get loaded into gfx-card twice - because of setImage call 
-            from splitND2 import _rgbList
+            from .splitND2 import _rgbList
             # check what RGB-color are used so far
             for i in range(spv.nColors, a.shape[-3]):
                 for rgb in _rgbList:
@@ -724,10 +796,10 @@ class _listArrayViewer:
         arrs = {}
     
         def sebsort(m1,m2):
-            import __builtin__
+            import builtins
             k1 = arrs[ m1 ][1]
             k2 = arrs[ m2 ][1]
-            return __builtin__.cmp(k1,  k2)
+            return builtins.cmp(k1,  k2)
 
         for k in showdict:
             o = showdict[k]
@@ -818,7 +890,7 @@ def saveSession(fn=None, autosave=False):
 
     if autosave:
         if fn is not None:
-            raise ValueError, "you cannot specify a filename when autosave=True"
+            raise ValueError("you cannot specify a filename when autosave=True")
         
         import os, useful as U
         U.path_mkdir( os.path.dirname(PriConfig._autoSaveSessionPath) )
@@ -830,7 +902,7 @@ def saveSession(fn=None, autosave=False):
             f = file(fn[:-3]+PriConfig.autoSaveSessionCommands, 'w')
             #for c in __main__.shell.history[::-1]:
             for c in shell.history[::-1]:
-                print >>f, c
+                print(c, file=f)
             f.close()
 
     if fn is None:
@@ -847,7 +919,7 @@ def saveSession(fn=None, autosave=False):
     f.write(shell.GetText().encode("l1").replace('\r', ''))
     #f.write("\n") # append trailing newline, that appears to be missing in shell.GetText
     f.close()
-    print "# '%s' saved." %( fn, )
+    print("# '%s' saved." %( fn, ))
     
     
 def FN_seb(save=0, verbose=1):
@@ -863,7 +935,7 @@ def FN_seb(save=0, verbose=1):
         flags=0
     fn = wx.FileSelector("Please select file", flags=flags)
     if verbose:
-        print repr(fn)
+        print(repr(fn))
     return fn
 
 _DIR = None
@@ -877,7 +949,7 @@ def FN(save=0):
 def FNs(verbose=False):
     fns = FNs_am()
     if verbose:
-        print repr(fns)
+        print(repr(fns))
     return fns
 
 def FNs_am(multiple=True):
@@ -890,7 +962,7 @@ def FNs_am(multiple=True):
         from PriCommon import guiFuncs as G
         import os
     except ImportError:
-        raise NotImplementedError, 'Please install PriCommon'
+        raise NotImplementedError('Please install PriCommon')
 
     fns = None
     with G.FileSelectorDialog(direc=_DIR, wildcard=_WILDCARD, multiple=multiple) as dlg:
@@ -908,10 +980,10 @@ def view3(fns):
     opens a memory efficient viewer with orthogonal view
     """
     try:
-        from PriCommon import ndviewer
+        import ndviewer
         import os
     except ImportError:
-        raise NotImplementedError, 'Please install PriCommon'
+        raise NotImplementedError('Please install ndviewer')
 
     return ndviewer.main.main(fns)
         
@@ -928,7 +1000,7 @@ def DIR(verbose=1):
         d = "/"
     fn = wx.DirSelector("Please select directory", d)
     if verbose:
-        print repr(fn)
+        print(repr(fn))
     return fn
 
 def cd():
@@ -969,12 +1041,12 @@ def iterChildrenTree(parent, includeParent=True):
 ###############################################################################
 
 
-import plt
-from usefulP import *
+#from . import plt
+from .usefulP import *
 
 
 
-def plotProfileHoriz(img_id, y, avgBandSize=1, s='-'):
+def plotProfileHoriz(img_id, y, avgBandSize=1):#, s='-'):
     if type(img_id) == int:
         img = viewers[ img_id ].img
     else:
@@ -983,10 +1055,10 @@ def plotProfileHoriz(img_id, y, avgBandSize=1, s='-'):
 
     if avgBandSize >1:
         vals = N.sum( img[ y:y+avgBandSize ].astype(N.float64), 0 ) / float(avgBandSize)
-        ploty( vals, s )
+        ploty( vals, symbolSize=0)#s )
     else:
-        ploty( img[ y ], s )
-def plotProfileVert(img_id, x, avgBandSize=1, s='-'):
+        ploty( img[ y ], symbolSize=0)#s )
+def plotProfileVert(img_id, x, avgBandSize=1):#, s='-'):
     if type(img_id) == int:
         img = viewers[ img_id ].img
     else:
@@ -995,10 +1067,10 @@ def plotProfileVert(img_id, x, avgBandSize=1, s='-'):
 
     if avgBandSize >1:
         vals = N.sum( img[ :, x:x+avgBandSize ].astype(N.float64), 1 ) / float(avgBandSize)
-        ploty( vals, s )
+        ploty( vals, symbolSize=0)#s )
     else:
-        ploty( img[ :, x ], s )
-def plotProfileZ(img_id, y,x, avgBandSize=1, s='-'):
+        ploty( img[ :, x ], symbolSize=0)#s )
+def plotProfileZ(img_id, y,x, avgBandSize=1):#, s='-'):
     if type(img_id) == int:
         data = viewers[ img_id ].data
     else:
@@ -1013,9 +1085,9 @@ def plotProfileZ(img_id, y,x, avgBandSize=1, s='-'):
         prof = N.empty(shape=nz, dtype=N.float64)
         for z in range(nz):
             prof[z] = data[z,  y0:y1, x0:x1].mean()
-        ploty( prof, s )
+        ploty( prof, symbolSize=0)#s )
     else:
-        ploty( data[ :, int(y), int(x) ], s )
+        ploty( data[ :, int(y), int(x) ], symbolSize=0)#s )
 
 '''
 
@@ -1096,7 +1168,7 @@ def plotFitGaussian1D(parms, min=None,max=None,step=None,hold=True,s='-'):
 
 
 
-def plotFitAny(func, parms, min=None,max=None,step=None,hold=True,s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
+def plotFitAny(func, parms, min=None,max=None,step=None,hold=True,dataset=0,doFit=True, figureNo=None):#s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
     """
     if min is None defaults to min-x of current plot (for given dataset)
     if max is None defaults to max-x of current plot (for given dataset)
@@ -1107,27 +1179,28 @@ def plotFitAny(func, parms, min=None,max=None,step=None,hold=True,s='-', dataset
       do a curve fit to adjust parms  before plotting
       return (parms, fitFlag)
     """
-    import __builtin__
+    import builtins
     if min is None or max is None:
         dpx = plotDatapoints(dataset,figureNo)[0]
         if min is None:
-            min = __builtin__.min(dpx)
+            min = builtins.min(dpx)
         if max is None:
-            max = __builtin__.max(dpx)
+            max = builtins.max(dpx)
     if step is None:
         step = (max-min)/1000.
 
     x=N.arange(min,max,step)
     if doFit:
-        import useful as U
+        from . import useful as U
         data = N.asarray(plotDatapoints(dataset, figureNo), dtype=N.float64)
         parms, ret = U.fitAny(func, parms, data.T)
         
-    plotxy(x,func(parms,x), s, hold=hold, logY=logY, logX=logX, logZeroOffset=logZeroOffset, figureNo=figureNo)
+    #plotxy(x,func(parms,x), s, hold=hold, logY=logY, logX=logX, logZeroOffset=logZeroOffset, figureNo=figureNo)
+    plotxy(x,func(parms,x), c='-', hold=hold, figureNo=figureNo)#, symbolSize=0)
     if doFit:
         return parms, ret
 
-def plotFitDecay(parms=(1000,10000,10), min=None,max=None,step=None,hold=True,s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
+def plotFitDecay(parms=(1000,10000,10), min=None,max=None,step=None,hold=True,dataset=0,doFit=True, figureNo=None): #s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
     """
     see U.yDecay.
     if min is None defaults to min-x of current plot (dataset 0)
@@ -1135,10 +1208,10 @@ def plotFitDecay(parms=(1000,10000,10), min=None,max=None,step=None,hold=True,s=
     if step is None defautls to 1000 points between min and max
     if hold is not None call Y.plothold(hold) beforehand
     """
-    import useful as U
-    return plotFitAny(U.yDecay, parms, min,max,step,hold,s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
+    from . import useful as U
+    return plotFitAny(U.yDecay, parms, min,max,step,hold,dataset,doFit, figureNo) #s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
 
-def plotFitGaussian(parms=(0,10,100), min=None,max=None,step=None,hold=True,s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
+def plotFitGaussian(parms=(0,10,100), min=None,max=None,step=None,hold=True,dataset=0,doFit=True,figureNo=None):#s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
     """
     see U.yGaussian.
     if min is None defaults to min-x of current plot (dataset 0)
@@ -1146,50 +1219,52 @@ def plotFitGaussian(parms=(0,10,100), min=None,max=None,step=None,hold=True,s='-
     if step is None defautls to 1000 points between min and max
     if hold is not None call Y.plothold(hold) beforehand
     """
-    import useful as U
-    return plotFitAny(U.yGaussian, parms, min,max,step,hold,s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
+    from . import useful as U
+    return plotFitAny(U.yGaussian, parms, min,max,step,hold,dataset,doFit, figureNo)#s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
 
-def plotFitLine(abTuple, min=None,max=None,step=None,hold=True,s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
+def plotFitLine(abTuple, min=None,max=None,step=None,hold=True,dataset=0,doFit=True,figureNo=None):#s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
     """
     if min is None defaults to min-x of current plot (dataset 0)
     if max is None defaults to max-x of current plot (dataset 0)
     if step is None defautls to 1000 points between min and max
     if hold is not None call Y.plothold(hold) beforehand
     """
-    import useful as U
-    return plotFitAny(U.yLine, abTuple, min,max,step,hold,s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
-def plotFitPoly(parms, min=None,max=None,step=None,hold=True,s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
+    from . import useful as U
+    return plotFitAny(U.yLine, abTuple, min,max,step,hold,dataset,doFit, figureNo)#s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
+def plotFitPoly(parms, min=None,max=None,step=None,hold=True,dataset=0,doFit=True,figureNo=None):#s='-', dataset=0, doFit=True, figureNo=None, logY=False, logX=False, logZeroOffset=.01):
     """
     if min is None defaults to min-x of current plot (dataset 0)
     if max is None defaults to max-x of current plot (dataset 0)
     if step is None defautls to 1000 points between min and max
     if hold is not None call Y.plothold(hold) beforehand
     """
-    import useful as U
-    return plotFitAny(U.yPoly, parms, min,max,step,hold,s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
-
+    from . import useful as U
+    return plotFitAny(U.yPoly, parms, min,max,step,hold,dataset,doFit, figureNo)#s, dataset, doFit, figureNo=figureNo, logY=logY, logX=logX, logZeroOffset=logZeroOffset)
 
 
 def plotHistogram(a, nBins=None, amin=None,amax=None, histArr=None, norm=False, cumsum=False, exclude_amax=False,
-                  c=plot_defaultStyle, logY=False, logX=False, hold=None, logZeroOffset=.01, figureNo=None):
+                  #c=plot_defaultStyle, logY=False, logX=False, hold=None, logZeroOffset=.01, figureNo=None):
+                  color=None, hold=None, figureNo=None):
     """
     shortcut for Y.plotxy(U.histogramXY(a,...),...)
     """
-    from useful import histogramXY
+    from .useful import histogramXY
     plotxy(histogramXY(a, nBins=nBins, amin=amin,amax=amax, histArr=histArr, norm=norm, cumsum=cumsum, exclude_amax=exclude_amax),
-             c=c, logY=logY, logX=logX, hold=hold, logZeroOffset=logZeroOffset, figureNo=figureNo)
+             color=color, hold=hold, figureNo=figureNo)#, logY=logY, logX=logX, hold=hold, logZeroOffset=logZeroOffset, figureNo=figureNo)
     
-
-from gridviewer import gridview
+try:
+    from .gridviewer import gridview
+except ImportError:
+    pass
 
 #  try:
-from histogram import hist as histogram
-from mmviewer import mview
-from scalePanel import scalePanel
-from zslider import ZSlider
+from .histogram import hist as histogram
+from .mmviewer import mview
+from .scalePanel import scalePanel
+from .zslider import ZSlider
 
-from buttonbox import *
-from guiParams import guiParams
+from .buttonbox import *
+from .guiParams import guiParams
 
 #HIST= #dictionary
 #VIEW= #dictionary
@@ -1288,12 +1363,12 @@ try:
 except:
     viewers=[]
 
-from splitND import run as view
-from splitND2 import run as view2
+from .splitND import run as view
+from .splitND2 import run as view2
 
 
-from DragAndDrop import DropFrame
-from viewerRubberbandMode import viewerRubberbandMode as vROI
+from .DragAndDrop import DropFrame
+from .viewerRubberbandMode import viewerRubberbandMode as vROI
 
 def vd(id=-1):
     """
@@ -1371,7 +1446,7 @@ def vClose(id='all'):
     id can be a number, a sequence of numbers, or 'all'
     """
     if id is 'all':
-        id  = range(len(viewers))
+        id  = list(range(len(viewers)))
     elif type(id) == int:
         id = [id]
 
@@ -1431,7 +1506,7 @@ def vArrange(idxs=-1, nx=4, refSizeId=None, doCenter=1, x0=0, y0=0):
     as many columns as needed
     """
     if idxs==-1:
-        idxs = range(len(viewers))
+        idxs = list(range(len(viewers)))
     first = 1
     x,y = x0,y0
     ix,iy = 0,0
@@ -1519,7 +1594,7 @@ def vHistSettings(id_src=-2, id_target=-1):
         vColMap(id_target, spvFrom.viewer.colMap)
 
     else:
-        raise ValueError, "src and target are different type viewers (%s vs. %s)" %(spvFrom.__class__, spvTo.__class__)
+        raise ValueError("src and target are different type viewers (%s vs. %s)" %(spvFrom.__class__, spvTo.__class__))
 
 def vGetZSecTuple(id=-1):
     """
@@ -1540,7 +1615,7 @@ def vShortcutAdd(id=-1, key=' ', func='Y.wx.Bell()', mod=0):
     """
     v = viewers[id]
 
-    if isinstance(key, basestring):
+    if isinstance(key, six.string_types):
         if key.isupper():
             mod = mod | wx.MOD_SHIFT
         if key.islower():
@@ -1551,7 +1626,7 @@ def vShortcutAdd(id=-1, key=' ', func='Y.wx.Bell()', mod=0):
     if type(func) == str:
         def shortcutFunc():
             import __main__
-            exec func in __main__.__dict__
+            exec(func, __main__.__dict__)
     else:
         shortcutFunc = func
 
@@ -1698,7 +1773,7 @@ def vColMap(id=-1, colmap="", reverse=0):
        it should be of shape (3, 256)
     """
     v = viewers[id].viewer
-    if isinstance(colmap, basestring):
+    if isinstance(colmap, six.string_types):
         colmap = colmap.lower()
         if colmap == "":
             v.cmnone()
@@ -1741,7 +1816,7 @@ def vSetSlider(v_id=-1, z=0, zaxis=0, autoscale=False): #, refreshNow=False)
 
     if autoscale:
         #20090109     vScale(v_id)
-        print "#DEBUG - FIXME 20090109 - autoscale=True in Y.setSlider somehow not implemented...."
+        print("#DEBUG - FIXME 20090109 - autoscale=True in Y.setSlider somehow not implemented....")
 def vSetAspectRatio(v_ids=[-1], y_over_x=1, refreshNow=1):
     """
     strech images in y direction
@@ -1807,7 +1882,7 @@ def vSaveRGBviewport(v_id, fn, clip=True, flipY=True):
     if type(v_id)  is int:
         v_id = viewers[v_id].viewer
     
-    import useful as U
+    from . import useful as U
     a = v_id.readGLviewport(clip=clip, flipY=flipY, copy=True)
 
     U.saveImg(a, fn)
@@ -1828,7 +1903,7 @@ def vCopyToClipboard(v_id=-1, clip=True):
     bi=im.ConvertToBitmap()
     bida=wx.BitmapDataObject(bi)
     if not wx.TheClipboard.Open():
-        raise RuntimeError, "cannot open clipboard"
+        raise RuntimeError("cannot open clipboard")
     try:
         success = wx.TheClipboard.SetData(bida)
         # success seems to be always True
@@ -1838,7 +1913,7 @@ def vCopyToClipboard(v_id=-1, clip=True):
 
 def vresizeto(refId=0, idxs=-1, nx=4):
     if idxs==-1:
-        idxs = range(555)
+        idxs = list(range(555))
     s = wx.GetTopLevelParent(viewers[refId].viewer).GetSize()
     
     for i in idxs:
@@ -1971,9 +2046,9 @@ def vLeftClickHorizProfile(id=-1, avgBandSize=1, s='-'):
     def f(x,y):
         if _plotprofile_avgSize >1:
             vals = N.sum( v.img[ y:y+_plotprofile_avgSize ].astype(N.float64), 0 ) / float(_plotprofile_avgSize)
-            ploty( vals, s )
+            ploty( vals, symbolSize=0)#s )
         else:
-            ploty( v.img[ y ], s )
+            ploty( v.img[ y ], symbolSize=0)#s )
     def fg(x,y):
         if _plotprofile_avgSize >1:
             glLine(0,y,w,y, PriConfig.defaultGfxColor)
@@ -1993,9 +2068,9 @@ def vLeftClickVertProfile(id=-1, avgBandSize=1, s='-'):
     def f(x,y):
         if _plotprofile_avgSize >1:
             vals = N.sum( v.img[ :, x:x+_plotprofile_avgSize ].astype(N.float64), 1 ) / float(_plotprofile_avgSize)
-            ploty( vals, s )
+            ploty( vals, symbolSize=0)#s )
         else:
-            ploty( v.img[ :, x ], s )
+            ploty( v.img[ :, x ], symbolSize=0)#s )
     def fg(x,y):
         if _plotprofile_avgSize >1:
             glLine(x,0,x,h, PriConfig.defaultGfxColor)
@@ -2012,7 +2087,7 @@ def vLeftClickZProfile(id=-1, avgBoxSize=1, s='-', slice=Ellipsis):
     data = v.data[slice]
 
     if data.ndim != 3:
-        raise ValueError, "ZProfile only works for 3D data (TODO: for 4+D)"
+        raise ValueError("ZProfile only works for 3D data (TODO: for 4+D)")
     nz = data.shape[0]
 
     global _plotprofile_avgSize # 20051025
@@ -2028,14 +2103,14 @@ def vLeftClickZProfile(id=-1, avgBoxSize=1, s='-', slice=Ellipsis):
             w,h = _plotprofile_avgSize,_plotprofile_avgSize
             w2,h2 = w/2., h/2.
             v.poly[:] = x0,y0,x1,y1 = int(x-w2+.5),int(y-h2+.5),  int(x+w2+.5),int(y+h2+.5)
-            from useful import mean2d
+            from .useful import mean2d
             prof = N.empty(shape=nz, dtype=N.float)
             for z in range(nz):
                 prof[z] = data[z,  y0:y1, x0:x1].mean()
             #prof = mean2d(a[:,  y0:y1, x0:x1])   ##->  TypeError: Can't reshape non-contiguous numarray
-            ploty( prof, s )
+            ploty( prof, symbolSize=0)#s )
         else:
-            ploty( data[ :, int(y), int(x) ], s )
+            ploty( data[ :, int(y), int(x) ], symbolSize=0)#s )
     def fg(x,y):
         if _plotprofile_avgSize >1:
             x0,y0,x1,y1 = v.poly
@@ -2067,17 +2142,17 @@ def vLeftClickLineProfile(id=-1, abscissa='line', s='-'):
             ddx = dx/l
             ddy = dy/l
             #print dx,dy,l, x0,y0,x1,y1
-            xs = map(int, N.arange(x0, x1, ddx)+.5)
-            ys = map(int, N.arange(y0, y1, ddy)+.5)
+            xs = list(map(int, N.arange(x0, x1, ddx)+.5))
+            ys = list(map(int, N.arange(y0, y1, ddy)+.5))
             #print len(xs), len(ys)
             try:
                 vs = v.img[ ys,xs ]
                 if abscissa == 'x':
-                    plotxy(xs, vs, s)
+                    plotxy(xs, vs, s)#symbolSize=0)#s)
                 elif abscissa == 'y':
-                    plotxy(ys, vs, s)
+                    plotxy(ys, vs, s)#symbolSize=0)#s)
                 else:
-                    ploty(vs, s)
+                    ploty(vs, s)#symbolSize=0)#s)
             except:
                 raise #print "line profile bug:", len(xs), len(ys)
 
@@ -2109,7 +2184,7 @@ def vLeftClickLineMeasure(id=-1, roundCoords2int=False):
         dx,dy = x1-x0, y1-y0
 
         s = "length: %s" % (N.sqrt(dx*dx+dy*dy), )
-        print s
+        print(s)
         v.viewer.SetToolTipString(s)
         
     def fg(x,y):
@@ -2176,7 +2251,7 @@ def vLeftClickTriangleMeasure(id=-1, roundCoords2int=0):
                 s= "outerCircle=> cx,cy: %.1f %.1f   r: %.1f  diameter: %.1f" %       (xxc,yyc, R, 2*R)
             else:
                 s= "outerCircle=> area: %.2f" % (area,)
-            print s
+            print(s)
             v.viewer.SetToolTipString(s)
         except ZeroDivisionError:
             pass
@@ -2434,7 +2509,7 @@ def vFollowMouse(v_id, xyViewers=[], xzViewers=[], yzViewers=[],
             zaxis=None
         zAxisSliders.append(zaxis)
                     
-    xzViewers__zAxisSliders = zip(xzViewers, zAxisSliders)
+    xzViewers__zAxisSliders = list(zip(xzViewers, zAxisSliders))
     del zAxisSliders
 
     zAxisSliders=[]
@@ -2446,7 +2521,7 @@ def vFollowMouse(v_id, xyViewers=[], xzViewers=[], yzViewers=[],
             zaxis=None
         zAxisSliders.append(zaxis)
 
-    yzViewers__zAxisSliders = zip(yzViewers, zAxisSliders)
+    yzViewers__zAxisSliders = list(zip(yzViewers, zAxisSliders))
     del zAxisSliders
 
     def onMouseFollower(x,y, ev):
@@ -2717,8 +2792,8 @@ except ImportError:
         if color is not None:
             GL.glColor( color )
 
-        ps = map(lambda a: (x0+r*N.cos(a),
-                       y0+r*N.sin(a)), N.arange(0,2*N.pi, 2*N.pi/nEdges))
+        ps = [(x0+r*N.cos(a),
+                       y0+r*N.sin(a)) for a in N.arange(0,2*N.pi, 2*N.pi/nEdges)]
         GL.glBegin( GL.GL_LINE_LOOP )
         for x,y in ps:
             GL.glVertex2f( x,y )
@@ -2734,8 +2809,8 @@ except ImportError:
     def glEllipse(x0,y0,rx=10, ry=5, phi=0, nEdges=60, color=None):
         if color is not None:
             GL.glColor( color )
-        ps = map(lambda a: (x0+rx*N.cos(a),
-                       y0+ry*N.sin(a)), N.arange(phi,phi+2*N.pi, 2*N.pi/nEdges))
+        ps = [(x0+rx*N.cos(a),
+                       y0+ry*N.sin(a)) for a in N.arange(phi,phi+2*N.pi, 2*N.pi/nEdges)]
         GL.glBegin( GL.GL_LINE_LOOP )
         for x,y in ps:
             GL.glVertex2f( x,y )
@@ -2895,7 +2970,7 @@ def shellMessage(msg):
         __main__.shell.promptPosStart += len(msg)
         __main__.shell.promptPosEnd += len(msg)
     except:
-        print msg ,# in case there is no main.shell
+        print(msg, end=' ')# in case there is no main.shell
 
 def shellMenuAppendNewCommand(cmd, menuText="new command", menuCtrlKey='D', menu=0, bell=True, execModule=None):
     """
@@ -2957,7 +3032,7 @@ def shellMenuAppendNewCommand(cmd, menuText="new command", menuCtrlKey='D', menu
         if callable(cmd):
             cmd()
         else:
-            exec cmd in execModule.__dict__ # , {'x':ev.GetString(), '_':self.execModule}        
+            exec(cmd, execModule.__dict__) # , {'x':ev.GetString(), '_':self.execModule}        
 
     frame.Bind(wx.EVT_MENU, onAS, id=eid)
 
@@ -3010,7 +3085,7 @@ def clipboardGetText():
 
     do = wx.TextDataObject()
     if not wx.TheClipboard.Open():
-        raise RuntimeError, "cannot open clipboard"
+        raise RuntimeError("cannot open clipboard")
     try:
         success = wx.TheClipboard.GetData(do)
     finally:
@@ -3032,7 +3107,7 @@ def clipboardSetText(obj, useRepr=False):
     do = wx.TextDataObject()
     do.SetText(obj)
     if not wx.TheClipboard.Open():
-        raise RuntimeError, "cannot open clipboard"
+        raise RuntimeError("cannot open clipboard")
     try:
         wx.TheClipboard.SetData(do)
     finally:
@@ -3044,10 +3119,10 @@ def clipboardImageSaveToFile(fn=None):
     if fn is None: uses FN()
     """
     if not wx.TheClipboard.Open():
-        raise RuntimeError, "cannot open clipboard"
+        raise RuntimeError("cannot open clipboard")
     try:
         if not wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
-            raise RuntimeError, "no bitmap in clipboard"
+            raise RuntimeError("no bitmap in clipboard")
 
         if fn is None:
             fn = FN(save=1)
@@ -3069,7 +3144,7 @@ def clipboardImageSaveToFile(fn=None):
         elif fn[-4:].lower() == '.gif':
             typ = wx.BITMAP_TYPE_GIF
         else:
-            raise ValueError, "Unknow file extention"
+            raise ValueError("Unknow file extention")
 
         bmp.SaveFile(fn, typ) #, wx.BITMAP_TYPE_PNG
     finally:
@@ -3097,125 +3172,125 @@ def clipboardGetText2array(transpose=False, comment='#', sep=None, convFcn = Non
     """
  
     txt = clipboardGetText()
-    import useful as U
+    from . import useful as U
     return U.text2array(txt, transpose=transpose, comment=comment, sep=sep, 
                         convFcn = convFcn, convertDecimalKomma=convertDecimalKomma)
 
 try:
- def vtkInit():
-    import sys
+    def vtkInit():
+        import sys
 
-    p1 = '/jws18/haase/VTK-4.2-20040703/VTK/Wrapping/Python'
-    p2 = '/jws18/haase/VTK-4.2-20040703/VTK/bin'
-    if not p1 in sys.path:
-        sys.path.append(p1)
-        sys.path.append(p2)
+        p1 = '/jws18/haase/VTK-4.2-20040703/VTK/Wrapping/Python'
+        p2 = '/jws18/haase/VTK-4.2-20040703/VTK/bin'
+        if not p1 in sys.path:
+            sys.path.append(p1)
+            sys.path.append(p2)
 
- def vtkWxDemoCone(resolution=8):
-    vtkInit()
-        
-    import wx, vtkpython
+    def vtkWxDemoCone(resolution=8):
+        vtkInit()
 
-    #A simple VTK widget for wxPython.  Note that wxPython comes
-    #with its own wxVTKRenderWindow in wxPython.lib.vtk.  Try both
-    #and see which one works better for you.
-    from vtk.wx.wxVTKRenderWindow import wxVTKRenderWindow
+        import wx, vtkpython
 
-
-    # create the widget
-    frame = wx.Frame(None, -1, "wxRenderWindow", size=wx.Size(400,400))
-    widget = wxVTKRenderWindow(frame, -1)
-    
-    ren = vtkpython.vtkRenderer()
-    widget.GetRenderWindow().AddRenderer(ren)
-
-    cone = vtkpython.vtkConeSource()
-    cone.SetResolution( resolution )
-    
-    coneMapper = vtkpython.vtkPolyDataMapper()
-    coneMapper.SetInput(cone.GetOutput())
-    
-    coneActor = vtkpython.vtkActor()
-    coneActor.SetMapper(coneMapper)
-
-    ren.AddActor(coneActor)
-
-    # show the window
-    
-    frame.Show(1)
-
- class vtkMountain:
-    
-    def __init__(self, arr2d, title="wxRenderWindow"):
-        self.arr2d = arr2d
-
-
-        try:
-            import vtk
-        except:
-            vtkInit()
-            import vtk
-            
-
-        #from vtk.wx.wxVTKRenderWindow import wxVTKRenderWindow
-        #from vtk import vtkImageImport
-
-        #global f, w, ren, ii, h,w, mi,ma,  geom,warp, mapper, carpet, _vtktypedict 
-
-        self._vtktypedict = {N.uint8:vtk.VTK_UNSIGNED_CHAR,
-                        N.uint16:vtk.VTK_UNSIGNED_SHORT,
-                        N.uint32:vtk.VTK_UNSIGNED_INT,
-                        N.int8:vtk.VTK_CHAR,
-                        N.int16:vtk.VTK_SHORT,
-                        N.int32:vtk.VTK_INT,
-                        #N.int32:vtk.VTK_LONG,
-                        #N.uint8:vtk.VTK_FLOAT,
-                        #N.uint8:vtk.VTK_DOUBLE,
-                        N.float32:vtk.VTK_FLOAT,
-                        N.float64:vtk.VTK_DOUBLE }
-
-
-
+        #A simple VTK widget for wxPython.  Note that wxPython comes
+        #with its own wxVTKRenderWindow in wxPython.lib.vtk.  Try both
+        #and see which one works better for you.
         from vtk.wx.wxVTKRenderWindow import wxVTKRenderWindow
-        from vtk import vtkImageImport
 
-        self.f = wx.Frame(None, -1, title, size=wx.Size(400,400))
-        self.w = wxVTKRenderWindow(self.f, -1)
-        self.ren = vtk.vtkRenderer()
-        self.w.GetRenderWindow().AddRenderer(self.ren)
 
-        self.ii = vtkImageImport()
+        # create the widget
+        frame = wx.Frame(None, -1, "wxRenderWindow", size=wx.Size(400,400))
+        widget = wxVTKRenderWindow(frame, -1)
 
-        #size = len(a.flat)  * a.itemsize()
-        #ii.SetImportVoidPointer(a.flat, size)
-        ####use tostring instead    self.ii.SetImportVoidPointer(arr2d._data, len(arr2d._data))
-        self.ii.SetImportVoidPointer(arr2d._data, len(arr2d._data))
-        self.ii.SetDataScalarType( self._vtktypedict[arr2d.dtype]) 
+        ren = vtkpython.vtkRenderer()
+        widget.GetRenderWindow().AddRenderer(ren)
+
+        cone = vtkpython.vtkConeSource()
+        cone.SetResolution( resolution )
+
+        coneMapper = vtkpython.vtkPolyDataMapper()
+        coneMapper.SetInput(cone.GetOutput())
+
+        coneActor = vtkpython.vtkActor()
+        coneActor.SetMapper(coneMapper)
+
+        ren.AddActor(coneActor)
+
+        # show the window
+
+        frame.Show(1)
+
+    class vtkMountain:
     
-        h,w = arr2d.shape[-2:]
-        self.ii.SetDataExtent (0,w-1, 0,h-1, 0,0)
-        self.ii.SetWholeExtent(0,w-1, 0,h-1, 0,0)
-        import useful as U
-        self.mi,self.ma = U.mm( arr2d )
-        
-        
-        self.geom = vtk.vtkImageDataGeometryFilter()
-        self.geom.SetInput(self.ii.GetOutput())
-        self.warp = vtk.vtkWarpScalar()
-        self.warp.SetInput(self.geom.GetOutput())
-        self.mapper = vtk.vtkPolyDataMapper()
-        self.mapper.SetInput(self.warp.GetPolyDataOutput())
-        self.carpet = vtk.vtkActor()
-        self.carpet.SetMapper(self.mapper)
-        self.carpet.SetScale(1,1, 50)
+        def __init__(self, arr2d, title="wxRenderWindow"):
+            self.arr2d = arr2d
 
-        
-        self.mapper.SetScalarRange(self.mi,self.ma)
-        self.ren.AddActor(self.carpet)
-    
-    def setZScale(self, zscale):
-        self.carpet.SetScale(1,1, zscale)
-        self.w.Refresh()
+
+            try:
+                import vtk
+            except:
+                vtkInit()
+                import vtk
+
+
+            #from vtk.wx.wxVTKRenderWindow import wxVTKRenderWindow
+            #from vtk import vtkImageImport
+
+            #global f, w, ren, ii, h,w, mi,ma,  geom,warp, mapper, carpet, _vtktypedict 
+
+            self._vtktypedict = {N.uint8:vtk.VTK_UNSIGNED_CHAR,
+                            N.uint16:vtk.VTK_UNSIGNED_SHORT,
+                            N.uint32:vtk.VTK_UNSIGNED_INT,
+                            N.int8:vtk.VTK_CHAR,
+                            N.int16:vtk.VTK_SHORT,
+                            N.int32:vtk.VTK_INT,
+                            #N.int32:vtk.VTK_LONG,
+                            #N.uint8:vtk.VTK_FLOAT,
+                            #N.uint8:vtk.VTK_DOUBLE,
+                            N.float32:vtk.VTK_FLOAT,
+                            N.float64:vtk.VTK_DOUBLE }
+
+
+
+            from vtk.wx.wxVTKRenderWindow import wxVTKRenderWindow
+            from vtk import vtkImageImport
+
+            self.f = wx.Frame(None, -1, title, size=wx.Size(400,400))
+            self.w = wxVTKRenderWindow(self.f, -1)
+            self.ren = vtk.vtkRenderer()
+            self.w.GetRenderWindow().AddRenderer(self.ren)
+
+            self.ii = vtkImageImport()
+
+            #size = len(a.flat)  * a.itemsize()
+            #ii.SetImportVoidPointer(a.flat, size)
+            ####use tostring instead    self.ii.SetImportVoidPointer(arr2d._data, len(arr2d._data))
+            self.ii.SetImportVoidPointer(arr2d._data, len(arr2d._data))
+            self.ii.SetDataScalarType( self._vtktypedict[arr2d.dtype]) 
+
+            h,w = arr2d.shape[-2:]
+            self.ii.SetDataExtent (0,w-1, 0,h-1, 0,0)
+            self.ii.SetWholeExtent(0,w-1, 0,h-1, 0,0)
+            from . import useful as U
+            self.mi,self.ma = U.mm( arr2d )
+
+
+            self.geom = vtk.vtkImageDataGeometryFilter()
+            self.geom.SetInput(self.ii.GetOutput())
+            self.warp = vtk.vtkWarpScalar()
+            self.warp.SetInput(self.geom.GetOutput())
+            self.mapper = vtk.vtkPolyDataMapper()
+            self.mapper.SetInput(self.warp.GetPolyDataOutput())
+            self.carpet = vtk.vtkActor()
+            self.carpet.SetMapper(self.mapper)
+            self.carpet.SetScale(1,1, 50)
+
+
+            self.mapper.SetScalarRange(self.mi,self.ma)
+            self.ren.AddActor(self.carpet)
+
+        def setZScale(self, zscale):
+            self.carpet.SetScale(1,1, zscale)
+            self.w.Refresh()
         
 except:
     import sys
@@ -3223,7 +3298,7 @@ except:
     exc_info = sys.exc_info()
     #import traceback
     #traceback.print_exc()
-    print "* no VTK *"
+    print("* no VTK *")
     pass
 
 
@@ -3275,7 +3350,7 @@ except:
 #         return v.newGLListDone(enable, refreshNow)
 
 def _define_vgAddXXX(addWhat, extraArgs, extraDoc, extraCode):
-    exec '''
+    exec('''
 def vgAdd%(addWhat)s  (id, %(extraArgs)s 
                        color=PriConfig.defaultGfxColor, width=1, name=None, idx=None, enable=True, refreshNow=True):
     """
@@ -3305,7 +3380,7 @@ def vgAdd%(addWhat)s  (id, %(extraArgs)s
            traceback.print_exc() #limit=None, file=None)
     else:
         return v.newGLListDone(enable, refreshNow)
-''' % locals() in globals()
+''' % locals(), globals())
 
 # vgAddBoxes
 # vgAddCircles
@@ -3586,7 +3661,7 @@ def vgEnabled(id=-1, idx=-1):
     else:
         v=id
 
-    if isinstance(idx, basestring):
+    if isinstance(idx, six.string_types):
         idx=v.m_moreGlLists_NamedIdx[idx]
     return v.m_moreGlLists_enabled[idx]
 
@@ -3661,7 +3736,7 @@ def vgNameToggle(id=-1, name='', on=None):
     
     vgNameBlacklist(id, name, add=not on)
     if on:
-        nameGoesWithSectTuples = any((isinstance(k,tuple) for k in vv.m_moreGlLists_dict.keys() if vv.m_moreGlLists_dict[name][0] in vv.m_moreGlLists_dict[k]))
+        nameGoesWithSectTuples = any((isinstance(k,tuple) for k in list(vv.m_moreGlLists_dict.keys()) if vv.m_moreGlLists_dict[name][0] in vv.m_moreGlLists_dict[k]))
         if nameGoesWithSectTuples:
             # trigger redraw of all gfxs in current section, instead of all gfxs having "name" (which would be accross many z-sections)
             name = vGetZSecTuple(id)
@@ -3684,7 +3759,7 @@ def vgNameEnablerGUIbox(id=-1):
     buttonBox(
         [
             ("tb x.SetValue(0==len(viewers[%d].viewer.m_moreGlLists_nameBlacklist.intersection( viewers[%d].viewer.m_moreGlLists_dict['%s'] )))\t%s"%(id,id, name,name), "vgNameToggle(%d, name='%s', on=x)"%(id,name))
-            for name in sorted(viewers[id].viewer.m_moreGlLists_dict.keys()) if isinstance(name, basestring)],
+            for name in sorted(viewers[id].viewer.m_moreGlLists_dict.keys()) if isinstance(name, six.string_types)],
         title="named GFXs for viewer %d"%(id,),
         execModule=sys.modules['Priithon.usefulX'], #__import__(__name__),
         )#, layout="boxVert")
@@ -3753,11 +3828,11 @@ def vDrawingCircles(v_id=-1,
     if add: add value is used as multiplier and then added to image,  
     otherwise image is substituted where brush>0 
     """
-    import fftfuncs as F
+    from . import fftfuncs as F
 
     v = viewers[v_id]
 
-    from splitND import spv as spv_class
+    from .splitND import spv as spv_class
     #from splitND2 import spv as spv2_class
     
 
@@ -3824,31 +3899,31 @@ def _registerEventHandler(handlerList, newFcn=None, newFcnName=None, oldFcnName=
     if newFcn is a string: it is executed in `__main__` with `args` containing the handler arguments
     """
     
-    if isinstance(newFcn, basestring):
+    if isinstance(newFcn, six.string_types):
         newFcnStr=newFcn
         def myCmdString(*args):#selfExecMod, x, b, ev, cmd=cmd):
             import __main__
-            exec newFcnStr in __main__.__dict__, {'args':args} #'_':selfExecMod, '_ev':ev, '_b':b, 'x':x}
+            exec(newFcnStr, __main__.__dict__, {'args':args}) #'_':selfExecMod, '_ev':ev, '_b':b, 'x':x}
         newFcn = myCmdString
 
     if newFcnName:
         try:
-            newFcn.func_name = newFcnName
+            newFcn.__name__ = newFcnName
         except AttributeError:
             # HACK for instance methods:
             # http://www.velocityreviews.com/forums/t395502-why-cant-you-pickle-instancemethods.html
-            newFcn.im_func.__name__ = newFcnName
+            newFcn.__func__.__name__ = newFcnName
 
     if oldFcnName is None:  # append new
         handlerList.append( newFcn )
         
     else:
         if oldFcnName == '':
-            oldFcnName = newFcn.func_name
+            oldFcnName = newFcn.__name__
 
         ## iterate backwards, so that we can delete items
         for i in range(len(handlerList)-1,-1,-1):
-            if handlerList[i].func_name == oldFcnName:
+            if handlerList[i].__name__ == oldFcnName:
                 if newFcn is not None:
                     handlerList[i] = newFcn
                     newFcn = None
@@ -3891,14 +3966,14 @@ def vAnimate(vids=-1):
         animationZ = 0
         while self.animationRunning or singleStep:
             try:
-                vids = map(int, self.animateVids.split())
-                axes = map(int, self.animateAxes.split())
+                vids = list(map(int, self.animateVids.split()))
+                axes = list(map(int, self.animateAxes.split()))
                 if len(axes) < len(vids):
                     axes += axes[-1:]*(len(vids)-len(axes))
                 strideStr = self.animateStrides
                 if '/' in strideStr:
                     strideStr, minMaxStr=strideStr.split('/',1)
-                    minMax = map(int, minMaxStr.split())
+                    minMax = list(map(int, minMaxStr.split()))
                     if len(minMax)>1:
                         minZ = minMax[0]
                         maxZ = minMax[1]
@@ -3909,7 +3984,7 @@ def vAnimate(vids=-1):
                     minZ = 0
                     maxZ = None
                     
-                strides = map(int, strideStr.split())
+                strides = list(map(int, strideStr.split()))
                 if len(strides) < len(vids):
                     strides += strides[-1:]*(len(vids)-len(strides))
                 #autoscales = map(int, self.animateAutoscale.split())

@@ -1,8 +1,14 @@
-
-import sys, os
+from __future__ import print_function
+import sys, os, six, itertools
 import  wx
 import  wx.lib.mixins.listctrl  as  listmix
-from . import bioformatsIO, commonfuncs as C
+#try:
+#    from agw import hyperlink as hl
+#except ImportError: # if it's not there locally, try the wxPython lib.
+#    import wx.lib.agw.hyperlink as hl
+from . import commonfuncs as C
+import imgio
+from PriCommon import guiFuncs as G
 
 SIZE_COL0=180
 SIZE_COL1=280
@@ -25,6 +31,7 @@ class BasicFileListCtrl(wx.ListCtrl,
         listmix.ListCtrlAutoWidthMixin.__init__(self)
 
         self.multiple = multiple
+        self.counter = itertools.count()
         self.last_index = 0
         self.Populate()
 
@@ -33,7 +40,7 @@ class BasicFileListCtrl(wx.ListCtrl,
         self.dropTarget = MyFileDropTarget(self)
         self.SetDropTarget(self.dropTarget)
 
-        self.setDefaultFileLoadFunc(bioformatsIO.load)
+        self.setDefaultFileLoadFunc()#bioformatsIO.load)
 
 
     def initialize(self):
@@ -75,12 +82,18 @@ class BasicFileListCtrl(wx.ListCtrl,
 
         self.currentItem = 0
 
-    def setDefaultFileLoadFunc(self, func):
-        self.load_func = func
+    def setDefaultFileLoadFunc(self, func=None):
+        if not func:
+            self.load_func = imgio.Reader
+        else:
+            self.load_func = func
 
 
     def SetStringItem(self, index, col, data):
-        wx.ListCtrl.SetStringItem(self, index, col, data)
+        if wx.version().startswith('3'):
+            wx.ListCtrl.SetStringItem(self, index, col, data)
+        else:
+            wx.ListCtrl.SetItem(self, index, col, data)
         
     def addFiles(self, fns):
         """
@@ -100,27 +113,35 @@ class BasicFileListCtrl(wx.ListCtrl,
         """
         fill in the first 4 columns
         """
-        if not os.path.isfile(fn):
-            raise ValueError, 'The input file is not a valid file'
+        if not os.path.exists(fn):
+            raise ValueError('The input file is not a valid file')
         
         dd, ff = os.path.split(fn)
 
         
         try:
             h = self.load_func(fn)
-        except ValueError:
-            dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
+        except (ValueError, AttributeError) as e:
+            imgio_dialog(e, self)
+            return ''
+            old="""
+            dlg = wx.MessageDialog(self, ' '.join(e.args), 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
             raise
             if dlg.ShowModal() == wx.ID_OK:
-                return
+                return"""
         except:
-            print 'file %s was not recognized..., skip' % fn
-            #raise
+            print('file %s was not recognized..., skip' % fn)
+            raise
             return
 
         # column 0
         index0 = len(self.columnkeys)
-        index = self.InsertStringItem(sys.maxint, dd)
+        if wx.version().startswith('3') and not sys.platform.startswith('win'):
+            index = self.InsertStringItem(sys.maxsize, dd)
+        elif wx.version().startswith('3') and sys.platform.startswith('win'):
+            index = self.InsertStringItem(next(self.counter), dd)
+        else:
+            index = self.InsertItem(next(self.counter), dd)#sys.maxsize, dd)
 
         # column 1
         self.SetStringItem(index, 1, ff)
@@ -139,7 +160,7 @@ class BasicFileListCtrl(wx.ListCtrl,
 
         self.nws.append(len(nw))
 
-        seq = bioformatsIO.generalIO.IMGSEQ[h.imgSequence]
+        seq = imgio.generalIO.IMGSEQ[h.imgSequence]
         self.seqs.append(seq)
 
         self.pxszs.append(h.pxlsiz[0])
@@ -158,7 +179,10 @@ class BasicFileListCtrl(wx.ListCtrl,
         """
         return directory, basefilename, waves, nt
         """
-        return [self.GetItem(index, col).GetText() for col in range(self.nColums)]#5)]#6)]
+        if self.GetItemCount():
+            return [self.GetItem(index, col).GetText() for col in range(self.nColums)]
+        else:
+            return []
             
 
     def clearRaw(self, index):
@@ -229,18 +253,21 @@ class FileListCtrl(BasicFileListCtrl):
         """
         fill in the first 4 columns
         """
-        if not os.path.isfile(fn):
-            raise ValueError, 'The input file is not a valid file'
+        if not os.path.exists(fn):
+            raise ValueError('The input file is not a valid file')
         
         dd, ff = os.path.split(fn)
 
         try:
             h = self.load_func(fn)
-        except ValueError:
-            dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
+        except (ValueError, AttributeError) as e:
+            old="""
+            dlg = wx.MessageDialog(self, ' '.join(e.args), 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
 
             if dlg.ShowModal() == wx.ID_OK:
-                return
+                return"""
+            imgio_dialog(e, self)
+            return ''
         if not h:
             return
         old="""
@@ -257,7 +284,12 @@ class FileListCtrl(BasicFileListCtrl):
 
         # column 0
         index0 = len(self.columnkeys)
-        index = self.InsertStringItem(sys.maxint, dd)
+        if wx.version().startswith('3') and not sys.platform.startswith('win'):
+            index = self.InsertStringItem(sys.maxsize, dd)
+        elif wx.version().startswith('3') and sys.platform.startswith('win'):
+            index = self.InsertStringItem(next(self.counter), dd)
+        else:
+            index = self.InsertItem(next(self.counter), dd)#self.GetItemCount(), dd)
 
         # column 1
         self.SetStringItem(index, 1, ff)
@@ -265,7 +297,7 @@ class FileListCtrl(BasicFileListCtrl):
         # column 2
         nw = []
         for w in h.wave[:h.nw]:
-            if w % 1:
+            if not isinstance(w, six.string_types) and w % 1:
                 nw.append(str(int(round(w))))
             else:
                 nw.append(str(w))
@@ -286,7 +318,7 @@ class FileListCtrl(BasicFileListCtrl):
         self.SetStringItem(index, 4, str(nz))
         
         # column 5
-        seq = bioformatsIO.generalIO.IMGSEQ[h.imgSequence]
+        seq = imgio.generalIO.IMGSEQ[h.imgSequence]
         #self.SetStringItem(index, 5, seq)
         self.seqs.append(seq)
 
@@ -320,9 +352,9 @@ class MyFileDropTarget(wx.FileDropTarget):
             if len(args) == len(funcs):
                 self.args = args
             else:
-                raise ValueError, 'len(args) must be the same as len(funcs)'
+                raise ValueError('len(args) must be the same as len(funcs)')
         except TypeError:
-            self.args = [args for i in xrange(len(self.funcs))]
+            self.args = [args for i in range(len(self.funcs))]
             
 
     def OnDropFiles(self, x, y, filenames):
@@ -334,4 +366,50 @@ class MyFileDropTarget(wx.FileDropTarget):
         for i, func in enumerate(self.funcs):
             func(self.args[i])
 
+        return True
 
+#####
+def imgio_dialog(e=None, parent=None):
+    """
+    e: error or messege string
+
+    opens a dialog to navigate to install JDK
+    """
+    if isinstance(e, six.string_types) or e.args[0].startswith(imgio.JDK_MSG[:10]):
+        if os.name == 'nt':
+            sysname = 'Windows'
+            arch = os.getenv('PROCESSOR_ARCHITECTURE')
+        else:
+            uname = os.uname()
+            if sys.version_info.major == 2:
+                sysname = uname[0]
+                machine = uname[-1]
+            else:
+                sysname = uname.sysname
+                machine = uname.machine
+            sysname = sysname.replace('Darwin', 'macOS')
+            arch = machine.replace('x86_64', 'x64')
+
+        if isinstance(e, six.string_types):
+            msg0 = e
+        else:
+            msg0 = ' '.join(e.args)
+        msg = msg0 + '\n\nWould you like to obtain JDK?'
+        extra = '\nYour platform: %s %s' % (sysname, arch)
+        
+        if sysname.startswith('Linux'):
+            extra += '\n\nYou can also obtain JDK by your package manager.'
+
+        dlg = wx.MessageDialog(parent,  msg, 'Your image requires JDK', style=wx.YES_NO)
+        dlg.SetExtendedMessage(extra)
+        if dlg.ShowModal() == wx.ID_YES:
+            import webbrowser
+            webbrowser.open(imgio.bioformatsIO.URL)
+            return False
+        else:
+            return False
+    else:
+        dlg = wx.MessageDialog(parent, ' '.join([str(aa) for aa in e.args]), 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
+        raise
+        if dlg.ShowModal() == wx.ID_OK:
+            return False

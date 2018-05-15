@@ -1,9 +1,9 @@
 """provides the bitmap OpenGL panel for Priithon's ND 2d-section-viewer (multi-color version)"""
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
-from viewerCommon import *
+from .viewerCommon import *
 
 
 dataTypeMaxValue_table = {
@@ -53,7 +53,9 @@ class GLViewer(GLViewerCommon):
         if not wx.Platform == '__WXMSW__': #20070525-black_on_black on Windows
             self.SetCursor(wx.CROSS_CURSOR)
 
-        wx.EVT_PAINT(self, self.OnPaint)
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        #wx.EVT_PAINT(self, self.OnPaint)
         
         #EVT_MIDDLE_DOWN(self, self.OnMiddleDown)
         self.MakePopupMenu()
@@ -80,29 +82,51 @@ class GLViewer(GLViewerCommon):
         self.m_menu.Append(Menu_chgOrig, "c&hangeOrig")
         self.m_menu.Append(Menu_Reload, "reload\tr")
         #20070823-colmap2 ?? self.m_menu.Append(Menu_Color, "change ColorMap")
-        self.m_menu.AppendMenu(wx.NewId(), "save", self.m_menu_save)
+
+        #20171225-PY2to3 deprecation warning use Append
+        if wx.version().startswith('3') and not wx.version().endswith('(phoenix)'):
+            self.m_menu.AppendMenu(wx.NewId(), "save", self.m_menu_save)
+        else:
+            self.m_menu.Append(wx.NewId(), "save", self.m_menu_save)
         ####self.m_menu.Append(Menu_Save, "save2d")
         self.m_menu.Append(Menu_aspectRatio, "change aspect ratio")
         self.m_menu.Append(Menu_rotate, "display rotated...")
         self.m_menu.Append(Menu_noGfx, "hide all gfx\tb", '',wx.ITEM_CHECK)
-            
-        wx.EVT_MENU(self, Menu_ZoomCenter, self.OnCenter)
-        wx.EVT_MENU(self, Menu_ZoomOut, self.OnZoomOut)
-        wx.EVT_MENU(self, Menu_ZoomIn, self.OnZoomIn)
-        wx.EVT_MENU(self, Menu_Zoom2x,     self.OnMenu)
+
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_MENU, self.OnCenter,          id=Menu_ZoomCenter)
+        self.Bind(wx.EVT_MENU, self.OnZoomOut,         id=Menu_ZoomOut)
+        self.Bind(wx.EVT_MENU, self.OnZoomIn,          id=Menu_ZoomIn)
+        self.Bind(wx.EVT_MENU, self.OnMenu,            id=Menu_Zoom2x)
+        self.Bind(wx.EVT_MENU, self.OnMenu,            id=Menu_Zoom_5x)
+        self.Bind(wx.EVT_MENU, self.doReset,           id=Menu_ZoomReset)
+        self.Bind(wx.EVT_MENU, self.OnReload,          id= Menu_Reload)
+        self.Bind(wx.EVT_MENU, self.OnChgOrig,         id=Menu_chgOrig)
+        self.Bind(wx.EVT_MENU, self.OnSave,            id=Menu_Save)
+        self.Bind(wx.EVT_MENU, self.OnSaveScreenShort, id=Menu_SaveScrShot)
+        self.Bind(wx.EVT_MENU, self.OnSaveClipboard,   id=Menu_SaveClipboard)
+        self.Bind(wx.EVT_MENU, self.OnAssign,          id=Menu_Assign)
+        self.Bind(wx.EVT_MENU, self.OnAspectRatio,     id=Menu_aspectRatio)
+        self.Bind(wx.EVT_MENU, self.OnRotate,          id=Menu_rotate)
+        self.Bind(wx.EVT_MENU, self.OnNoGfx,           id=Menu_noGfx)
+                      
+        #wx.EVT_MENU(self, Menu_ZoomCenter, self.OnCenter)
+        #wx.EVT_MENU(self, Menu_ZoomOut, self.OnZoomOut)
+        #wx.EVT_MENU(self, Menu_ZoomIn, self.OnZoomIn)
+        #wx.EVT_MENU(self, Menu_Zoom2x,     self.OnMenu)
         #wx.EVT_MENU(self, Menu_ZoomCenter, self.OnMenu)
-        wx.EVT_MENU(self, Menu_Zoom_5x,    self.OnMenu)
-        wx.EVT_MENU(self, Menu_ZoomReset,  self.doReset) # OnMenu)
+        #wx.EVT_MENU(self, Menu_Zoom_5x,    self.OnMenu)
+        #wx.EVT_MENU(self, Menu_ZoomReset,  self.doReset) # OnMenu)
         #20070823-colmap2 ?? wx.EVT_MENU(self, Menu_Color,      self.OnColor)
-        wx.EVT_MENU(self, Menu_Reload,      self.OnReload)
-        wx.EVT_MENU(self, Menu_chgOrig,      self.OnChgOrig)
-        wx.EVT_MENU(self, Menu_Save,      self.OnSave)
-        wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
-        wx.EVT_MENU(self, Menu_SaveClipboard,    self.OnSaveClipboard)
-        wx.EVT_MENU(self, Menu_Assign,      self.OnAssign)
-        wx.EVT_MENU(self, Menu_aspectRatio,      self.OnAspectRatio)
-        wx.EVT_MENU(self, Menu_rotate,      self.OnRotate)
-        wx.EVT_MENU(self, Menu_noGfx,      self.OnNoGfx)
+        #wx.EVT_MENU(self, Menu_Reload,      self.OnReload)
+        #wx.EVT_MENU(self, Menu_chgOrig,      self.OnChgOrig)
+        #wx.EVT_MENU(self, Menu_Save,      self.OnSave)
+        #wx.EVT_MENU(self, Menu_SaveScrShot,      self.OnSaveScreenShort)
+        #wx.EVT_MENU(self, Menu_SaveClipboard,    self.OnSaveClipboard)
+        #wx.EVT_MENU(self, Menu_Assign,      self.OnAssign)
+        #wx.EVT_MENU(self, Menu_aspectRatio,      self.OnAspectRatio)
+        #wx.EVT_MENU(self, Menu_rotate,      self.OnRotate)
+        #wx.EVT_MENU(self, Menu_noGfx,      self.OnNoGfx)
 
     def InitGL(self):
 #        (self.m_w, self.m_h) = self.GetClientSizeTuple()
@@ -171,6 +195,7 @@ class GLViewer(GLViewerCommon):
         self.picTexRatio_x = float(pic_nx) / tex_nx
         self.picTexRatio_y = float(pic_ny) / tex_ny
 
+        wx.Yield()
         self.SetCurrent(self.context) # 20141127
         textureID = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, textureID)
@@ -218,7 +243,7 @@ class GLViewer(GLViewerCommon):
 
         else:
             self.error = "unsupported data mode"
-            raise ValueError, self.error
+            raise ValueError(self.error)
 
         #self.newGLListNow()
         curGLLIST = glGenLists( 1 )
@@ -420,7 +445,7 @@ class GLViewer(GLViewerCommon):
                             GL_LUMINANCE,GL_UNSIGNED_SHORT, imgString)
         else:
             self.error = "unsupported data mode"
-            raise ValueError, self.error
+            raise ValueError(self.error)
         
     def _setHistScale(self, smin, smax, dataTypeMaxValue):
         #dataTypeMaxValue was  self.maxUShort = (1<<16)-1
@@ -488,7 +513,7 @@ class GLViewer(GLViewerCommon):
         
 
     def changeHistogramScaling(self): #, smin=0, smax=0, RefreshNow=1):
-        self.m_loadImgsToGfxCard += range(len(self.m_imgList))
+        self.m_loadImgsToGfxCard += list(range(len(self.m_imgList)))
         self.Refresh(False)
 #       if smin != smax:
 #           self.m_minHistScale = smin
@@ -508,7 +533,7 @@ class GLViewer(GLViewerCommon):
         if imgidx == -1:
             for imgListItem in self.m_imgList:
                 imgListItem[4:6] = [smin,smax]
-            self.m_loadImgsToGfxCard += range(len(self.m_imgList))
+            self.m_loadImgsToGfxCard += list(range(len(self.m_imgList)))
         else:
             self.m_imgList[imgidx][4:6] = [smin,smax]
             self.m_loadImgsToGfxCard += [imgidx]
@@ -524,7 +549,7 @@ class GLViewer(GLViewerCommon):
         """
         if ty is None:
             if len(tx_or_4tuple) != 4:
-                raise ValueError, "tx_or_4tuple must be a scalar or a tuple of length 4"
+                raise ValueError("tx_or_4tuple must be a scalar or a tuple of length 4")
             self.m_imgList[imgidx][9:13] = tx_or_4tuple
         else:
             self.m_imgList[imgidx][9:13] = [tx_or_4tuple, ty,rot,mag]
@@ -599,7 +624,7 @@ class GLViewer(GLViewerCommon):
                 import traceback as tb
                 tb.print_exc(limit=None, file=None)
                 self.error = "error with self.defGlList()"
-                print "ERROR:", self.error
+                print("ERROR:", self.error)
             self.m_gllist_Changed = False
 
         #       if not self.m_gllist:
@@ -750,7 +775,7 @@ class GLViewer(GLViewerCommon):
         elif o == 8:
             self.setOriginLeftBottom(1)
         else:
-            print "FixMe: OnChgOrig"
+            print("FixMe: OnChgOrig")
         
     def OnColor(self, event=None):
         wx.Bell()
@@ -767,19 +792,19 @@ def view(arrayL, title=None, size=None, parent=None):
     for i in range(len(arrayL)):
         array = arrayL[i]
         if len(array.shape) != 2:
-            raise ValueError, "arrays must be of dimension 2"
+            raise ValueError("arrays must be of dimension 2")
 
         if   array.dtype.type == N.int32:
-            print "** viewer: converted Int32 to Int16"
+            print("** viewer: converted Int32 to Int16")
             arrayL[i] = array.astype(N.int16)
         elif array.dtype.type == N.float64:
-            print "** viewer: converted Float64 to Float32"
+            print("** viewer: converted Float64 to Float32")
             arrayL[i] = array.astype(N.float32)
         elif array.dtype.type == N.complex128:
-            print "** viewer: converted Complex128to Float32 - used abs()"
+            print("** viewer: converted Complex128to Float32 - used abs()")
             arrayL[i] = N.abs(array).astype(N.float32)
         elif array.dtype.type == N.complex64:
-            print "** viewer: complex - used abs()"
+            print("** viewer: complex - used abs()")
             arrayL[i] = N.abs(array)
         
     array = arrayL[0]

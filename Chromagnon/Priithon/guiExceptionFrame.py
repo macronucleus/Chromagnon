@@ -71,15 +71,20 @@ class MyFrame(wx.Frame):
         hs = wx.BoxSizer(wx.HORIZONTAL)
         self.sizer.Add(hs, 0, wx.EXPAND)
         b = wx.Button(self, id_close, "dismiss [ESC]")
-        wx.EVT_BUTTON(self, id_close, self.OnClose)
+
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_BUTTON, self.OnClose, id=id_close)
+        #wx.EVT_BUTTON(self, id_close, self.OnClose)
         hs.Add(b, 0, wx.ALL, 5)
 
         b = wx.Button(self, id_print, "print to stderr & dismiss")
-        wx.EVT_BUTTON(self, id_print, self.OnPrint)
+        self.Bind(wx.EVT_BUTTON, self.OnPrint, id=id_print)
+        #wx.EVT_BUTTON(self, id_print, self.OnPrint)
         hs.Add(b, 0, wx.ALL, 5)
 
         b = wx.Button(self, id_debug, "debug")
-        wx.EVT_BUTTON(self, id_debug, self.OnDebug)
+        self.Bind(wx.EVT_BUTTON, self.OnDebug, id=id_debug)
+        #wx.EVT_BUTTON(self, id_debug, self.OnDebug)
         hs.Add(b, 0, wx.ALL, 5)
 
 
@@ -87,7 +92,8 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
         for w in self.GetChildren():
             w.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
-        wx.EVT_CLOSE(self, self.OnClose)
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+        #wx.EVT_CLOSE(self, self.OnClose)
         #self.sizer.Fit(self)
 
         self.SetAutoLayout(True)

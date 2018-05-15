@@ -1,10 +1,11 @@
 #!/usr/bin/env priithon
-
+from __future__ import print_function
 import os
-from Priithon import Mrc
+import six
+from ..Priithon import Mrc
 import numpy as N
 #import OMXlab2 as O
-import guiFuncs as G, imgfileIO, mrcIO
+from . import guiFuncs as G, imgfileIO, mrcIO
 
 # GUI
 import wx, time
@@ -246,11 +247,11 @@ class BatchPanel(wx.Panel):
             self.aui.Show()
 
         # draw
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             newpanel = ndviewer.main.ImagePanel(self.aui, target)
             #newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             name = os.path.basename(target)
         else:
             name = target.file
@@ -276,7 +277,7 @@ if __name__ == '__main__':
     options, arguments = p.parse_args()
 
     if not arguments:
-        from Priithon import PriApp
+        from ..Priithon import PriApp
         PriApp._maybeExecMain()
     else:
         make = options.make
@@ -299,7 +300,7 @@ if __name__ == '__main__':
                 [os.remove(out) for out in outs]
             else:
                 out = outs[0]
-            print out, ' saved'
+            print(out, ' saved')
         else:
             for fn in fns:
-                print flatConv(fn, **options.__dict__), ' done'
+                print(flatConv(fn, **options.__dict__), ' done')

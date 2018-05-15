@@ -95,26 +95,31 @@ class FileDropTarget(wx.FileDropTarget):
             
         m.Append(Menu_paste,   "paste")
 
-        wx.EVT_MENU(self.parent, Menu_assign, self.onAssign)
-        wx.EVT_MENU(self.parent, Menu_assignFN, self.onAssignFN)
-        wx.EVT_MENU(self.parent, Menu_assignList,self.onAssignList)
-        wx.EVT_MENU(self.parent, Menu_paste, self.onPaste)
-        wx.EVT_MENU(self.parent, Menu_view,  self.onView)
-        wx.EVT_MENU(self.parent, Menu_view2,  self.onView2)
-        wx.EVT_MENU(self.parent, Menu_dir,  self.onDir)
-        wx.EVT_MENU(self.parent, Menu_cd,  self.onCd)
-        wx.EVT_MENU(self.parent, Menu_appSysPath,  self.onAppSysPath)
-        wx.EVT_MENU(self.parent, Menu_assignSeq, self.onAssignSeq)
-        wx.EVT_MENU(self.parent, Menu_viewSeq, self.onViewSeq)
-
-        wx.EVT_MENU(self.parent, Menu_exec,  self.onExe)
-        wx.EVT_MENU(self.parent, Menu_import,  self.onImport)
-        wx.EVT_MENU(self.parent, Menu_importAs,  self.onImportAs)
-        wx.EVT_MENU(self.parent, Menu_editor,  self.onEditor)
-        wx.EVT_MENU(self.parent, Menu_editor2,  self.onEditor2)
+        # 20180114 deprecation warning
+        self.parent.Bind(wx.EVT_MENU, self.onAssign, id=Menu_assign)
+        self.parent.Bind(wx.EVT_MENU, self.onAssignFN, id=Menu_assignFN)
+        self.parent.Bind(wx.EVT_MENU, self.onAssignList, id=Menu_assignList)
+        self.parent.Bind(wx.EVT_MENU, self.onPaste, id=Menu_paste)
+        self.parent.Bind(wx.EVT_MENU, self.onView, id=Menu_view)
+        self.parent.Bind(wx.EVT_MENU, self.onView2, id=Menu_view2)
+        self.parent.Bind(wx.EVT_MENU, self.onDir, id=Menu_dir)
+        self.parent.Bind(wx.EVT_MENU, self.onCd, id=Menu_cd)
+        self.parent.Bind(wx.EVT_MENU, self.onAppSysPath, id=Menu_appSysPath)
+        self.parent.Bind(wx.EVT_MENU, self.onAssignSeq, id=Menu_assignSeq)
+        self.parent.Bind(wx.EVT_MENU, self.onViewSeq, id=Menu_viewSeq)
         
-        self.parent.PopupMenuXY(m, x,y)
+        self.parent.Bind(wx.EVT_MENU, self.onExe, id=Menu_exec)
+        self.parent.Bind(wx.EVT_MENU, self.onImport, id=Menu_import)
+        self.parent.Bind(wx.EVT_MENU, self.onImportAs, id=Menu_importAs)
+        self.parent.Bind(wx.EVT_MENU, self.onEditor, id=Menu_editor)
+        self.parent.Bind(wx.EVT_MENU, self.onEditor2, id=Menu_editor2)
 
+        if wx.version().startswith('3'):
+            self.parent.PopupMenuXY(m, x,y)
+        else:
+            self.parent.PopupMenu(m, x,y)
+
+        return True # 20180114 wxpython Phoenix
 
 
     def onPaste(self, ev):
@@ -174,7 +179,7 @@ class FileDropTarget(wx.FileDropTarget):
             return
         import __main__
         try:
-            exec '%s = %s' % (v,self.txt) in __main__.__dict__
+            exec('%s = %s' % (v,self.txt), __main__.__dict__)
         except:
             if NO_SPECIAL_GUI_EXCEPT:
                 raise
@@ -195,7 +200,7 @@ class FileDropTarget(wx.FileDropTarget):
             return
         import __main__
         try:
-            exec '%s = %s' % (v, self.fn_or_fns) in __main__.__dict__
+            exec('%s = %s' % (v, self.fn_or_fns), __main__.__dict__)
         except:
             if NO_SPECIAL_GUI_EXCEPT:
                 raise
@@ -216,7 +221,7 @@ class FileDropTarget(wx.FileDropTarget):
             return
         import __main__
         try:
-            exec '%s = U.loadImg_seq(%s)' % (v,self.fn_or_fns) in __main__.__dict__
+            exec('%s = U.loadImg_seq(%s)' % (v,self.fn_or_fns), __main__.__dict__)
         except:
             if NO_SPECIAL_GUI_EXCEPT:
                 raise
@@ -254,7 +259,7 @@ class FileDropTarget(wx.FileDropTarget):
         try:
             try:
                 self.pyshell.addHistory("execfile(r\"%s\")"%(self.fn_or_fns,))
-                execfile(self.fn_or_fns, __main__.__dict__)
+                exec(compile(open(self.fn_or_fns).read(), self.fn_or_fns, 'exec'), __main__.__dict__)
             except:
                 if NO_SPECIAL_GUI_EXCEPT:
                     raise
@@ -279,7 +284,7 @@ class FileDropTarget(wx.FileDropTarget):
             try:
                 mod = os.path.basename( self.fn_or_fns )
                 mod = os.path.splitext( mod )[0]
-                exec ('import %s' % mod) in __main__.__dict__
+                exec(('import %s' % mod), __main__.__dict__)
                 self.pyshell.addHistory("import %s"%mod)
             except:
                 if NO_SPECIAL_GUI_EXCEPT:
@@ -311,7 +316,7 @@ class FileDropTarget(wx.FileDropTarget):
                 mod = os.path.basename( self.fn_or_fns )
                 mod = os.path.splitext( mod )[0]
                 s = 'import %s as %s' % (mod, v)
-                exec (s) in __main__.__dict__
+                exec((s), __main__.__dict__)
                 self.pyshell.addHistory(s)
             except:
                 if NO_SPECIAL_GUI_EXCEPT:

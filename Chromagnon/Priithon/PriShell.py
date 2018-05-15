@@ -6,7 +6,7 @@
 # main namespace to look as much as possible like the regular Python
 # shell environment.
 import __main__
-original = __main__.__dict__.keys()
+original = list(__main__.__dict__.keys())
 
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
@@ -15,7 +15,6 @@ __license__ = "BSD license - see LICENSE file"
 #seb __revision__ = "$Revision: 1.7 $"[11:-2]
 
 import wx
-
 
 """
 The main() function needs to handle being imported, such as with the
@@ -47,7 +46,7 @@ def main():
             self.frame.SetStatusText(intro.replace('\n', ', '))
         
             from Priithon import fileDropPopup
-            self.frame.SetDropTarget( fileDropPopup.FileDropTarget(self.frame, self.frame.shell) )
+            self.frame.shell.SetDropTarget( fileDropPopup.FileDropTarget(self.frame, self.frame.shell) )
             self.frame.SetSize((750, 525))
             self.frame.Show()
             self.SetTopWindow(self.frame)
@@ -64,7 +63,7 @@ def main():
     #seb note: wee don't need to keep any of these 
 
     # Cleanup the main namespace, leaving the App class.
-    for key in md.keys():
+    for key in list(md.keys()):
         if key not in [
             #20071212 'App',
             '__author__',
@@ -100,6 +99,7 @@ def main():
     # >>> import sys
     # >>> sys.app.whatever
     sys.app = app
+        
 
     #seb: load Priithon modules
     #exec "from Priithon.all import *" in __main__.__dict__
@@ -112,6 +112,8 @@ def main():
         wx.MessageBox(traceback.format_exc(), 
                       "Exception while Priithon Startup", 
                       wx.ICON_ERROR)
+    #20171225 p2to3 remove this part since GuiExceptionHook always appear
+    old="""
     try:
         # GUI part
         __main__.Y._setAutosavePath()
@@ -120,7 +122,7 @@ def main():
         import traceback
         wx.MessageBox(traceback.format_exc(), 
                       "Exception while Priithon Startup", 
-                      wx.ICON_ERROR)
+                      wx.ICON_ERROR)"""
 
 
     del sys

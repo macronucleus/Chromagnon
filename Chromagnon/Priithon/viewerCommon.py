@@ -3,7 +3,7 @@ provides the bitmap OpenGL panel for Priithon's ND 2d-section-viewer
 
 common base class for single-color and multi-color version
 """
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
@@ -19,8 +19,7 @@ __license__ = "BSD license - see LICENSE file"
 
 
 
-
-
+import six
 import wx
 from wx import glcanvas as wxgl
 #from wxPython import glcanvas
@@ -28,7 +27,8 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 import numpy as N
-import traceback, sys, PriConfig
+import traceback, sys
+from . import PriConfig
 
 bugXiGraphics = 0
 
@@ -104,12 +104,17 @@ class GLViewerCommon(wxgl.GLCanvas):
         self.doOnLDown       = [] # (x,y, ev)
         
 
-        wx.EVT_ERASE_BACKGROUND(self, self.OnEraseBackground)
-        #20080707-unused wx.EVT_MOVE(parent, self.OnMove) # CHECK
-        wx.EVT_SIZE(self, self.OnSize)
-        wx.EVT_MOUSEWHEEL(self, self.OnWheel)
-        wx.EVT_MOUSE_EVENTS(self, self.OnMouse)
-        #self.Bind(wx.EVT_SIZE, self.OnSize)
+        #wx.EVT_ERASE_BACKGROUND(self, self.OnEraseBackground)
+
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
+        #wx.EVT_SIZE(self, self.OnSize)
+        #evtHandler.Bind(wx.EVT_SIZE, self.OnSize)
+        self.Bind(wx.EVT_MOUSEWHEEL, self.OnWheel)
+        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
+        #wx.EVT_MOUSEWHEEL(self, self.OnWheel)
+        #wx.EVT_MOUSE_EVENTS(self, self.OnMouse)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
 
 
     def setPixelGrid(self, ev=None):
@@ -169,7 +174,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         """
         self.m_moreGlListReuseIdx = idx
         self.SetCurrent(self.context)
-        if isinstance(idx, basestring):
+        if isinstance(idx, six.string_types):
             idx = self.m_moreGlLists_NamedIdx.get(idx) # Never raises an exception if k is not in the map, instead it returns x. x is optional; when x is not provided and k is not in the map, None is returned. 
             if idx is None:
                 self.curGLLIST = glGenLists( 1 )
@@ -194,7 +199,7 @@ class GLViewerCommon(wxgl.GLCanvas):
     def newGLListAbort(self):
         glEndList()
         glDeleteLists(self.curGLLIST, 1)
-        if isinstance(self.m_moreGlListReuseIdx, basestring):
+        if isinstance(self.m_moreGlListReuseIdx, six.string_types):
             try:
                 del self.m_moreGlLists_NamedIdx[self.m_moreGlListReuseIdx] # CHECK
             except KeyError:
@@ -203,7 +208,7 @@ class GLViewerCommon(wxgl.GLCanvas):
 
     def newGLListDone(self, enable=True, refreshNow=True):
         glEndList()
-        if isinstance(self.m_moreGlListReuseIdx, basestring):
+        if isinstance(self.m_moreGlListReuseIdx, six.string_types):
             idx = self.m_moreGlLists_NamedIdx.get(self.m_moreGlListReuseIdx)
         else:
             idx = self.m_moreGlListReuseIdx
@@ -219,7 +224,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         self.newGLListNameAdd(idx, self.curGLLISTname)
 
         # remember named idx for future re-use
-        if isinstance(self.m_moreGlListReuseIdx, basestring):
+        if isinstance(self.m_moreGlListReuseIdx, six.string_types):
             self.m_moreGlLists_NamedIdx[self.m_moreGlListReuseIdx] = idx
         self.m_moreGlListReuseIdx = None
 
@@ -279,7 +284,7 @@ class GLViewerCommon(wxgl.GLCanvas):
 #           glDeleteTextures( self.m_moreGlLists_texture[idx] )
 #           del self.m_moreGlLists_img[idx]
 
-        if isinstance(idx, basestring):
+        if isinstance(idx, six.string_types):
             idx=self.m_moreGlLists_NamedIdx[idx]
         elif idx<0:
             idx += len(self.m_moreGlLists)
@@ -299,7 +304,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         #remove idx from 'name' dict entry
         #   remove respective dict-name if it gets empty
         _postposeDelList = [] # to prevent this error:dictionary changed size during iteration
-        for name,idxList in self.m_moreGlLists_dict.iteritems():
+        for name,idxList in self.m_moreGlLists_dict.items():
             try:
                 idxList.remove(idx)
                 if not len(idxList):
@@ -316,7 +321,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         """
         ignore moreGlList items that are None !
         """
-        if isinstance(idx, basestring):
+        if isinstance(idx, six.string_types):
             idx=self.m_moreGlLists_NamedIdx[idx]
         if self.m_moreGlLists_enabled[idx] is not None:
             self.m_moreGlLists_enabled[idx] = on
@@ -346,8 +351,8 @@ class GLViewerCommon(wxgl.GLCanvas):
         del self.m_moreGlLists_dict[name]
 
         # clean up other name entries in dict
-        for name,idxList in self.m_moreGlLists_dict.items():
-            for i in xrange(len(idxList)-1,-1,-1):
+        for name,idxList in list(self.m_moreGlLists_dict.items()):
+            for i in range(len(idxList)-1,-1,-1):
                 if self.m_moreGlLists[idxList[i]] is None:
                     del idxList[i]
             if not len(idxList):
@@ -355,7 +360,7 @@ class GLViewerCommon(wxgl.GLCanvas):
 
 
         #20090505: remove trailing None's
-        for idx in xrange(len(self.m_moreGlLists)-1, -1, -1):
+        for idx in range(len(self.m_moreGlLists)-1, -1, -1):
             if self.m_moreGlLists[idx] is None:
                 del self.m_moreGlLists[idx]
                 del self.m_moreGlLists_enabled[idx]
@@ -616,9 +621,9 @@ class GLViewerCommon(wxgl.GLCanvas):
                     if PriConfig.raiseEventHandlerExceptions:
                         raise
                     else:
-                        print >>sys.stderr, " *** error in doOnLDown **"
+                        print(" *** error in doOnLDown **", file=sys.stderr)
                         traceback.print_exc()
-                        print >>sys.stderr, " *** error in doOnLDown **"
+                        print(" *** error in doOnLDown **", file=sys.stderr)
                     
         elif ev.LeftDClick():
             for f in self.doOnLDClick:
@@ -628,9 +633,9 @@ class GLViewerCommon(wxgl.GLCanvas):
                     if PriConfig.raiseEventHandlerExceptions:
                         raise
                     else:
-                            print >>sys.stderr, " *** error in doOnLDClick **"
+                            print(" *** error in doOnLDClick **", file=sys.stderr)
                             traceback.print_exc()
-                            print >>sys.stderr, " *** error in doOnLDClick **"
+                            print(" *** error in doOnLDClick **", file=sys.stderr)
                     
             #print ":", x,y, "   ", x0,y0, s, "   ", xyEffInside, " : ", xEff, yEff
             
@@ -646,9 +651,9 @@ class GLViewerCommon(wxgl.GLCanvas):
                 if PriConfig.raiseEventHandlerExceptions:
                     raise
                 else:
-                    print >>sys.stderr, " *** error in doOnMouse **"
+                    print(" *** error in doOnMouse **", file=sys.stderr)
                     traceback.print_exc()
-                    print >>sys.stderr, " *** error in doOnMouse **"
+                    print(" *** error in doOnMouse **", file=sys.stderr)
         ev.Skip() # other things like EVT_MOUSEWHEEL are lost
 
 
@@ -662,7 +667,7 @@ class GLViewerCommon(wxgl.GLCanvas):
     #20080707-unused     event.Skip()
 
     def OnSize(self, event):
-        self.m_w, self.m_h = self.GetSizeTuple() # self.GetClientSizeTuple()
+        self.m_w, self.m_h = self.GetSize() #Tuple() # self.GetClientSizeTuple()
         if self.m_w <=0 or self.m_h <=0:
             #print "GLViewer.OnSize self.m_w <=0 or self.m_h <=0", self.m_w, self.m_h
             return
@@ -721,7 +726,7 @@ class GLViewerCommon(wxgl.GLCanvas):
 
         
     def OnSaveClipboard(self, event=None):
-        import usefulX as Y
+        from . import usefulX as Y
         Y.vCopyToClipboard(self, clip=1)
         Y.shellMessage("### screenshot saved to clipboard'\n")
 
@@ -741,7 +746,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         Y.shellMessage("### screenshot saved to '%s'\n"%fn)
 
     def OnAssign(self, event=None):
-        import usefulX as Y
+        from . import usefulX as Y
         ss = "<2d section shown>"
 
         for i in range(len(Y.viewers)):
@@ -770,7 +775,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         Y.shellMessage("### section saved to '%s'\n"%fn)
 
     def OnRotate(self, evt):
-        import usefulX as Y
+        from . import usefulX as Y
         Y.vRotate(self)
     def OnAspectRatio(self, evt):
         ds = "nx/ny"

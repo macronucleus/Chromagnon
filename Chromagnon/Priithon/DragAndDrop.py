@@ -37,7 +37,7 @@ class ClipTextPanel(wx.Panel):
         self.do = wx.TextDataObject()
         self.do.SetText(self.text.GetValue())
         if not wx.TheClipboard.Open():
-            raise RuntimeError, "cannot open clipboard"
+            raise RuntimeError("cannot open clipboard")
         wx.TheClipboard.SetData(self.do)
         wx.TheClipboard.Close()
 
@@ -45,7 +45,7 @@ class ClipTextPanel(wx.Panel):
     def OnPaste(self, evt):
         do = wx.TextDataObject()
         if not wx.TheClipboard.Open():
-            raise RuntimeError, "cannot open clipboard"
+            raise RuntimeError("cannot open clipboard")
         success = wx.TheClipboard.GetData(do)
         wx.TheClipboard.Close()
         if success:
@@ -60,7 +60,7 @@ class ClipTextPanel(wx.Panel):
             bmp = wx.Bitmap(dlg.GetFilename(), wx.BITMAP_TYPE_BMP)
             bmpdo = wx.BitmapDataObject(bmp)
             if not wx.TheClipboard.Open():
-                raise RuntimeError, "cannot open clipboard"
+                raise RuntimeError("cannot open clipboard")
             wx.TheClipboard.SetData(bmpdo)
             wx.TheClipboard.Close()
 
@@ -95,7 +95,7 @@ class MyFileDropTarget(wx.FileDropTarget):
             stdout = sys.stdout
             sys.stdout = self.window.text
         try:
-            exec self.execStr in self.execDict, locals
+            exec(self.execStr, self.execDict, locals)
         finally:
             if self.redirStdOut:
                 sys.stdout = stdout

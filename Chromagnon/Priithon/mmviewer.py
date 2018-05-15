@@ -1,5 +1,5 @@
 """Priithon's MOSAIC viewer"""
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
@@ -221,7 +221,7 @@ class GLViewer(wxgl.GLCanvas):
                              GL_LUMINANCE,GL_UNSIGNED_SHORT, None)
             else:
                 self.error = "unsupported data mode"
-                raise ValueError, self.error
+                raise ValueError(self.error)
 
     def defGlList(self):
         pass
@@ -383,7 +383,7 @@ class GLViewer(wxgl.GLCanvas):
         from Priithon.all import Mrc, U
 
         if baseFn is None:
-            from usefulX import FN
+            from .usefulX import FN
             baseFn = FN(1)
             if not baseFn:
                 return
@@ -423,7 +423,7 @@ class GLViewer(wxgl.GLCanvas):
         from Priithon.all import Mrc, U
 
         if baseFn is None:
-            from usefulX import FN
+            from .usefulX import FN
             baseFn = FN()
             if not baseFn:
                 return
@@ -666,7 +666,7 @@ class GLViewer(wxgl.GLCanvas):
                          GL_LUMINANCE,GL_UNSIGNED_SHORT, None)
         else:
             self.error = "unsupported data mode"
-            raise ValueError, self.error
+            raise ValueError(self.error)
 
         if not holdBackUpdate:
             self.m_loadImgsToGfxCard += [idx]
@@ -846,7 +846,7 @@ class GLViewer(wxgl.GLCanvas):
             return
         #//seb check PrepareDC(dc)
         if not self.GetContext():
-            print "OnPaint GetContext() error"
+            print("OnPaint GetContext() error")
             return
         
         self.SetCurrent()
@@ -865,7 +865,7 @@ class GLViewer(wxgl.GLCanvas):
         if self.m_imgL_changed:
             self.InitTex()
             self.m_positionsChanged = True
-            self.m_loadImgsToGfxCard += range(self.m_nImgs)
+            self.m_loadImgsToGfxCard += list(range(self.m_nImgs))
             self.m_imgL_changed = False
 
 
@@ -888,7 +888,7 @@ class GLViewer(wxgl.GLCanvas):
                 import traceback as tb
                 tb.print_exc(limit=None, file=None)
                 self.error = "error with self.defGlList()"
-                print "ERROR:", self.error
+                print("ERROR:", self.error)
             self.m_gllist_Changed = False
 
         if len( self.m_loadImgsToGfxCard ):
@@ -959,7 +959,7 @@ class GLViewer(wxgl.GLCanvas):
                     else:
                         glPixelTransferi(GL_MAP_COLOR, False)
                 else:
-                    print "mmviewer-debug12: min==max: self.m_imgScaleMM[i]", self.m_imgScaleMM[i]
+                    print("mmviewer-debug12: min==max: self.m_imgScaleMM[i]", self.m_imgScaleMM[i])
                     
                 if bugXiGraphics: #20070126  or (bugOSX1036 and img.dtype.type == N.float32): #20060221
                     itSize = 1
@@ -990,7 +990,7 @@ class GLViewer(wxgl.GLCanvas):
                                     GL_LUMINANCE,GL_UNSIGNED_SHORT, imgString)
                 else:
                     self.error = "unsupported data mode"
-                    raise ValueError, self.error
+                    raise ValueError(self.error)
 
             self.m_loadImgsToGfxCard = []
 
@@ -1067,7 +1067,7 @@ class GLViewer(wxgl.GLCanvas):
         #print "***1 ", self.GetSizeTuple()
         #print "***2 ", self.GetClientSizeTuple()
         if self.m_w <=0 or self.m_h <=0:
-            print "view.OnSize self.m_w <=0 or self.m_h <=0", self.m_w, self.m_h
+            print("view.OnSize self.m_w <=0 or self.m_h <=0", self.m_w, self.m_h)
             return
 
         self.doOnFrameChange()
@@ -1283,7 +1283,7 @@ class GLViewer(wxgl.GLCanvas):
         def s2c(s):
             mat = col_regex.match(s)
             if mat:
-                return N.array( map(int, mat.groups()), dtype=N.float32 ) /255.
+                return N.array( list(map(int, mat.groups())), dtype=N.float32 ) /255.
             else:
                 return N.array( self.colnames[s], dtype=N.float32 ) /255.
 
@@ -1328,15 +1328,15 @@ class GLViewer(wxgl.GLCanvas):
     
     def cmgrey(self, reverse=0):
         self.cms(self.grey, reverse)
-        self.m_loadImgsToGfxCard += range(self.m_nImgs)
+        self.m_loadImgsToGfxCard += list(range(self.m_nImgs))
         self.Refresh(0)
     def cmcol(self, reverse=0):
         self.cms(self.spectrum3, reverse)
-        self.m_loadImgsToGfxCard += range(self.m_nImgs)
+        self.m_loadImgsToGfxCard += list(range(self.m_nImgs))
         self.Refresh(0)
     def cmnone(self):
         self.colMap = None
-        self.m_loadImgsToGfxCard += range(self.m_nImgs)
+        self.m_loadImgsToGfxCard += list(range(self.m_nImgs))
         self.Refresh(0)
     def cmgray(self, gamma=1):
         """set col map to gray"""
@@ -1351,7 +1351,7 @@ class GLViewer(wxgl.GLCanvas):
             self.colMap = N.empty(shape = (3,n), dtype = N.float32)
             self.colMap[:] = \
                   (0 + (1 - 0) * ((N.arange(n) - 0) / (1. - 0)) **gamma) / wmax
-        self.m_loadImgsToGfxCard += range(self.m_nImgs)
+        self.m_loadImgsToGfxCard += list(range(self.m_nImgs))
         self.Refresh(0)
     
 def mview(arrayL=None, imgPosArr=None, imgSizeArr=None,

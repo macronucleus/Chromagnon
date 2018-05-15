@@ -1,11 +1,20 @@
-
-import os, threading, exceptions, time, sys
+from __future__ import print_function
+import os, threading, time, sys
 import wx
+
+try:
+    from PriCommon import flatConv
+    from Priithon import fftmanager
+except ImportError:
+    from Chromagnon.PriCommon import flatConv
+    from Chromagnon.Priithon import fftmanager
+
 try:
     from . import alignfuncs, chromformat, aligner
 except ValueError:
+    from Chromagnon import alignfuncs, chromformat, aligner
+except ImportError:
     import alignfuncs, chromformat, aligner
-from PriCommon import bioformatsIO, flatConv
 
 
 # cross platform
@@ -40,7 +49,7 @@ class MyEvent(wx.PyEvent):
 ###---- funcs to cancel execution ---------
 # http://stackoverflow.com/questions/323972/is-there-any-way-to-kill-a-thread-in-python
 
-class MyError(exceptions.Exception): pass
+class MyError(Exception): pass
 
 class ThreadWithExc(threading.Thread):
     '''A thread class that supports raising exception in the thread from
@@ -71,7 +80,7 @@ class ThreadWithExc(threading.Thread):
             return self._thread_id
 
         # no, look for it in the _active dict
-        for tid, tobj in threading._active.items():
+        for tid, tobj in list(threading._active.items()):
             if tobj is self:
                 self._thread_id = tid
                 return tid
@@ -83,6 +92,11 @@ class ThreadWithExc(threading.Thread):
         Since it uses GUI, this function uses several events to control GUI
         They are called by wx.PostEvent()
         """
+        OLD_SCIK = fftmanager.SCIK
+        OLD_REIK = fftmanager.REIK
+        fftmanager.SCIK = False
+        fftmanager.REIK = False
+        
         fns = self.fns
         targets = self.targets
         parms = self.parms
@@ -91,12 +105,9 @@ class ThreadWithExc(threading.Thread):
         cutout = parms[0]
         initGuess = parms[1]
         if initGuess and not os.path.isfile(initGuess):
-            raise ValueError, 'The initial guess is not a valid Chromagnon file'
+            raise ValueError('The initial guess is not a valid Chromagnon file')
         local = parms[2]
 
-
-        #cthre = parms[3]
-        #forceZmag = parms[3]
         maxShift = parms[3]
         zmag = parms[4]
         self.parm_suffix = parms[5]
@@ -117,25 +128,22 @@ class ThreadWithExc(threading.Thread):
 
         kwds = {}
 
-        #if self.notify_obj:
-        #    wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [0]))
         self.progress(0)
 
         try:
             # calibration
             for index, fn in enumerate(fns):
-                clk0 = time.clock()
-               # an = aligner.Chromagnon(fn)
+                #clk0 = time.clock()
                 # calculation
                 if not chromformat.is_chromagnon(fn):
-                    tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
+                    tstf = time.strftime('%Y %b %d %H:%M:%S', time.localtime())
                     self.log('\n**Measuring shifts in %s at %s' % (os.path.basename(fn), tstf))
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
                     an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
-                    an.setZmagSwitch(zmag)#setForceZmag(forceZmag)
+                    an.setZmagSwitch(zmag)
                     an.setMaxShift(maxShift)
 
                     pgen = self.progressValues(target=False, an=an, alignChannels=alignChannels, alignTimeFrames=alignTimeFrames, local=local)
@@ -146,12 +154,11 @@ class ThreadWithExc(threading.Thread):
                         # mapyx should not be inherited...
                         an.mapyx = None
                     
-                    #if (alignChannels and nts[index] <= 1) or (alignChannels and not alignTimeFrames):
-                    if (an.nw > 1 and an.nt == 1):#(alignChannels and an.nw > 1):# or (alignChannels and not alignTimeFrames):
+                    if (an.nw > 1 and an.nt == 1):
                         an.findBestChannel()
                         self.echo('Calculating channel alignment...')
                         
-                        for t in xrange(an.nt):
+                        for t in range(an.nt):
                             try:
                                 an.findAlignParamWave(t=t)
                             except alignfuncs.AlignError: # in xcorr or else
@@ -160,9 +167,6 @@ class ThreadWithExc(threading.Thread):
                                 continue
                             
                             if local in self.localChoice[1:]:
-                                #an.setCCthreshold(cthre)
-                                #arr = an.findNonLinear2D(t=t, npxls=min_pxls_yx)
-                                #del arr
                                 an.findNonLinear2D(t=t, npxls=min_pxls_yx)
                                 
                             if local in self.localChoice[2:]:
@@ -170,7 +174,7 @@ class ThreadWithExc(threading.Thread):
                                 del arr
                             
                         
-                    elif an.nt > 1:#alignTimeFrames:
+                    elif an.nt > 1:
                         self.echo('Calculating timelapse alignment...')
                         an.findBestChannel()
                         an.findBestTimeFrame(an.refwave)
@@ -178,23 +182,10 @@ class ThreadWithExc(threading.Thread):
                         an.findAlignParamTime(doWave=False)
 
                     fn = an.saveParm()
-                    #if not initGuess and self.notify_obj:
-                    #    wx.PostEvent(self.notify_obj, MyEvent(EVT_INITGUESS_ID, [fn]))
-                        
-                    #initGuess = fn
-                        #fn = initGuess = an.saveParm()
-                        #self.initGuess.SetValue(initGuess)
-                        #self.initGuess.SetForegroundColour(wx.BLUE)
-                    
+
                     currlist = None
-                    clk1 = time.clock()
-                    print 'Done seconds', (clk1-clk0)
-                    
-                    #if local in self.localChoice[1:]:# and not wx.__version__.startswith('2.8'):
-                     #   an.loadParm(fn)
-                        #nonlinear = an.saveNonlinearImage()
-                        #if self.notify_obj:
-                        #    wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [nonlinear]))
+                    #clk1 = time.clock()
+                    #print('Done seconds', (clk1-clk0))
 
                     an.close()
                 
@@ -209,7 +200,7 @@ class ThreadWithExc(threading.Thread):
                     
                     target = targets[index]
                     tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
-                    self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
+                    self.log('\n**Applying to %s using %s at %s' % (os.path.basename(target), os.path.basename(fn), tstf))
 
                     an = self.getAligner(target, index, what='target')
                     
@@ -221,43 +212,19 @@ class ThreadWithExc(threading.Thread):
                     #if cutout:
                     an.setRegionCutOut(cutout)
 
-                    old='''
-                    import sys
-                    if sys.platform.startswith('win'):#self.notify_obj:
-                        base, ext = os.path.splitext(an.img.filename)
-                        outfn = base + an.img_suffix + an.img_ext
-                        # check open windows (to avoid WindowsError when removing pre-existing file)
-                        #if os.path.isfile(outfn):
-                        #    outfn = fntools.nextFN(outfn)
-                        #this_was_not_enough_probably_because_handler_was_not_closed_yet = """
-                        aui = self.notify_obj.panel.aui
-                        if aui:
-                            for i in xrange(aui.imEditWindows.GetPageCount()):
-                                page = aui.imEditWindows.GetPage(i)
-                                print 'prepSaveFile',  page.doc.filename, fn, page.doc.closed()
-                                if page.doc.filename == outfn and not page.doc.closed():
-                                    print 'trying to close...'
-                                    page.doc.close()
-                                    #self.aui.imEditWindows.DeletePage(i)
-                                    #wx.PostEvent(self.notify_obj, MyEvent(EVT_CLOSE_PAGE_ID, [i]))"""
-                    else:
-                        outfn = None#'''
-
                     out = an.saveAlignedImage()
                     donetgt.append(index)
 
                     an.close()
-                    #if self.notify_obj:
-                        #wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [prange.pop(0)]))
-                    #pgen.next()
 
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
                     
-                    #out = aligner.Chromagnon(out)
                     if self.notify_obj:
-                        print 'event view', out
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+                        
+                elif self.notify_obj:
+                    wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fn]))
 
 
             # remaining target files use the last alignment file
@@ -267,7 +234,11 @@ class ThreadWithExc(threading.Thread):
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
 
                 target = targets[index]
-                self.log('\n**Applying to %s' % os.path.basename(target))
+                tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
+                if fns:
+                    self.log('\n**Applying to %s using %s at %s' % (os.path.basename(target), os.path.basename(fn), tstf))
+                else:
+                    self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
                 
                 an = self.getAligner(target, index, what='target')
                 pgen = self.progressValues(target=True, an=an)
@@ -293,7 +264,7 @@ class ThreadWithExc(threading.Thread):
 
                 #out = aligner.Chromagnon(out)
                 if self.notify_obj:
-                    print 'event view', out
+                    print('event view', out)
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
 
         except MyError:
@@ -323,6 +294,9 @@ class ThreadWithExc(threading.Thread):
             self.logh.close()
         #bioformatsIO.uninit_javabridge()
 
+        fftmanager.SCIK = OLD_SCIK
+        fftmanager.REIK = OLD_REIK
+
     def getAligner(self, fn, index, what='ref'):
         """
         what: 'ref' or 'tgt'
@@ -334,19 +308,19 @@ class ThreadWithExc(threading.Thread):
             an.setParmSuffix(self.parm_suffix)
 
         except IOError:
-            raise IOError, 'filename %s, index %i, fns %s' % (fn, index, fns)
+            raise IOError('filename %s, index %i, fns %s' % (fn, index, fns))
 
 
         an.setEchofunc(self.echo)
         return an
 
     
-    def echo(self, msg):
-        if self.notify_obj:
+    def echo(self, msg, skip_notify=False):
+        if self.notify_obj and not skip_notify:
             wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
-            self.log(msg, prefix='    ')
-        else:
-            print msg
+
+        self.log(msg, prefix='    ')
+        print(msg)
 
     def log(self, msg, prefix=''):
         self.logh.write('%s%s\n' % (prefix, msg))
@@ -456,7 +430,7 @@ class GUImanager(wx.EvtHandler):
             self.panel.view(fn)#, calib=chrom)
         else:
             wx.CallAfter(self.panel.view,fn)#, calib=chrom)
-        wx.Yield()
+        #wx.Yield()
 
     def OnDone(self, evt=None):
 
@@ -512,7 +486,7 @@ class GUImanager(wx.EvtHandler):
     def echo(self, msg, color='red'):
         self.panel.label.SetLabel(msg)
         self.panel.label.SetForegroundColour(color)
-        print msg
+        #print(msg)
 
     def OnInitGuess(self, evt):
         self.panel._setInitGuess(evt.data[0])
@@ -562,12 +536,12 @@ class ThreadFlat(ThreadWithExc):
 
         try:
             # calibration
-            clk0 = time.clock()
+            #clk0 = time.clock()
             #an = aligner.Chromagnon(fn)
             #if not hasattr(an.img, 'hdr') or an.img.hdr.type != flatConv.IDTYPE:
             if not flatConv.is_flat(fn):
                 #an = aligner.Chromagnon(fn)
-                print 'The file is not flat file'
+                print('The file is not flat file')
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', 0, wx.RED]))
                 self.echo('Making a calibration file...')
 
@@ -575,10 +549,10 @@ class ThreadFlat(ThreadWithExc):
 
                 #out = aligner.Chromagnon(flatFile)
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [flatFile]))#out]))
-                clk1 = time.clock()
+                #clk1 = time.clock()
                 #an.close()
             else:
-                print 'The file is a flat file'
+                print('The file is a flat file')
                 flatFile = fn
                 
            # an.close()

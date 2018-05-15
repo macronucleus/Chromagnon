@@ -1,25 +1,41 @@
+from __future__ import print_function
 import numpy as N
-from Priithon.all import U
-from PriCommon import xcorr, imgResample, imgGeo,imgFilters
 import sys
-if hasattr(sys, 'app'):
-    from PriCommon import ppro
-else:
-    from PriCommon import ppro26 as ppro
+
+try:
+    from Priithon.all import U, F
+    from PriCommon import xcorr, imgResample, imgGeo,imgFilters
+
+    if sys.version_info.major == 2 and hasattr(sys, 'app'):
+        from PriCommon import ppro
+    else:
+        from PriCommon import ppro26 as ppro
+        
+except ImportError:
+    from Chromagnon.Priithon.all import U, F
+    from Chromagnon.PriCommon import xcorr, imgResample, imgGeo,imgFilters
+    
+    if sys.version_info.major == 2 and hasattr(sys, 'app'):
+        from Chromagnon.PriCommon import ppro
+    else:
+        from Chromagnon.PriCommon import ppro26 as ppro
+        
 try:
     from . import cutoutAlign
 except ValueError:
+    from Chromagnon import cutoutAlign
+except ImportError: # python2
     import cutoutAlign
-from scipy import ndimage
-import exceptions
+from scipy import ndimage, spatial
+#import exceptions
 
 
-class AlignError(exceptions.Exception): pass
+class AlignError(Exception): pass
 
-CTHRE=0.065
+CTHRE=0.065 * 0.3 # xcorr Gaussian profile was normalized to 0.3 to 1, then threshold also changed...
 MAX_SHIFT = 5 #2 #0.4 # um
 MIN_PXLS_YX = 60
-MIN_PXLS_YXS = [str(30 * (2**i)) for i in xrange(4)]
+MIN_PXLS_YXS = [str(30 * (2**i)) for i in range(4)]
 MAX_SHIFT_LOCAL = 4#2 # pixel
 
 QUADRATIC_AREA=['Right-Top', 'Left-Top', 'Left-Bottom', 'Right-Bottom']
@@ -37,6 +53,69 @@ def prep2D(a3d, zs=None):
 
     aa = a3d[zs]
     return N.max(aa, axis=0)
+
+def measureSaturation(a3d, force_calc_neighbor=False, ret_fraction=False):
+    """
+    return (number of saturated pixels, number of saturated pixels next to other saturated pixels)
+    """
+    try:
+        ii = N.iinfo(a3d.dtype)
+    except ValueError: # N.float
+        return 0, 0
+    
+    if a3d.max() == ii.max:
+        maxdist = N.linalg.norm(a3d.shape)
+        # obtain indices of saturated pixels
+        ind = N.array(N.where(a3d == ii.max)).T
+        spx = len(ind)
+        # examine if the coordinates are next to each other
+        if spx / a3d.size < 0.0001 or force_calc_neighbor:
+            dmat = spatial.distance.cdist(ind, ind, 'euclidean')
+            # a mask for the diagnal 0
+            eye = N.eye(dmat.shape[1], dmat.shape[0], dtype=dmat.dtype.type) * maxdist
+            dmat += eye
+            # obtain saturated pixels in clusters
+            next_pxl_cubic = N.linalg.norm((2**0.5)+1)
+            ind = N.where(dmat <= next_pxl_cubic)
+            npxl = len(ind[0]) // 2 # removing redundancy
+        else:
+            npxl = spx
+
+        if ret_fraction:
+            return spx / a3d.size, npxl / (dmat.size // 2)
+        else:
+            return spx, npxl
+    else:
+        return 0, 0
+
+def fixSaturation(a3d, sat=0, lowpass_sigma=0.1):
+    """
+    return lowpass filtered image if sat >0
+    """
+    if sat:
+        a3d = lowPassGaussFilter(a3d, sigma=lowpass_sigma)
+    return a3d
+
+def lowPassGaussFilter(arr, sigma=0.5):
+    """
+    return lowpass filtered image even if arr.shape is odd.
+    """
+    shape = N.array(arr.shape)
+    oddAxes = N.floor(shape % 2).astype(N.uint)
+    if N.any(oddAxes):
+        newshape = (shape + oddAxes).astype(N.uint)
+        canvas = N.empty(newshape, arr.dtype.type)
+        canvas[:] = N.median(arr)
+        slcs = [slice(0,np) for np in shape]
+        canvas[slcs] = arr
+        arr = N.ascontiguousarray(canvas)
+    arr = F.lowPassGaussFilter(arr, sigma=sigma)
+
+    if N.any(oddAxes):
+        arr = arr[slcs]
+    return arr
+
+##### ---- quadrisection phase correlation
 
 def chopImg(a2d, center=None):
     """
@@ -63,6 +142,11 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, cqthre=CTHRE/10., max_
     if center is None:
         shape = N.array(a2d.shape)
         center = shape // 2
+
+    # threshold
+    threfact = 0.03
+    variance = getVar(a2d, ref)
+    threshold = variance * threfact
 
     # separate quadrisection
     a1234 = chopImg(ref, center)
@@ -95,21 +179,23 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, cqthre=CTHRE/10., max_
     cm2 = N.array((ycm, xcm)) * 2"""
 
     # quadrisection cross correlation
-    ab = zip(a1234p, b1234p)
+    ab = list(zip(a1234p, b1234p))
     try:
         yxcs = [xcorr.Xcorr(a, b, phaseContrast=False, searchRad=max_shift_pxl) for a, b in ab]
     except IndexError:
-        return N.array((0,0,0,1,1), N.float32), [0,0], [(i, 0) for i in xrange(4)]
+        return N.array((0,0,0,1,1), N.float32), [0,0], [(i, 0) for i in range(4)]
     except (ValueError, ZeroDivisionError):
         raise AlignError
     yxs = [yx for yx, c in yxcs]
     
     # quality check
     cqvs = [c.max() - c[c.shape[0]//4].std() for yx, c in yxcs]
-    del yxcs, ab, c
     
-
     checks = [(idx, cq) for idx, cq in enumerate(cqvs) if cq < cqthre]
+    #ab_vars = [(a.var(), b.var()) for a, b in ab]
+    #checks += [(idx, threshold) for idx, ab_var in enumerate(ab_vars) if ab_var[0] < threshold or ab_var[1] < threshold]
+    
+    del yxcs, ab#, c 
 
     # translation
     tyx = getTranslation(yxs)
@@ -211,7 +297,7 @@ def getOffset(asiny1, asiny2, asinx, theta, center2):
     dx = (a1 * a2 * tan2 - a1 * a2 * tan1) / (a1 * tan1 + a2 * tan2)
     return dx
 
-def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=5, cqthre=CTHRE/10., if_failed=IF_FAILED[0]):#'simplex'):
+def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=5, cqthre=CTHRE/10.*1/0.3, if_failed=IF_FAILED[0]):#'simplex'):
     """
     iteratively do quadratic cross correlation
 
@@ -233,7 +319,9 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
     else:
-        print 'in iteration, initial geuss is', initguess
+        #print('in iteration, initial geuss is', initguess)
+        if echofunc:
+            echofunc('in iteration, initial geuss is %s' % initguess, skip_notify=True)
         ret[:] = initguess[:]
 
     if if_failed == IF_FAILED[2]:#force_simplex':
@@ -295,14 +383,18 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             ret[3:] *= ll[3:]
             
         elif goodImg == 0:
-            print 'doing simplex'
+            #print('doing simplex')
+            if echofunc:
+                echofunc('doing simplex', skip_notify=True)
             ll = simplex(b, c, phaseContrast, rough=rough)
             ret[:3] += ll[:3]
             ret[3:] *= ll[3:]
             rough = False
             #if echofunc:
             #echofunc('%i: %s' % (i, ll))#ref))
-        print i, ret
+        #print(i, ret)
+        if echofunc:
+            echofunc('%i %s' % (i, ret), skip_notify=True)
         errs = errPxl(ll, center)
         try:
             if len(maxErr) ==2:
@@ -355,11 +447,10 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
     yxs = N.zeros((2,), N.float32)
     if initguess is not None:
         yxs[:] = initguess
-        #if echofunc:
-        #    echofunc('initguess Xcorr: %s' % yxs)
-        print 'initguess Xcorr:', yxs
+        if echofunc:
+            echofunc('initguess Xcorr: %s' % yxs, skip_notify=True)
     
-    for i in xrange(niter):
+    for i in range(niter):
         if i == 0 and initguess is None:
             b = a2d
             c = ref
@@ -377,9 +468,9 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
 
         yx = xcorr.Xcorr(c, b, phaseContrast=phaseContrast)[0]
         yxs += yx
-        print 'xcorr', i, yxs
-        #if echofunc:
-        #    echofunc('xcorr %i: %s' % (i, yx))
+        #print('xcorr', i, yxs)
+        if echofunc:
+            echofunc('xcorr %i: %s' % (i, yxs), skip_notify=True)
 
         if N.all(N.abs(yx) < maxErr):
             break
@@ -487,7 +578,7 @@ def roughRotMag(a, b, yxrm, idx, step=0.02, nstep=20):
         check = 5
     else: # go ahead and fit poly
         x = xs[xi]
-        data = zip(xs,pp)
+        data = list(zip(xs,pp))
         fit, check = U.fitPoly(data, p=(1,1,1,1,1,1,1))
 
     if check == 5:
@@ -519,7 +610,7 @@ def findBestRefZs(ref, sigma=1):
     if ref.ndim == 2:
         return [0]
     elif nz <= 3:
-        return range(nz)
+        return list(range(nz))
 
     # Due to the roll up after FFT, the edge sections in Z may contain different information among the channels. Thus these sections are left unused.
     ms = N.zeros((nz -2,), N.float32)
@@ -532,7 +623,7 @@ def findBestRefZs(ref, sigma=1):
 
     ids = [idx for idx in range(1,nz-1) if ms[idx-1] > thr]
     if not ids:
-        ids = range(1,nz-1)
+        ids = list(range(1,nz-1))
 
     return ids
 
@@ -555,14 +646,14 @@ def findBestRefZs(ref, sigma=0.5):
     if ref.ndim == 2:
         return [0]
     elif nz <= 3:
-        return range(nz)
+        return list(range(nz))
 
     # ring array
     ring = F.ringArr(ref.shape[-2:], radius1=ref.shape[-1]//10, radius2=ref.shape[-2]//4, orig=(0,0), wrap=1)
     
     # Due to the roll up after FFT, the edge sections in Z may contain different information among the channels. Thus these sections are left unused.
     ms = N.zeros((nz -2,), N.float32)
-    for z in xrange(1, nz-1):
+    for z in range(1, nz-1):
         af = F.rfft(N.ascontiguousarray(ref[z]))
         ar = af * ring[:,:af.shape[-1]]
         ms[z-1] = N.sum(N.abs(ar))
@@ -575,7 +666,7 @@ def findBestRefZs(ref, sigma=0.5):
 
     ids = [idx for idx in range(1,nz-1) if ms[idx-1] > thr]
     if not ids:
-        ids = range(1,nz-1)
+        ids = list(range(1,nz-1))
 
     return ids
 
@@ -670,7 +761,7 @@ def chopShapeND(shape, npxls=(32,32), shiftOrigin=(0,0)):#False):
     """
     try:
         if len(npxls) != len(shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(shape))]
         
@@ -701,7 +792,7 @@ def chopImage2D(arr, npxls=(32,32), shiftOrigin=(0,0)):#False):
     """
     try:
         if len(npxls) != arr.ndim:
-            raise ValueError, 'length of the list of npxls must be the same as arr.ndim'
+            raise ValueError('length of the list of npxls must be the same as arr.ndim')
     except TypeError:
         npxls = [npxls for d in range(arr.ndim)]
         
@@ -729,7 +820,7 @@ def chopImageND(arr, npxls=(32,32)):
     """
     try:
         if len(npxls) != arr.ndim:
-            raise ValueError, 'length of the list of npxls must be the same as arr.ndim'
+            raise ValueError('length of the list of npxls must be the same as arr.ndim')
     except TypeError:
         npxls = [npxls for d in range(arr.ndim)]
         
@@ -771,7 +862,7 @@ def xcorNonLinearSingle(arr, ref, npxls=60, threshold=None, phaseContrast=True, 
     arrays = []
     regions = []
     yxs = []
-    for i in xrange(niter):
+    for i in range(niter):
         yx, region, c = xcorNonLinear(arr, ref, npxls, threshold, phaseContrast, cthre, pxlshift_allow)
         if fillHole:
             yx = fillHoles(yx, region[0])
@@ -787,9 +878,9 @@ def xcorNonLinearSingle(arr, ref, npxls=60, threshold=None, phaseContrast=True, 
         x0 = tslcs[0][0][1].start
 
         canvas = N.zeros_like(arr)
-        for y in xrange(y0, arr.shape[0], npxls):
+        for y in range(y0, arr.shape[0], npxls):
             canvas[y] = 1
-        for x in xrange(x0, arr.shape[1], npxls):
+        for x in range(x0, arr.shape[1], npxls):
             canvas[:,x] = 1
 
         arrays.append(N.array((arr2, ref, canvas, c, ret[0], ret[1])))
@@ -833,7 +924,7 @@ def xcorNonLinear_old(arr, ref, npxls=60, threshold=None, phaseContrast=True, ct
     
     try:
         if len(npxls) != len(arr.shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
     
@@ -888,7 +979,7 @@ def xcorNonLinear(arr, ref, npxls=60, threshold=None, cthre=CTHRE, pxlshift_allo
     cfact = 1
     try:
         if len(npxls) != len(arr.shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
 
@@ -896,8 +987,8 @@ def xcorNonLinear(arr, ref, npxls=60, threshold=None, cthre=CTHRE, pxlshift_allo
         variance = getVar(arr, ref)
         threshold = variance * threfact
 
-    taas = [[chopImage2D(arr, npxls, shiftOrigin=(yi,xi)) for xi in xrange(2)] for yi in xrange(2)]
-    tars = [[chopImage2D(ref, npxls, shiftOrigin=(yi,xi)) for xi in xrange(2)] for yi in xrange(2)]
+    taas = [[chopImage2D(arr, npxls, shiftOrigin=(yi,xi)) for xi in range(2)] for yi in range(2)]
+    tars = [[chopImage2D(ref, npxls, shiftOrigin=(yi,xi)) for xi in range(2)] for yi in range(2)]
 
     nsplit0 = N.array((len(taas[0][0][0]), len(taas[0][0][0][0])))
     nsplit1 = N.array((len(taas[1][1][0]), len(taas[1][1][0][0])))
@@ -906,8 +997,8 @@ def xcorNonLinear(arr, ref, npxls=60, threshold=None, cthre=CTHRE, pxlshift_allo
     region = N.zeros((3,)+nsplit, N.float32)
     cs = N.zeros((2,2,) + arr.shape, N.float32)
         
-    for yi in xrange(2):
-        for xi in xrange(2):
+    for yi in range(2):
+        for xi in range(2):
             tslcs, arrs = taas[yi][xi]
             rslcs, refs = tars[yi][xi]
 
@@ -958,7 +1049,7 @@ def xcorNonLinear2(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre
     
     try:
         if len(npxls) != len(arr.shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
     
@@ -986,7 +1077,7 @@ def xcorNonLinear2(arr, ref, npxls=32, threshold=None, phaseContrast=True, cthre
             regions[1,y,x] = var
             yx0 = N.zeros((2,), N.float32)
             if var > threshold:
-                for i in xrange(20):
+                for i in range(20):
                     yx, c = xcorr.Xcorr(a, b, phaseContrast=phaseContrast)
                     csd = c[:c.shape[0]//4].std()
                     cqual = (c.max() - csd) / (c.sum() / cfact)
@@ -1052,7 +1143,7 @@ def resizeLocal2D(arr, targetShape):
     elif N.all(shape <= tshape):
         return imgFilters.paddingValue(arr, tshape, value=0, smooth=10, interpolate=False)
     else:
-        raise NotImplementedError, 'The size of image does not match with the local distortion map'
+        raise NotImplementedError('The size of image does not match with the local distortion map')
 
 def resizeLocal3D(arr, targetShape):
     """
@@ -1081,9 +1172,9 @@ def paddYX(yx, npxl, shape, maxcutY=0, maxcutX=0):
     """
     npxl //= 2
     
-    from Priithon.all import F
+    #from Priithon.all import F
     pshape = (2,) + tuple([int(s) for s in N.array(yx.shape[-2:]) + 3*2])
-    yxp = F.getPadded(yx, pshape)
+    #yxp = F.getPadded(yx, pshape)
     #from Priithon.all import Y
     #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl))#, order=1, prefilter=False)
     #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl), order=1, prefilter=False) # bilinear is better
@@ -1122,26 +1213,26 @@ def paddYX(yx, npxl, shape, maxcutY=0, maxcutX=0):
     zeros = N.zeros((2,)+tuple(shape), N.float32)
     zeros[:,start2[0]:start2[0]+yx.shape[1],start2[1]:start2[1]+yx.shape[2]] += yx
 
-    for d in xrange(2):
+    for d in range(2):
         # left
-        for x in xrange(int(start2[1])):
+        for x in range(int(start2[1])):
             zeros[d,:start2[0],x] += yx[d,0,0]
             zeros[d,start2[0]:start2[0]+yx.shape[1],x] += yx[d,:,0]
             zeros[d,start2[0]+yx.shape[1]:,x] += yx[d,-1,0]
         # right
-        for x in xrange(int(start2[1]+yx.shape[2]),int(zeros.shape[-1])):
+        for x in range(int(start2[1]+yx.shape[2]),int(zeros.shape[-1])):
             zeros[d,:start2[0],x] += yx[d,0,-1]
             zeros[d,start2[0]:start2[0]+yx.shape[1],x] += yx[d,:,-1]
             zeros[d,start2[0]+yx.shape[1]:,x] += yx[d,-1,-1]
         # bottom
-        for y in xrange(int(start2[0])):
+        for y in range(int(start2[0])):
             zeros[d,y,:start2[1]] += yx[d,0,0]
             zeros[d,y,:start2[1]] /= 2.
             zeros[d,y,start2[1]:start2[1]+yx.shape[2]] += yx[d,0,:]
             zeros[d,y,start2[1]+yx.shape[2]:] += yx[d,0,-1]
             zeros[d,y,start2[1]+yx.shape[2]:] /= 2.
         # top
-        for y in xrange(int(start2[0]+yx.shape[1]),int(zeros.shape[-2])):
+        for y in range(int(start2[0]+yx.shape[1]),int(zeros.shape[-2])):
             zeros[d,y,:start2[1]] += yx[d,-1,0]
             zeros[d,y,:start2[1]] /= 2.
             zeros[d,y,start2[1]:start2[1]+yx.shape[2]] += yx[d,-1,:]
@@ -1317,10 +1408,10 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
 
         canvas = N.zeros_like(arr)
         #for y in xrange(y0-npxl//4, arr.shape[0], npxl//2):
-        for y in xrange(y0+npxl//2, arr.shape[0], npxl):
+        for y in range(y0+npxl//2, arr.shape[0], npxl):
             canvas[y] = 1
         #for x in xrange(x0-npxl//4, arr.shape[1], npxl//2):
-        for x in xrange(x0+npxl//2, arr.shape[1], npxl):
+        for x in range(x0+npxl//2, arr.shape[1], npxl):
             canvas[:,x] = 1
 
     for i in range(niter):
@@ -1351,7 +1442,7 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
         # for example, using arr.shape = (1008, 1012)
         # following window size did not work
         if i and debug:
-            print i, N.abs(yx).mean(), N.abs(yxs[i-1]).mean()
+            print(i, N.abs(yx).mean(), N.abs(yxs[i-1]).mean())
         if i and N.abs(yx).mean() > N.abs(yxs[i-1]).mean() and not debug:
             return None, N.zeros((1,)), None #None, None
         yxs.append(yx)
@@ -1410,7 +1501,7 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
 def makeWin(shape, minwin, maxwin=300):
     win0 = min((float(min(shape//2)), maxwin))
     series = int(N.log2(win0 / minwin)) + 1
-    print series
+    #print(series)
     wins0 = win0 // (2 ** N.arange(series))
     wins = []
     for win in wins0:
@@ -1466,7 +1557,7 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
         wins.append(win)
     print wins"""
     wins = makeWin(shape, minwin)
-    print wins
+    #print(wins)
     if not wins:
         return N.zeros((2,)+arr.shape, N.float32), None, None
         
@@ -1481,7 +1572,7 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
     for i, win in enumerate(wins):
         if echofunc:
             echofunc('--current window size: %i' % win)
-        for ii in xrange(10):
+        for ii in range(10):
             yxc, regions, arr2 = iterNonLinear(arr, ref, npxl=win, affine=affine, initGuess=currentGuess, threshold=threshold, phaseContrast=phaseContrast, niter=niter, maxErr=maxErr, cthre=cthre, echofunc=echofunc)
             if yxc is None:
                 if echofunc:
@@ -1514,7 +1605,9 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
                 echofunc('  no region was found to be good enough')
             break
         else:
-            print 'rmax: %.2f, -- continue' % rmax
+            #print('rmax: %.2f, -- continue' % rmax)
+            if echofunc:
+                echofunc('rmax: %.2f, -- continue' % rmax, skip_notify=True)
 
     old="""
     # throw away regions with low contrast
@@ -1547,7 +1640,7 @@ def xcorNonLinear_para(arr, ref, npxls=32, threshold=None, phaseContrast=True, c
     
     try:
         if len(npxls) != len(arr.shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
     
@@ -1588,10 +1681,10 @@ def xcorNonLinear_para(arr, ref, npxls=32, threshold=None, phaseContrast=True, c
 
 
     if 0:#ppro26.NCPU > 1:
-        print 'multi'
+        print('multi')
         ccy = ppro26.pmap(_xcorNonLinear, abyxs, threshold=threshold, phaseContrast=phaseContrast)
     else:
-        print 'single'
+        print('single')
         ccy = [_xcorNonLinear(ab, threshold=threshold, phaseContrast=phaseContrast) for ab in abyxs]
 
     for c, var, cqual, yx, y, x in ccy:
@@ -1665,8 +1758,8 @@ def fillHoles(yx, region, win=3):
                     yi, xi = N.nonzero(region[y-yh0:y+yh1,x-xh0:x+xh1])
                     if len(yi):
                         # replace with mean in the window
-                        yx2[0,y,x] = N.mean(yx[0,y-yh0:y+yh1,x-xh0:x+xh1][yi,xi])
-                        yx2[1,y,x] = N.mean(yx[1,y-yh0:y+yh1,x-xh0:x+xh1][yi,xi])
+                        yx2[0,y,x] = N.mean(yx[0,y-yh0:y+yh1,x-xh0:x+xh1][yi,xi]) / (2 ** ((win-3)/2))
+                        yx2[1,y,x] = N.mean(yx[1,y-yh0:y+yh1,x-xh0:x+xh1][yi,xi]) / (2 ** ((win-3)/2))
                         region2[y,x] = 1
         region = region2
         yx = yx2

@@ -1,11 +1,10 @@
 """provides the histogram scaling OpenGL-based panel for Priithon's ND 2d-section-viewer"""
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
 #20051107 from wxPython   import wx
 import wx
-
 from wx import glcanvas
 from OpenGL import GL
 # from OpenGL import GLU   ## CHECK langur has not GLUT - debian glutg3
@@ -19,7 +18,8 @@ except:
 #from numarray import numeric as Num
 #import numarray as na
 import numpy as N
-import traceback, sys, PriConfig
+import traceback, sys
+from . import PriConfig
 
 ###########################################from numarray import numeric as na
 #----------------------------------------------------------------------
@@ -123,9 +123,15 @@ class MyCanvasBase(glcanvas.GLCanvas):
         # initial mouse position
         #seb self.lastx = self.x = 30
         #seb self.lasty = self.y = 30
-        wx.EVT_ERASE_BACKGROUND(self, self.OnEraseBackground)
-        wx.EVT_SIZE(self, self.OnSize)
-        wx.EVT_PAINT(self, self.OnPaint)
+
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        
+        #wx.EVT_ERASE_BACKGROUND(self, self.OnEraseBackground)
+        #wx.EVT_SIZE(self, self.OnSize)
+        #wx.EVT_PAINT(self, self.OnPaint)
         #          EVT_LEFT_DOWN(self, self.OnMouseDown)  # needs fixing...
         #          EVT_LEFT_UP(self, self.OnMouseUp)
         #          EVT_MOTION(self, self.OnMouseMotion)
@@ -140,7 +146,7 @@ class MyCanvasBase(glcanvas.GLCanvas):
         pass # Do nothing, to avoid flashing on MSW.
 
     def OnSize(self, event):
-        self.m_w, self.m_h = self.GetClientSizeTuple()
+        self.m_w, self.m_h = self.GetClientSize()#Tuple()
         if self.m_w <=0 or self.m_h <=0:
             #print "debug: HistogramCanvas.OnSize: self.m_w <=0 or self.m_h <=0", self.m_w, self.m_h
             return
@@ -207,8 +213,12 @@ class HistogramCanvas(MyCanvasBase):
         self.dragLeft   = True # in case mouseIsDown happens without preceeding mouseDown
         self.keepZoomedToBraces = True # 20080806
 
-        wx.EVT_MOUSE_EVENTS(self, self.OnMouse)
-        wx.EVT_MOUSEWHEEL(self, self.OnWheel)
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_MOUSE_EVENTS,  self.OnMouse)
+        self.Bind(wx.EVT_MOUSEWHEEL,    self.OnWheel)
+        
+        #wx.EVT_MOUSE_EVENTS(self, self.OnMouse)
+        #wx.EVT_MOUSEWHEEL(self, self.OnWheel)
         #wx.EVT_CLOSE(self, self.OnClose)
         self.MakePopupMenu()
         self.m_histPlotArray = None
@@ -234,7 +244,7 @@ class HistogramCanvas(MyCanvasBase):
 
 
     def InitGL(self):
-        (self.m_w, self.m_h) = self.GetClientSizeTuple()
+        (self.m_w, self.m_h) = self.GetClientSize()#Tuple()
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
         GL.glOrtho(  0, self.m_w, 0, self.m_h, -1,1)
@@ -323,8 +333,8 @@ class HistogramCanvas(MyCanvasBase):
             GL.glTexCoord2f( 1, 0);          GL.glVertex2f  ( self.rightBrace, HEIGHT*.1)
             GL.glEnd()
         except:
-            print 'DEBUG: histogram.py: oops - set self.bandTobeGenerated'
-            print 'DEBUG: self.m_texture_list', self.m_texture_list
+            print('DEBUG: histogram.py: oops - set self.bandTobeGenerated')
+            print('DEBUG: self.m_texture_list', self.m_texture_list)
             self.bandTobeGenerated  = True
 
         GL.glDisable(GL.GL_TEXTURE_1D);
@@ -478,9 +488,9 @@ class HistogramCanvas(MyCanvasBase):
                     if PriConfig.raiseEventHandlerExceptions:
                         raise
                     else:
-                        print >>sys.stderr, " *** error in doOnBrace **"
+                        print(" *** error in doOnBrace **", file=sys.stderr)
                         traceback.print_exc()
-                        print >>sys.stderr, " *** error in doOnBrace **"
+                        print(" *** error in doOnBrace **", file=sys.stderr)
                     
             self.Refresh(0)
 
@@ -499,7 +509,7 @@ class HistogramCanvas(MyCanvasBase):
             self.Refresh(0)
         """
         if ev.LeftDClick():
-            print "x,y: %d %d    xEff: %.3f" %(x,y, xEff)
+            print("x,y: %d %d    xEff: %.3f" %(x,y, xEff))
         for f in self.doOnMouse:
             try:
                 f(xEff, ev) # , 0) #bin)
@@ -507,9 +517,9 @@ class HistogramCanvas(MyCanvasBase):
                 if PriConfig.raiseEventHandlerExceptions:
                     raise
                 else:
-                    print >>sys.stderr, " *** error in doOnMouse **"
+                    print(" *** error in doOnMouse **", file=sys.stderr)
                     traceback.print_exc()
-                    print >>sys.stderr, " *** error in doOnMouse **"
+                    print(" *** error in doOnMouse **", file=sys.stderr)
 
     #20080707 def doOnMouse(self, xEff, bin):
     #20080707    pass
@@ -525,12 +535,21 @@ class HistogramCanvas(MyCanvasBase):
         menu.Append(Menu_Log, "log")
         menu.Append(Menu_FitYToSeen, "auto fit y axis to shown values")
         menu.Append(Menu_EnterScale, "scale to ...")
-        wx.EVT_MENU(self, Menu_Reset, self.OnReset)
-        wx.EVT_MENU(self, Menu_ZoomToBraces, self.zoomToBraces)
-        wx.EVT_MENU(self, Menu_AutoFit, self.autoFit)
-        wx.EVT_MENU(self, Menu_Log, self.OnLog)
-        wx.EVT_MENU(self, Menu_FitYToSeen, self.OnFitYToSeen)
-        wx.EVT_MENU(self, Menu_EnterScale, self.OnEnterScale)
+
+        #20171225-PY2to3 deprecation warning use meth: EvtHandler.Bind -> self.Bind()
+        self.Bind(wx.EVT_MENU, self.OnReset, id=Menu_Reset)
+        self.Bind(wx.EVT_MENU, self.zoomToBraces, id=Menu_ZoomToBraces)
+        self.Bind(wx.EVT_MENU, self.autoFit,      id=Menu_AutoFit)
+        self.Bind(wx.EVT_MENU, self.OnLog,        id=Menu_Log)
+        self.Bind(wx.EVT_MENU, self.OnFitYToSeen, id=Menu_FitYToSeen)
+        self.Bind(wx.EVT_MENU, self.OnEnterScale, id=Menu_EnterScale)
+        
+        #wx.EVT_MENU(self, Menu_Reset, self.OnReset)
+        #wx.EVT_MENU(self, Menu_ZoomToBraces, self.zoomToBraces)
+        #wx.EVT_MENU(self, Menu_AutoFit, self.autoFit)
+        #wx.EVT_MENU(self, Menu_Log, self.OnLog)
+        #wx.EVT_MENU(self, Menu_FitYToSeen, self.OnFitYToSeen)
+        #wx.EVT_MENU(self, Menu_EnterScale, self.OnEnterScale)
         #20051117  wx.EVT_MENU(self, Menu_Gamma, self.OnMenuGamma)
         self.menu = menu
 
@@ -587,7 +606,7 @@ class HistogramCanvas(MyCanvasBase):
         n = yArray.shape[0]
         #glSeb      print "setHist00     ms: %.2f"% ((time.clock()-x)*1000.0)
         if n < 2:
-            raise ValueError, "cannot have Histogram with less than 2 bins"
+            raise ValueError("cannot have Histogram with less than 2 bins")
         if xMin == xMax:
             #WARN:? print " ** setHist: xMin == xMax ==",xMin, "!! set xMax+=1"
             xMax+=1
@@ -611,7 +630,7 @@ class HistogramCanvas(MyCanvasBase):
            self.m_histPlotArray[:,0] = N.linspace(xMin,xMax, n)
         #glSeb      print "setHist2 ms: %.2f"% ((time.clock()-x)*1000.0)
 
-        if not self.GetContext():
+        if 0:#not self.GetContext():
             testing="""
             print " ** setHist: no self.GetContext():"
             return"""
@@ -621,7 +640,8 @@ class HistogramCanvas(MyCanvasBase):
         #glSeb      print "setHist3b ms: %.2f"% ((time.clock()-x)*1000.0)
         #
         #glSeb.glVertexPointer(self.m_histPlotArray) # AM 20130203
-        self.SetCurrent(self.context) # 20141124 Cocoa
+	
+       	self.SetCurrent(self.context) # 20141124 Cocoa
         GL.glVertexPointerf(self.m_histPlotArray)
         
         #glSeb       print "setHist4 ms: %.2f"% ((time.clock()-x)*1000.0)
@@ -736,9 +756,9 @@ class HistogramCanvas(MyCanvasBase):
                 if PriConfig.raiseEventHandlerExceptions:
                     raise
                 else:
-                    print >>sys.stderr, " *** error in doOnBrace **"
+                    print(" *** error in doOnBrace **", file=sys.stderr)
                     traceback.print_exc()
-                    print >>sys.stderr, " *** error in doOnBrace **"
+                    print(" *** error in doOnBrace **", file=sys.stderr)
 
 
     def setBraces(self, l,r): #20060823 , gamma=None):
@@ -751,9 +771,9 @@ class HistogramCanvas(MyCanvasBase):
                 if PriConfig.raiseEventHandlerExceptions:
                     raise
                 else:
-                    print >>sys.stderr, " *** error in doOnBrace **"
+                    print(" *** error in doOnBrace **", file=sys.stderr)
                     traceback.print_exc()
-                    print >>sys.stderr, " *** error in doOnBrace **"
+                    print(" *** error in doOnBrace **", file=sys.stderr)
 
         #20080707 self.doOnBrace(self.leftBrace, self.rightBrace) #20060823, gamma)
         self.Refresh(0)

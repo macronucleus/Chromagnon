@@ -6,7 +6,8 @@ __license__ = "BSD license - see LICENSE file"
 
 import numpy as N
 
-import fftwam as fftw
+from . import fftmanager as fftw #fftwam as fftw
+from functools import reduce
 
 defshape = (256,256)  #use this default shape to make testing easy
 
@@ -31,7 +32,7 @@ def _normailze_ndparm(ndparm, rank):
     """
     try:
         if len(ndparm) != rank:
-            raise ValueError, "ndparm must be of length %d"%rank
+            raise ValueError("ndparm must be of length %d"%rank)
         return ndparm
     except TypeError:
         return (ndparm,)*rank
@@ -78,7 +79,7 @@ def copyPadded(a,b, pad=0):
     """
 
     if a.ndim != b.ndim:
-        raise ValueError, "arrays need to be of same ndim"
+        raise ValueError("arrays need to be of same ndim")
     
     ######## print
     dS = N.subtract(b.shape, a.shape)
@@ -87,8 +88,8 @@ def copyPadded(a,b, pad=0):
         b[:] = pad #HACK - because not very efficient !?
        
     for i in range(a.ndim):
-        a = N.transpose(a, [a.ndim-1]+range(a.ndim-1))
-        b = N.transpose(b, [b.ndim-1]+range(b.ndim-1))
+        a = N.transpose(a, [a.ndim-1]+list(range(a.ndim-1)))
+        b = N.transpose(b, [b.ndim-1]+list(range(b.ndim-1)))
         dS = b.shape[0] - a.shape[0]
         d2 = dS//2
         #print i, "AA)", a.shape[0], b.shape[0], dS, d2
@@ -135,7 +136,7 @@ def getWithoutBorder(arr, border=10):
         lower = border[-i]
         upper = len(a)-border[-i]
         a = a[lower:upper]
-        a = N.transpose(a, [a.ndim-1]+range(a.ndim-1))
+        a = N.transpose(a, [a.ndim-1]+list(range(a.ndim-1)))
         #border[:] = [border[-1]]+border[:-1]
     return a
     
@@ -170,7 +171,7 @@ def getThresholded(arr, min=0, force0Base=False):
 
 
 def bin2d(inArr, outArr, binX=2, binY=2):
-    import useful as U
+    from . import useful as U
     U.checkGoodArrayF(outArr, 1, (inArr.shape[0]//binY, inArr.shape[1]//binX))
 
     if inArr.dtype.isnative:
@@ -182,11 +183,11 @@ def bin2d(inArr, outArr, binX=2, binY=2):
 
 
 def getXZview(arr, zaxis=-3):
-    s = range(arr.ndim)
+    s = list(range(arr.ndim))
     s[zaxis],s[-2] = s[-2],s[zaxis]
     return N.transpose(arr, s)
 def getYZview(arr, zaxis=-3):
-    s = range(arr.ndim)
+    s = list(range(arr.ndim))
     s[zaxis],s[-1] = s[-1],s[zaxis]
     return N.transpose(arr, s)
     
@@ -204,7 +205,7 @@ def getHistEqualizedF(arr, histYX=None, nBins=None):
             if arr is of float dtype   and nBins < 1000:
                 nBins = 1000
     """
-    from useful import histogramYX
+    from .useful import histogramYX
 
     if histYX is None:
         if nBins is None:
@@ -250,7 +251,7 @@ def radialPhiArr(shape, func, orig=None, dtype=N.float32):
             pass
     
     if len(shape) != len(orig):
-        raise ValueError, "shape and orig not same dimension"
+        raise ValueError("shape and orig not same dimension")
 
     if len(shape) == 2:
         y0,x0 = orig
@@ -264,7 +265,7 @@ def radialPhiArr(shape, func, orig=None, dtype=N.float32):
             (x-x0)**2 + (y-y0)**2 + (z-z0)**2 ), N.arctan2((y-y0), (x-x0)) ),
                               shape, dtype)
     else:
-        raise ValueError, "only defined for 1< dim <= 3"
+        raise ValueError("only defined for 1< dim <= 3")
 
 
 def radialArr(shape, func, orig=None, wrap=False, dtype=N.float32):
@@ -293,11 +294,11 @@ def radialArr(shape, func, orig=None, wrap=False, dtype=N.float32):
             pass
                 
     if len(shape) != len(orig):
-        raise ValueError, "shape and orig not same dimension"
+        raise ValueError("shape and orig not same dimension")
 
     try: 
         if len(wrap) != len(shape):
-            raise ValueError, "wrap tuple must be same length as shape"
+            raise ValueError("wrap tuple must be same length as shape")
     except TypeError:
         wrap = (wrap,)*len(shape)
 
@@ -345,7 +346,7 @@ def radialArr(shape, func, orig=None, wrap=False, dtype=N.float32):
                                              N.sqrt( \
             (wrapIt(-1,x-x0))**2 + (wrapIt(-2,y-y0))**2 + (wrapIt(-3,z-z0))**2 ) ), shape, dtype)
     else:
-        raise ValueError, "only defined for dim < 3 (TODO)"
+        raise ValueError("only defined for dim < 3 (TODO)")
 
 def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype=N.float32):
     """like radialArr but instead of using euclidian distance to determine r
@@ -364,7 +365,7 @@ def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype=N.float32):
             pass
     
     if len(shape) != len(orig):
-        raise ValueError, "shape and orig not same dimension"
+        raise ValueError("shape and orig not same dimension")
 
     if wrap:
         def wrapIt(q, nq):
@@ -390,7 +391,7 @@ def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype=N.float32):
              N.maximum.reduce(  \
             (N.absolute(wrapIt(x-x0,nx)) , N.absolute(wrapIt(y-y0,ny)) , N.absolute(wrapIt(z-z0,nz)) )) ), shape, dtype)
     else:
-        raise ValueError, "only defined for dim < 3 (TODO)"
+        raise ValueError("only defined for dim < 3 (TODO)")
 
 
 
@@ -419,10 +420,10 @@ def LoG(r,sigma=None, dim=1, r0=None, peakVal=None):
         if r0 is not None:
             sigma = float(r0) / N.sqrt(dim)
         else:
-            raise ValueError, "One of sigma or r0 have to be non-None"
+            raise ValueError("One of sigma or r0 have to be non-None")
     else:
         if r0 is not None:
-            raise ValueError, "Only one of sigma or r0 can be non-None"
+            raise ValueError("Only one of sigma or r0 can be non-None")
     s2 = sigma**2
     dsd = dim*sigma**dim
 
@@ -571,7 +572,7 @@ def lorentzian(r, dim=1, sigma=1., integralScale=None, peakVal=None):
     if both are None
          results defaults to integralScale==1
     """
-    import useful as U
+    from . import useful as U
 
     ff = 1.
     if integralScale is not None:
@@ -621,7 +622,7 @@ def poissonArr(shape=defshape, mean=1, dtype=N.uint16):
     if mean == 0:
         return zeroArrF(shape)
     elif mean < 0:
-        raise ValueError, "poisson not defined for mean < 0"
+        raise ValueError("poisson not defined for mean < 0")
     else:
         return N.random.poisson(mean, shape).astype(dtype)
 
@@ -724,7 +725,7 @@ def shuffle4irfft(arr):
     global ny,nx,nx2,nx21,ny2, a
     ny,nx = arr.shape[-2:]
     if nx % 2 or ny %2:
-        raise RuntimeError, "TODO"
+        raise RuntimeError("TODO")
     else:
         nx2 = nx // 2
         nx21 = nx2 + 1
@@ -757,7 +758,7 @@ def shift(arr, delta=None): #20081113 , dtype=N.float32):
     elif not hasattr(delta, '__len__'):
         delta = (delta,)*len(shape)
     elif len(shape) != len(delta):
-        raise ValueError, "shape and delta not same dimension"
+        raise ValueError("shape and delta not same dimension")
 
     return irfft(fourierRealShiftArr(shape, delta) *
                                     rfft(arr))
@@ -776,12 +777,12 @@ def fourierShiftArr(shape=defshape, delta=None, meantForRealFFT=False, dtype=N.f
         delta = N.array(shape) / 2.
     
     if len(shape) != len(delta):
-        raise ValueError, "shape and delta not same dimension"
+        raise ValueError("shape and delta not same dimension")
 
     if meantForRealFFT:
         nx = shape[-1]
         if nx % 2:
-            raise ValueError, "shape must be even sized in last dimension if meantForRealFFT"
+            raise ValueError("shape must be even sized in last dimension if meantForRealFFT")
 
     f = 2j*N.pi
 
@@ -861,7 +862,7 @@ def fft(a, minCdtype=fftw.CTYPE):
         a = N.asarray(a, minCdtype)
 
     return fftw.fft(a)
-def ifft(af, normalize=True, minCdtype=fftw.CTYPE):
+def ifft(af, minCdtype=fftw.CTYPE):#normalize=True, minCdtype=fftw.CTYPE):
     """
     calculate nd inverse fourier transform
     performs full, i.e. non-real, ifft
@@ -879,7 +880,7 @@ def ifft(af, normalize=True, minCdtype=fftw.CTYPE):
     if af.dtype.type not in fftw.CTYPES:
         af = N.asarray(af, minCdtype)
 
-    return fftw.ifft(af, normalize=normalize)
+    return fftw.ifft(af)#, normalize=normalize)
         
 def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
@@ -894,7 +895,7 @@ def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
         a = N.asarray(a, minFdtype)
 
     return fftw.rfft(a, nthreads=nthreads)
-def irfft(af, normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
+def irfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
     """
     calculate nd inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -912,7 +913,7 @@ def irfft(af, normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
     if af.dtype.type not in fftw.CTYPES:
         af = N.asarray(af, minCdtype)
 
-    return fftw.irfft(af, normalize=normalize, nthreads=nthreads)
+    return fftw.irfft(af, nthreads=nthreads)
 
 def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
@@ -930,7 +931,7 @@ def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
 
     nx = a.shape[-1]
     if nx % 2:
-        raise ValueError, "a must be even sized in last dimension"
+        raise ValueError("a must be even sized in last dimension")
     s2 = a.shape[:-1]+(nx//2+1,)
 
     
@@ -939,12 +940,12 @@ def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     elif aDtype == N.float64:
         af = N.empty(shape=s2, dtype=N.complex128)
     else:
-        raise TypeError, "a must be of dtype float32 or float64 (%s given)"%a.dtype 
+        raise TypeError("a must be of dtype float32 or float64 (%s given)"%a.dtype) 
     for tup in N.ndindex(a.shape[:-2]):
         af[tup] = fftw.rfft(N.asarray(a[tup], aDtype), nthreads=nthreads)
     return af
 
-def irfft2d(af, preserve=True, normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
+def irfft2d(af, preserve=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
     """
     calculate (section-wise) 2d inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -973,14 +974,14 @@ def irfft2d(af, preserve=True, normalize=True, minCdtype=fftw.CTYPE, nthreads=ff
     elif afDtype == N.complex128:
         a = N.empty(shape=shape, dtype=N.float64)
     else:
-        raise TypeError, "af must be of dtype complex64 or complex128 (%s given)"%af.dtype 
+        raise TypeError("af must be of dtype complex64 or complex128 (%s given)"%af.dtype) 
 
     for tup in N.ndindex(af.shape[:-2]):
         if preserve :
             myAF = N.array(af[tup], afDtype, copy=1)
         else:
             myAF = N.asarray(af[tup], afDtype)
-        a[tup] = fftw.irfft(myAF, normalize=normalize, nthreads=nthreads)
+        a[tup] = fftw.irfft(myAF, nthreads=nthreads)#), normalize=normalize, nthreads=nthreads)
     return a
 
 '''
@@ -1253,7 +1254,7 @@ def drawHexPattern2d(a, d=20, sizeYX=None, yx0=(0,0), val=1):
 
 
 def zzern_r(n,m,r):
-    from useful import fac
+    from .useful import fac
     if n==m==0:
         return 1
     rr = 0
@@ -1327,7 +1328,7 @@ def lowPassGaussFilter(a, sigma=5):
     """
     s = N.array(a.shape)
     if N.any(s % 2):
-        raise ValueError, "only shape % 2 == 0 supported"
+        raise ValueError("only shape % 2 == 0 supported")
     s2 = s/2.
 
     nx = s[0] # FIXME HACK
@@ -1371,7 +1372,7 @@ class mockNDarray(object):
                 return mockNDarray(*a)
             if a is None:
                 return mockNDarray()
-            raise ValueError, "don't know how to mockify %s" %(a,)
+            raise ValueError("don't know how to mockify %s" %(a,))
         self._arrs = [conv(a) for a in arrs]
         self._mockAxisSet(0)
 
@@ -1430,15 +1431,15 @@ class mockNDarray(object):
         __setShapeErrMsg = "mockNDarray supports only trivial set_shape functionality"
         foundMinus=False
         if len(self._shape) != len(s):
-            raise ValueError, __setShapeErrMsg
+            raise ValueError(__setShapeErrMsg)
         for i in range(len(self._shape)):
             if s[i] == -1:
                 if foundMinus:
-                    raise ValueError, __setShapeErrMsg
+                    raise ValueError(__setShapeErrMsg)
                 else:
                     foundMinus = True
             elif s[i] != self._shape[i]:
-                    raise ValueError, __setShapeErrMsg
+                    raise ValueError(__setShapeErrMsg)
 
     shape = property( _getshape,_setshape )
 
@@ -1523,7 +1524,7 @@ class mockNDarray(object):
             return s
 
 
-        raise IndexError, "should not get here .... " 
+        raise IndexError("should not get here .... ") 
 
     def transpose(self, *axes):
         try:
@@ -1531,13 +1532,13 @@ class mockNDarray(object):
         except:
             pass
         if len(axes) != self._ndim:
-            raise ValueError, "axes don't match mockarray"
+            raise ValueError("axes don't match mockarray")
 
         for newMockAxis in range(self._ndim):
             if axes[newMockAxis] == self._mockAxis:
                 break
         else:
-            raise ValueError, "axes don't contain mockAxis"
+            raise ValueError("axes don't contain mockAxis")
 
         othersAxes = (ax if ax<newMockAxis else ax-1 for ax in axes[:newMockAxis] + axes[newMockAxis+1:])
 

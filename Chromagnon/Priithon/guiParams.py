@@ -36,7 +36,7 @@ class guiParams(object):
         try:
             v = self._paramsVals[n]
         except:
-            raise AttributeError, "parameter `%s` unknown" %(n,)
+            raise AttributeError("parameter `%s` unknown" %(n,))
 
         return v
 
@@ -82,7 +82,7 @@ class guiParams(object):
 
         triggeringGUI = self.__dict__['_paramsGUI_setAttrSrc']
 
-        if not guis.has_key(n):
+        if n not in guis:
             guis[n] = []
             doOns[n] = []
         else:
@@ -122,7 +122,7 @@ class guiParams(object):
 
     # for PyCrust -- PyShell
     def _getAttributeNames(self):
-        return self.__dict__['_paramsVals'].keys()
+        return list(self.__dict__['_paramsVals'].keys())
         
 
     #def _register(self, n, v): #, filterFnc=int):
@@ -141,7 +141,7 @@ class guiParams(object):
         try:
             l=self.__dict__['_paramsGUIs'][n]
         except KeyError:
-            raise AttributeError, "parameter `%s` unknown" %(n,)            
+            raise AttributeError("parameter `%s` unknown" %(n,))            
             #    l=self.__dict__['_paramsGUIs'][n] = []
 
         if val2gui is not None:
@@ -153,7 +153,7 @@ class guiParams(object):
         elif isinstance(gui, (wx.CheckBox, wx.ToggleButton)):
             gui.val2gui = "bool" 
         else:
-            print "DEBUG: GuiParams: what is the type of this gui:", gui
+            print("DEBUG: GuiParams: what is the type of this gui:", gui)
             gui.val2gui = "int" 
             
         #if gui in not None:
@@ -163,7 +163,7 @@ class guiParams(object):
         try:
             l=self.__dict__['_paramsGUIs'][n]
         except KeyError:
-            raise AttributeError, "parameter `%s` unknown" %(n,)            
+            raise AttributeError("parameter `%s` unknown" %(n,))            
         l.remove(gui)
 
 
@@ -176,7 +176,7 @@ class guiParams(object):
            apply / reset hold for all params
         """
         if n is None:
-            for n in self.__dict__['_paramsVals'].iterkeys():
+            for n in self.__dict__['_paramsVals'].keys():
                 self._holdParamEvents(n, hold)
             return
 
@@ -375,13 +375,13 @@ class guiParams(object):
                     t += '\t'
                 l.append( (t, fcn, weight,expand,tooltip) )
             else:
-                raise ValueError, "bool control type '%s' not recognized"%(c,)
+                raise ValueError("bool control type '%s' not recognized"%(c,))
         if newLine:
             l += ['\n']
 
         # register event handlers
         if regFcn is not None:
-            from usefulX import _registerEventHandler
+            from .usefulX import _registerEventHandler
             _registerEventHandler(self.__dict__['_paramsDoOnValChg'][n], newFcn=regFcn, newFcnName=regFcnName) #, oldFcnName='', delAll=False)
 
         return l
@@ -461,7 +461,7 @@ class guiParams(object):
 
         # register event handlers
         if regFcn is not None:
-            from usefulX import _registerEventHandler
+            from .usefulX import _registerEventHandler
             _registerEventHandler(self.__dict__['_paramsDoOnValChg'][n], newFcn=regFcn, newFcnName=regFcnName) #, oldFcnName='', delAll=False)
 
         return l

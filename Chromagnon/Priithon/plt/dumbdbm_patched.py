@@ -22,9 +22,9 @@ is read when the database is opened, and some updates rewrite the whole index)
 """
 
 _os = __import__('os')
-import __builtin__
+import builtins
 
-_open = __builtin__.open
+_open = builtins.open
 
 _BLOCKSIZE = 512
 
@@ -65,8 +65,8 @@ class _Database:
         try: _os.rename(self._dirfile, self._bakfile)
         except _os.error: pass
         f = _open(self._dirfile, 'w')
-        for key, (pos, siz) in self._index.items():
-            f.write("%s, (%s, %s)\n" % (`key`, `pos`, `siz`))
+        for key, (pos, siz) in list(self._index.items()):
+            f.write("%s, (%s, %s)\n" % (repr(key), repr(pos), repr(siz)))
         f.close()
     
     def __getitem__(self, key):
@@ -99,16 +99,17 @@ class _Database:
         f.close()
         return (pos, len(val))
     
-    def _addkey(self, key, (pos, siz)):
+    def _addkey(self, key, xxx_todo_changeme):
+        (pos, siz) = xxx_todo_changeme
         self._index[key] = (pos, siz)
         f = _open(self._dirfile, 'a')
-        f.write("%s, (%s, %s)\n" % (`key`, `pos`, `siz`))
+        f.write("%s, (%s, %s)\n" % (repr(key), repr(pos), repr(siz)))
         f.close()
     
     def __setitem__(self, key, val):
         if not type(key) == type('') == type(val):
-            raise TypeError, "keys and values must be strings"
-        if not self._index.has_key(key):
+            raise TypeError("keys and values must be strings")
+        if key not in self._index:
             (pos, siz) = self._addval(val)
             self._addkey(key, (pos, siz))
         else:
@@ -128,10 +129,10 @@ class _Database:
         self._commit()
     
     def keys(self):
-        return self._index.keys()
+        return list(self._index.keys())
     
     def has_key(self, key):
-        return self._index.has_key(key)
+        return key in self._index
     
     def __len__(self):
         return len(self._index)

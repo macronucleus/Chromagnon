@@ -4,15 +4,16 @@ the container of
 
 common base class for single-color and multi-color version
 """
-
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
+import six
 import wx
 import numpy as N
-import fftfuncs as F  # for mockNDarray
+from . import fftfuncs as F  # for mockNDarray
 import weakref
-import PriConfig
+from . import PriConfig
 
 ##thrd   import  threading
 ##thrd   ccc=0
@@ -97,13 +98,13 @@ class spvCommon:
         self.autoHistEachSect = ev.GetId() - Menu_AutoHistSec0
 
     def OnMenuAssignND(self, ev=None):
-        import usefulX as Y
+        from . import usefulX as Y
         Y.assignNdArrToVarname(self.data, "Y.vd(%s)"%(self.id,))
 
     def OnZZSlider(self, event):
         i = event.GetId()-1001
         zz = event.GetInt()
-        self.zsec[i] = zz
+        self.zsec[i] = int(zz)
         if zz != self.zlast[i]:
             #self.doOnZchange( zz )
             zsecTuple = tuple(self.zsec)
@@ -130,9 +131,9 @@ class spvCommon:
                         raise
                     else:
                         import traceback, sys
-                        print >>sys.stderr, " *** error in doOnSecChanged **"
+                        print(" *** error in doOnSecChanged **", file=sys.stderr)
                         traceback.print_exc()
-                        print >>sys.stderr, " *** error in doOnSecChanged **"
+                        print(" *** error in doOnSecChanged **", file=sys.stderr)
 
             self.zlast[i] = zz
                 
@@ -141,7 +142,7 @@ class spvCommon:
     def setSlider(self, z, zaxis=0):
         """zaxis specifies "which" zaxis should move to new value z
         """
-        self.zsec[zaxis] = z
+        self.zsec[zaxis] = int(z)
         self.zzslider[zaxis].SetValue(self.zsec[zaxis])
         e = wx.CommandEvent(wx.wxEVT_COMMAND_SLIDER_UPDATED, 1001+zaxis)
         e.SetInt( self.zsec[zaxis] )
@@ -185,8 +186,8 @@ class spvCommon:
 
 
     def normalizeKeyShortcutTable(self):
-        for k in self.keyShortcutTable.keys():
-            if isinstance(k[1], basestring):
+        for k in list(self.keyShortcutTable.keys()):
+            if isinstance(k[1], six.string_types):
                 if k[1].islower():
                     new_k = (k[0], ord(k[1])-ord('a')+ord('A'))
                 else: #if k[1].isupper():
@@ -197,7 +198,7 @@ class spvCommon:
                 del self.keyShortcutTable[k]
 
     def installKeyCommands(self, frame):
-        from usefulX import iterChildrenTree
+        from .usefulX import iterChildrenTree
         for p in iterChildrenTree(frame):
             p.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
 
@@ -263,8 +264,8 @@ class spvCommon:
         self.keyShortcutTable[ 0, '0' ] = self.viewer.doReset
         self.keyShortcutTable[ 0, '9' ] = self.viewer.OnCenter
         self.keyShortcutTable[ 0, wx.WXK_HOME ] = self.viewer.OnCenter
-        self.keyShortcutTable[ 0, wx.WXK_NEXT ] = self.viewer.OnZoomOut
-        self.keyShortcutTable[ 0, wx.WXK_PRIOR] = self.viewer.OnZoomIn
+        #self.keyShortcutTable[ 0, wx.WXK_NEXT ] = self.viewer.OnZoomOut
+        #self.keyShortcutTable[ 0, wx.WXK_PRIOR] = self.viewer.OnZoomIn
         # self.keyShortcutTable[ 0, 'd' ] = lambda :self.viewer.zoom(2., absolute=False)
         # self.keyShortcutTable[ 0, 'h' ] = lambda :self.viewer.zoom(.5, absolute=False)
         self.keyShortcutTable[ 0, 'z' ] = lambda :self.viewer.zoom(2., absolute=False)

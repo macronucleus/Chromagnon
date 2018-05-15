@@ -1,8 +1,10 @@
 #!/usr/bin/env priithon
-from __future__ import with_statement
+from __future__ import print_function
 import os, sys, tempfile
+import six
 from Priithon.all import Mrc
-from packages import priismCommands, byteSwap
+from PriCommon import priismCommands, ppro26 as ppro #, byteSwap
+import imgio
 
 PRINTOUT=False
 EXT_BLT='_blt'
@@ -11,16 +13,18 @@ EXT_DCN='_decon'
 DECON_OPT=['wiener', 'method', 'ncycl', 'smooth', 'sub']
 FFT_OPT=['gauss1', 'gauss2', 'gauss3', 'gauss4', 'butterworth_smooth']
 
-def parallel(fns, out=None, otf=None, limit=12, **kwds):
+def parallel(fns, out=None, otf=None, limit=ppro.NCPU, **kwds):
     global PRINTOUT
+    if isinstance(fns, six.string_types):
+        fns = [fns]
+        
     if len(fns) == 1 or limit == 1:
         OLD_PRINT=PRINTOUT
         PRINTOUT=True
-        out = main(fns[0], out, otf, **kwds)
+        out = [main(fn, out, otf, **kwds) for fn in fns]
         PRINTOUT=OLD_PRINT
         return out
     else:
-        from packages import ppro
         return ppro.pmap(main, fns, limit, out, otf, **kwds)
 
 def main(fn, out=None, otf=None, **kwds):
@@ -28,28 +32,39 @@ def main(fn, out=None, otf=None, **kwds):
     priismCommands.PriismSetup()
 
     # byteSwap for Softworx
-    if kwds.has_key('littleEndian'):
+    if 'littleEndian' in kwds:
         littleEndian = kwds.pop('littleEndian')
     else:
         littleEndian = False
 
     #bilateral
-    if kwds.has_key('filterMethod'):
+    if 'filterMethod' in kwds:
         filterMethod = kwds.pop('filterMethod')
     else:
         filterMethod = None
+
+    makelog = kwds.pop('makelog', None)
 
     if filterMethod:
         OPTS = [opt for opt in DECON_OPT] # copy
         if not filterMethod.startswith('f'):
             OPTS += FFT_OPT
         
-        fkwds = dict([(key, val) for key, val in kwds.iteritems() if key not in OPTS])
+        fkwds = dict([(key, val) for key, val in kwds.items() if key not in OPTS])
 
         fn = priismCommands.Filter3D(fn, out, filterMethod=filterMethod, **fkwds)
         if littleEndian:
             out = os.path.extsep.join((fn, byteSwap.DEF_EXT))
-            byteSwap.byteSwap(fn, out)
+            #byteSwap.byteSwap(fn, out)
+            # replacing byteSwap
+            h = imgio.Reader(fn)#mrcIO.MrcReader(fn)
+            o = imgio.Writer(out, hdr=h.hdr, byteorder='<')#mrcIO.MrcWriter(out, h.hdr, byteorder='<')
+            for t in range(h.nt):
+                for w in range(h.w):
+                    o.write3DArr(h.get3DArr(t=t, w=w), t=t, w=w)
+            o.close()
+            h.close()
+            
             os.remove(fn)
             fn = out
 
@@ -59,16 +74,16 @@ def main(fn, out=None, otf=None, **kwds):
     log = os.path.extsep.join((out, 'log'))
 
     # decon otf
-    if isinstance(otf, basestring) and os.path.exists(otf):
+    if isinstance(otf, six.string_types) and os.path.exists(otf):
         ctf = otf
-    elif isinstance(otf, basestring) and otf.isdigit():
+    elif isinstance(otf, six.string_types) and otf.isdigit():
         ctf = findOTFfromNum(otf)
     else:
         ctf = findOTF(fn)
     
     # decon
     options = []
-    for key, value in kwds.iteritems():
+    for key, value in kwds.items():
         if key in DECON_OPT:
             if value == True:
                 options.append('-%s' % key)
@@ -79,37 +94,49 @@ def main(fn, out=None, otf=None, **kwds):
     #com = ' '.join(['decon %s %s %s -title="%s" ' % (fn, out, ctf, title)] + options)
     com = ' '.join(['decon %s %s %s ' % (fn, out, ctf)] + options)
     if PRINTOUT:
-        print com
+        print(com)
 
-    if os.path.exists(log):
-        os.remove(log)
-    com += ' >> %s' % log
+    if makelog:
+        if os.path.exists(log):
+            os.remove(log)
+        com += ' >> %s' % log
+        h = open(log, 'a')
+        h.write(com)
 
     if sys.platform == 'darwin':
-        out = saveCommand(com)
+        out2 = saveCommand(com)
 
         import subprocess
-        err = subprocess.call(['sh', out])
-        os.remove(out)
+        err = subprocess.call(['sh', out2])
+        os.remove(out2)
     else:
         err = os.system(com)
 
 
     if err:
-        raise RuntimeError, 'Deconvolution failed (exit status %s)\ncommand is: %s' % (err, com)
-    
-    h = open(log, 'a')
-    h.write(com)
-    h.close()
+        raise RuntimeError('Deconvolution failed (exit status %s)\ncommand is: %s' % (err, com))
+
+    if makelog:
+        h.close()
 
     if littleEndian:
         fn = out
         out = os.path.extsep.join((fn, byteSwap.DEF_EXT))
-        byteSwap.byteSwap(fn, out)
+        #byteSwap.byteSwap(fn, out)
+        h = imgio.Reader(fn)#mrcIO.MrcReader(fn)
+        o = imgio.Writer(out, hdr=h.hdr, byteorder='<')#mrcIO.MrcWriter(out, h.hdr, byteorder='<')
+        #h = mrcIO.MrcReader(fn)
+        #o = mrcIO.MrcWriter(out, h.hdr, byteorder='<')
+        for t in range(h.nt):
+            for w in range(h.w):
+                o.write3DArr(h.get3DArr(t=t, w=w), t=t, w=w)
+        o.close()
+        h.close()
+        
         os.remove(fn)
 
     if PRINTOUT:
-        print 'Done %s' % out
+        print('Done %s' % out)
     return out
 
 # for mac, old 32bit does not work anymore...
@@ -156,7 +183,7 @@ def findMethod(method='b'):
     if len(method) <= 2:
         method = FILTER_METHODS.get(method)
     if not method:
-        raise ValueError, 'Filter3D methods not found'
+        raise ValueError('Filter3D methods not found')
     return method
 
 def Filter3D(fn, out=None, filterMethod='b', kernel='3:3:3', sigma='1:1:1', sigma_inten=5, iterations=1, **kwds):
@@ -174,7 +201,7 @@ def Filter3D(fn, out=None, filterMethod='b', kernel='3:3:3', sigma='1:1:1', sigm
         #-gauss1=0:0.6:5 -gauss2=0:0.1:-4
         options = []
         g = 0
-        for key, value in kwds.iteritems():
+        for key, value in kwds.items():
             if key.startswith('gauss') and value:
                 g += 1
                 options.append('-%s=%s' % (key, value))
@@ -202,7 +229,7 @@ def Filter3D(fn, out=None, filterMethod='b', kernel='3:3:3', sigma='1:1:1', sigm
     com += ' >> %s' % log
     err = os.system(com)
     if err:
-        raise RuntimeError, 'Filter3D had exit status %s\ncommand is: %s' % (err, com)
+        raise RuntimeError('Filter3D had exit status %s\ncommand is: %s' % (err, com))
     
     h = open(log, 'a')
     h.write(com)
@@ -229,7 +256,7 @@ elif os.path.exists('/Applications'): # mac
 elif os.path.exists('/opt/otf'): # others
     CTFDIR = r"/opt/otf"
 else:
-    raise ValueError, 'otf directory not found'
+    raise ValueError('otf directory not found')
     #CTFDIR=r"/opt/otf"
 
     
@@ -286,7 +313,7 @@ def findOTFfromNum(lensNum, ctfdir=None):
     if not ctf:
         ctf = os.path.join(os.environ['IVE_BASE'], 'CTF', 'lens13.realctf')
         if not os.path.exists(ctf):
-            raise RuntimeError, 'CTF not found!'
+            raise RuntimeError('CTF not found!')
 
     return ctf
     
@@ -316,7 +343,7 @@ if __name__ == '__main__':
 
     # filter method string
     methodsStr = []
-    keys = FILTER_METHODS.keys()
+    keys = list(FILTER_METHODS.keys())
     keys.sort()
     for key in keys:
         methodsStr.append(':'.join((key, FILTER_METHODS[key])))
@@ -366,18 +393,18 @@ if __name__ == '__main__':
     p.add_option('--littleEndian', '-l', action='store_true', default=False,
                  help='SoftWorx byteorder (default=native byteorder)')
     # parallel
-    p.add_option('--limit', '-L', default=12,
-                 help='number of CPU core (default=12)')
+    p.add_option('--limit', '-L', default=ppro.NCPU,#12,
+                 help='number of CPU core (default=%i)' % ppro.NCPU)
 
     options, arguments = p.parse_args()
     if not arguments:
-        raise ValueError, 'please supply image file'
+        raise ValueError('please supply image file')
 
     PRINTOUT=True
     fns = []
     for fn in arguments:
         fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
-    print fns
+    print(fns)
     out = parallel(fns, **options.__dict__)
 
-    print out, 'saved'
+    print(out, 'saved')

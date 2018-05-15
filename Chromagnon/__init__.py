@@ -1,10 +1,17 @@
-__author__ = "Atsushi Matsuda"
 
+import sys
+if sys.version_info.major == 3:
+    from importlib import reload
+
+__author__ = "Atsushi Matsuda"
 
 try:
     from . import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
-except:
-    import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
+except (ValueError, ImportError):
+    try:
+        from Chromagnon import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
+    except ImportError:
+        import version, cutoutAlign, alignfuncs, chromformat, aligner, chromeditor, threads, flatfielder, chromagnon
 
 reload(version)
 reload(cutoutAlign)
@@ -19,7 +26,11 @@ try:
     from . import testfuncs
     reload(testfuncs)
 except ImportError:
-    pass
+    try:
+        import testfuncs
+        reload(testfuncs)
+    except ImportError:
+        pass
 
 __version__ = version.version
 

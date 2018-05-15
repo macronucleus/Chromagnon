@@ -67,6 +67,8 @@ buttonBox([('c\ton/off', 'print x'),
 buttonBox([('l\tx-value:','',0),('t\t1234', '_.x=float(x)')])
 buttonBox([('l\tx-value:','',0),('t _.myText=x\t1234', '_.textVal=x;print x')])
 """
+from __future__ import print_function
+import six
 import wx
 try:
     buttonBoxes
@@ -129,7 +131,8 @@ class _buttonBox:
 
         self.doOnClose = [] # (self, ev)
         
-        wx.EVT_CLOSE(self.frame, self.onClose)
+        #wx.EVT_CLOSE(self.frame, self.onClose)
+        self.frame.Bind(wx.EVT_CLOSE, self.onClose)
 
     def onClose(self, ev):
         try:
@@ -142,9 +145,9 @@ class _buttonBox:
             try:
                 f( self, ev )
             except:
-                print >>sys.stderr, " *** error in onClose **"
+                print(" *** error in onClose **", file=sys.stderr)
                 traceback.print_exc()
-                print >>sys.stderr, " *** error in onClose **"
+                print(" *** error in onClose **", file=sys.stderr)
 
         #20090226: explicitely call close on children to make their onClose() get triggered
         # inspired by http://aspn.activestate.com/ASPN/Mail/Message/wxPython-users/2020248
@@ -255,7 +258,7 @@ class _buttonBox:
                 cmd = label
         elif typ == 'sl':
             if label:
-                value,minVal,maxVal = map(int, label.split())
+                value,minVal,maxVal = list(map(int, label.split()))
             else:
                 value,minVal,maxVal = 0,0,100
             b = wx.Slider(self.frame, wx.ID_ANY, value,minVal,maxVal
@@ -295,20 +298,20 @@ class _buttonBox:
             
             b = wx.StaticText(self.frame, wx.ID_ANY, label, style=wx.ALIGN_RIGHT)
         else:
-            raise ValueError, "unknown control type (%s)"% typ
+            raise ValueError("unknown control type (%s)"% typ)
         if exec_to_name_control:
-            exec exec_to_name_control in self.execModule.__dict__, {'x':b, '_':self.execModule}
+            exec(exec_to_name_control, self.execModule.__dict__, {'x':b, '_':self.execModule})
 
         if tooltip is not None:
-           b.SetToolTipString( tooltip )
+           b.SetToolTip( tooltip )
         elif cmd:
-            if isinstance(cmd, basestring):
-                b.SetToolTipString( cmd )
+            if isinstance(cmd, six.string_types):
+                b.SetToolTip( cmd )
             else:
                 try:
-                   b.SetToolTipString( "call '%s' [%s]" % (cmd.__name__, cmd) )
+                   b.SetToolTip( "call '%s' [%s]" % (cmd.__name__, cmd) )
                 except AttributeError:
-                   b.SetToolTipString( str(cmd) )
+                   b.SetToolTip( str(cmd) )
 
                
         if expand:
@@ -335,7 +338,7 @@ class _buttonBox:
         ## a string with two '%s':  1) the 'x' variable 2) the "wx.EVT_BUTTON" command
         ##
         _f_template = '''
-if isinstance(cmd, basestring):
+if isinstance(cmd, six.string_types):
    def myCmdString(selfExecMod, x, b, ev, cmd=cmd):
       exec cmd in selfExecMod.__dict__, {'_':selfExecMod, '_ev':ev, '_b':b, 'x':x}
    doOnEvt.insert(0, myCmdString)
@@ -359,17 +362,17 @@ def OnB(ev, self=self, b=b, iii=len(self.doOnEvt)):
              traceback.print_exc()
              print >>sys.stderr, " *** error in doOnEvt[%%d] **"%%(iii,)
 
-%s(self.frame, b.GetId(), OnB)
+self.frame.Bind(%s, OnB, id=b.GetId())
 '''
 
         ##
         ###################################################
         if typ == 'b':
            #print 'xxxxxxxxx', 'cmd' in locals()
-           exec _f_template%('ev.GetString()', 'wx.EVT_BUTTON') in globals(), locals()
+           exec(_f_template%('ev.GetString()', 'wx.EVT_BUTTON'), globals(), locals())
 
            '''
-           if isinstance(cmd, basestring):
+           if isinstance(cmd, six.string_types):
               def myCmdString(selfExecMod, x, b, ev):
                  exec cmd in selfExecMod.__dict__, {'_':selfExecMod, '_ev':ev, '_b':b, 'x':x}
               doOnEvt.insert(0, myCmdString)
@@ -390,10 +393,10 @@ def OnB(ev, self=self, b=b, iii=len(self.doOnEvt)):
            wx.EVT_BUTTON(self.frame, b.GetId(), OnB)
            '''
         elif typ == 'tb':
-           exec _f_template%('ev.GetInt()', 'wx.EVT_TOGGLEBUTTON') in globals(), locals()
+           exec(_f_template%('ev.GetInt()', 'wx.EVT_TOGGLEBUTTON'), globals(), locals())
            '''
             if cmd:
-               if isinstance(cmd, basestring):
+               if isinstance(cmd, six.string_types):
                   def OnB(ev):
                      exec cmd in self.execModule.__dict__, {'_':self.execModule, '_ev':ev, '_b':b, 'x':ev.GetInt()}
                elif callable(cmd):
@@ -404,20 +407,20 @@ def OnB(ev, self=self, b=b, iii=len(self.doOnEvt)):
                wx.EVT_TOGGLEBUTTON(self.frame, b.GetId(), OnB)
            '''
         elif typ == 'sl':
-           exec _f_template%('ev.GetInt()', 'wx.EVT_SLIDER') in globals(), locals()
+           exec(_f_template%('ev.GetInt()', 'wx.EVT_SLIDER'), globals(), locals())
            #if cmd:
            #     def OnB(ev):
            #         exec cmd in self.execModule.__dict__, {'_':self.execModule, '_ev':ev, '_b':b, 'x':ev.GetInt()}
            #    wx.EVT_SLIDER(self.frame, b.GetId(), OnB)
         elif typ == 't':
-           exec _f_template%('ev.GetString()', 'wx.EVT_TEXT') in globals(), locals()
+           exec(_f_template%('ev.GetString()', 'wx.EVT_TEXT'), globals(), locals())
            
            #if cmd:
            #     def OnT(ev):
            #         exec cmd in self.execModule.__dict__, {'_':self.execModule, '_ev':ev, '_b':b, 'x':ev.GetString()}
            #     wx.EVT_TEXT(self.frame, b.GetId(), OnT)
         elif typ == 'c':
-           exec _f_template%('ev.IsChecked()', 'wx.EVT_CHECKBOX') in globals(), locals()
+           exec(_f_template%('ev.IsChecked()', 'wx.EVT_CHECKBOX'), globals(), locals())
            #if cmd:
            #     def OnC(ev):
            #         exec cmd in self.execModule.__dict__, {'_':self.execModule, '_ev':ev, '_b':b, 'x':ev.IsChecked()}

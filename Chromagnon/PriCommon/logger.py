@@ -1,8 +1,10 @@
-import logging
-try:
-    from Priithon.all import Y
-except ImportError:
-    pass # not priithon
+import logging, sys
+import six
+if hasattr(sys,'app'):
+    try:
+        from Priithon.all import Y
+    except ImportError:
+        pass # not priithon
 
 THRESHOLD = logging.DEBUG
 LEVEL_DIC = {'debug': logging.DEBUG,
@@ -31,8 +33,9 @@ def debug(log, msg, level=logging.DEBUG):
     """
     do logging
     """
-    level = _getLevelName(level)
-    exec('log.%s(msg)' % level)
+    levelName = _getLevelName(level)
+    exec('log.%s(msg)' % levelName)
+    level = _getLevel(level)
     if log.getEffectiveLevel() <= level:
         try:
             Y.refresh()
@@ -58,9 +61,9 @@ def _getLevelName(level):
     """
     return string
     """
-    if isinstance(level, basestring):
-        if level not in LEVEL_DIC.keys():
-            raise ValueError, '%s not found' % level
+    if isinstance(level, six.string_types):
+        if level not in list(LEVEL_DIC.keys()):
+            raise ValueError('%s not found' % level)
     else:
         level = logging.getLevelName(level).lower()
     return level.lower()
@@ -69,10 +72,10 @@ def _getLevel(level):
     """
     return number
     """
-    if isinstance(level, basestring):
+    if isinstance(level, six.string_types):
         level = level.lower()
-        if level not in LEVEL_DIC.keys():
-            raise ValueError, '%s not found' % level
+        if level not in list(LEVEL_DIC.keys()):
+            raise ValueError('%s not found' % level)
         else:
             level = LEVEL_DIC[level]
     return level

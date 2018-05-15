@@ -43,9 +43,9 @@ if 1:
         sys.stdout.flush()
         sys.stderr.flush()
     def FN(verbose=0):
-        raise RuntimeError, "* sorry no GUI *"
+        raise RuntimeError("* sorry no GUI *")
     def DIR(verbose=0):
-        raise RuntimeError, "* sorry no GUI *"
+        raise RuntimeError("* sorry no GUI *")
 
 
 #del sys

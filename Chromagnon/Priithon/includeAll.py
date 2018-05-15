@@ -3,14 +3,14 @@
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
-print "   !!!  Welcome to Priithon !!!"
+print("   !!!  Welcome to Priithon !!!")
 from Priithon.all import *
 def _sebsDisplHook(v):
     if not v is None: # != None:
         import __main__ #global _
         #_ = v
         __main__._ = v
-        print U.myStr(v)
+        print(U.myStr(v))
         
 import sys
 sys.displayhook = _sebsDisplHook

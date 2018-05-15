@@ -77,7 +77,7 @@ if FFTW:
 
     def _fft(a, b, nthreads=ncpu, **kwds):
         if 0 in a.shape:
-            raise ValueError, 'This array cannot be transformed, shape: %s' % str(a.shape)
+            raise ValueError('This array cannot be transformed, shape: %s' % str(a.shape))
         modul = MODULS.get(a.dtype.type, fftw3)
         plan = modul.Plan(a, b, nthreads=nthreads, **kwds)
         plan()

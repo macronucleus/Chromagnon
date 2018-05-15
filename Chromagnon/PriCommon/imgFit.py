@@ -1,13 +1,21 @@
 ### Here all kinds of fitting
-
-from Priithon.all import N, U
-import imgFilters, imgGeo
-import exceptions
+from __future__ import print_function
+try:
+    from ..Priithon.all import N, U
+except ValueError:
+    from Priithon.all import N, U
+try:
+    from . import imgFilters, imgGeo
+except ValueError:
+    from PriCommon import imgFilters, imgGeo
+except ImportError: # python 2
+    import imgFilters, imgGeo
+#import exceptions
 
 #from packages import logger
 #logger = logger.getLogger('imgFit')
 
-class FittingError(exceptions.Exception): pass
+class FittingError(Exception): pass#exceptions.Exception): pass
 
 ERROR = [] # Error, message
 RAISE = None
@@ -19,10 +27,10 @@ def fitFailedAppend(msg, err=FittingError, verbose=None):
     """
     global ERROR
     if verbose:
-        print err, msg
+        print(err, msg)
     ERROR.append([err, msg])
     if RAISE:
-        raise err, msg
+        raise err(msg)
     return len(ERROR)
 
 def fitFailedClear():
@@ -80,7 +88,7 @@ def _scalerToSeq(sclOrSeq, ndim):
     """
     try:
         if len(sclOrSeq) != ndim:
-            raise ValueError, 'dimension does not match'
+            raise ValueError('dimension does not match')
     except TypeError:
         sclOrSeq = (sclOrSeq, ) * ndim
     return sclOrSeq
@@ -161,7 +169,7 @@ def fitSkew1D(img, ts=None, sigma=0.5, exp=0):
     ma, _1, _2, t = U.findMax(img)
     if ts is not None:
         t = ts[t]
-        img = zip(ts, img)
+        img = list(zip(ts, img))
 
     return U.fitAny(ySkew, (mi, ma-mi, t, sigma, exp), img, warning=None)
 
@@ -265,7 +273,7 @@ def yGaussian1D(param, t=0):
     elif len(param) == 6:
         c = param[4]*t+param[5]
     else:
-        raise ValueError, 'param must be tuple of length 4 or 6'
+        raise ValueError('param must be tuple of length 4 or 6')
     sigma  = (param[3]*param[3]) * c
     return param[0] + param[1] * N.exp(dist /sigma)
 
@@ -451,7 +459,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
             LD.append(sl.start)
 
     shapeTuple = tuple(shape+[rot])
-    if INDS_DIC.has_key(shapeTuple):
+    if shapeTuple in INDS_DIC:
         inds = INDS_DIC[shapeTuple]
     else:
         shape = N.array(shape)
@@ -584,7 +592,7 @@ def rotateIndices2DNew(shape, rot, orig=None, dtype=N.float64):
     else:
         y, x = orig
 
-    print y,x
+    print(y,x)
     if not rot:
         yi,xi = N.indices(shape, dtype=N.float64)
         yi -= y - 0.5 # remove pix center

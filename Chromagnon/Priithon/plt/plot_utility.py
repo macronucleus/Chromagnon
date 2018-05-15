@@ -34,7 +34,7 @@
 #               General layout classes
 #----------------------------------------------------------
 from numpy import *
-from seb import limits
+from .seb import limits
 
 LEFT,RIGHT,TOP,BOTTOM = 0,1,2,3 # used by same_as() method
 
@@ -172,8 +172,8 @@ class box_object:
         elif edge == BOTTOM: 
             self.topleft[1] = other_box.bottom() - margin                    
         else:
-            raise ValueError, "edge should only be plt.xxx where xxx is" \
-                              " LEFT,RIGHT,TOP, or BOTTOM"                              
+            raise ValueError("edge should only be plt.xxx where xxx is" \
+                              " LEFT,RIGHT,TOP, or BOTTOM")                              
     def radial_offset_from(self,other_box,angle,margin=0):
         """ Move this box so that its center is aligned along a radial ray
             out of other_box's center at the specified angle (in radians),
@@ -257,20 +257,20 @@ class point_object(box_object):
         return 0        
     def set_size(self,sz):
         # this'll catch all set_size, trim_xxx and other inappropriate methods
-        raise TypeError, "can't set the size of a point_object"
+        raise TypeError("can't set the size of a point_object")
 
 def bounding_points(objects):
-    l = min(map(lambda x: x.left(),objects))
-    t = min(map(lambda x: x.top(),objects))
-    r = min(map(lambda x: x.right(),objects))
-    b = min(map(lambda x: x.bottom(),objects))
+    l = min([x.left() for x in objects])
+    t = min([x.top() for x in objects])
+    r = min([x.right() for x in objects])
+    b = min([x.bottom() for x in objects])
     return (l,t),(r,b)
 
 def bounding_box(objects):
-    l = min(map(lambda x: x.left(),objects))
-    t = min(map(lambda x: x.top(),objects))
-    r = min(map(lambda x: x.right(),objects))
-    b = min(map(lambda x: x.bottom(),objects))
+    l = min([x.left() for x in objects])
+    t = min([x.top() for x in objects])
+    r = min([x.right() for x in objects])
+    b = min([x.bottom() for x in objects])
     return box_object((l,t),(r-l,b-t))
 
 #----------------------------------------------------------
@@ -312,7 +312,7 @@ class property_object:
     def __init__(self, kw, **attr):
         attrs = {};attrs.update(kw);
         if attr: attrs.update(attr)
-        for name, value in self._attributes.items():
+        for name, value in list(self._attributes.items()):
             val = value[0]
             try:
                 val = attrs[name]
@@ -321,13 +321,13 @@ class property_object:
     def reset_default(self):
         """ Reset the objects attributes to their default values.
         """
-        for name, value in self._attributes.items():
+        for name, value in list(self._attributes.items()):
             self.__dict__[name] = value[0]
 
     def clone_properties(self,other):
             """ Reset the objects attributes to their default values.
             """
-            for name in other._attributes.keys():
+            for name in list(other._attributes.keys()):
                 self.__dict__[name] = other.__dict__[name]
 
 #----------------------------------------------------------#
@@ -360,6 +360,8 @@ def rotate(pts,center,angle):
 
 def is_base2(range):
     " True if value is base 2 (2, 4, 8, 16, ...)"
+    if range == 0:
+        return False
     l = log2(range)
     return (l == floor(l) and l > 0.0)
 
@@ -434,8 +436,8 @@ def auto_ticks(data_bounds, bounds_info = default_bounds):
         pass   
     else:
         #print 'interval: ', interval
-        raise ValueError, str(interval) + " is an unknown value for interval: " \
-                          "  expects 'auto' or 'linear', or a number"
+        raise ValueError(str(interval) + " is an unknown value for interval: " \
+                          "  expects 'auto' or 'linear', or a number")
     
     # If the lower or upper bound are set to 'auto', 
     # calculate them based on the newly chosen interval.
@@ -479,7 +481,7 @@ def format_tick_labels(ticks):
     """ Convert tick values to formatted strings.
         Definitely needs some work
     """
-    return map(str,ticks)        
+    return list(map(str,ticks))        
     #print ticks
     #if equal(ticks,ticks.astype('l')):
     #    return map(str,ticks.astype('l'))

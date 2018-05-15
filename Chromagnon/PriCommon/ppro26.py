@@ -1,22 +1,25 @@
 
-import multiprocessing as mp
+import multiprocessing as mp, sys
 
-from Priithon.all import Y
-if not hasattr(Y, 'view'):
-    NCPU=mp.cpu_count()
-else:
+#from Priithon.all import Y
+
+if hasattr(sys,'app'): # runnging on Priithon
     NCPU = 1
+else:
+    NCPU=mp.cpu_count()
+    #import multiprocessing.dummy as mp
 
 def funcWrap(args):
     """
     return (i, result)
     """
+
     callable, i, kwds = args[:3]
     
     ret = callable(*args[3:], **kwds)
     return i, ret
 
-def pmap(callable, sequence, limit=None, *args, **kwds):
+def pmap(callable, sequence, limit=NCPU, *args, **kwds):
     """
     map function for parallel processing accepting args, kwds
     callable: the first arg must accept items of "sequence"
@@ -24,18 +27,25 @@ def pmap(callable, sequence, limit=None, *args, **kwds):
     
     return list of results
     """
-    pool = mp.Pool(processes=limit)
-    args0 = []
-    for i, item in enumerate(sequence):
-        args0.append([callable, i, kwds, item] + list(args))
+    if limit > 1:
 
-    results = pool.map(funcWrap, args0)
-    pool.terminate()
-    # re-ordering
-    # result contains sequential number
-    results.sort()
-    # remove number
-    return [result[1] for result in results]
+        pool = mp.Pool(processes=limit)
+        args0 = []
+        for i, item in enumerate(sequence):
+            args0.append([callable, i, kwds, item] + list(args))
+
+        results = pool.map(funcWrap, args0)
+        pool.terminate()
+        # re-ordering
+        # result contains sequential number
+        results.sort()
+        # remove number
+        return [result[1] for result in results]
+    else:
+
+        return [callable(x, *args, **kwds) for x in sequence]
+
+pmapLarge = pmap
  
 def funcMrcFile2D(func, fn, lock, t, w, z, *args, **kwds):
     """

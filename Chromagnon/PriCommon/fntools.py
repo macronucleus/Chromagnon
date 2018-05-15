@@ -91,9 +91,10 @@ def newestFileInTheDir(dr='.', whattime='m', suffix=None, excludeHidden=True):
     """
     what = whattime[0]
     if what in ['m', 'c', 'a']:
-        exec('func = os.path.get%stime' % what)
+        #exec('func = os.path.get%stime' % what)
+        func = os.path.__getattribute__('get%stime' % what) # python 3 compatible
     else:
-        raise ValueError, 'whatitme cannot be recognized'
+        raise ValueError('whatitme cannot be recognized')
         
     fns = [(func(os.path.join(dr,fn)), fn) for fn in os.listdir(dr)
            if os.path.isfile(os.path.join(dr, fn))]
@@ -107,7 +108,7 @@ def newestFileInTheDir(dr='.', whattime='m', suffix=None, excludeHidden=True):
     
 def appendToBasename(fn, suffix=''):
     base, ext = os.path.splitext(fn)
-    return base + prefix + ext
+    return base + suffix + ext
 
 def classifyFn(fns, sep='_', idx=0):
     """

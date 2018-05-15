@@ -1,13 +1,16 @@
 #!/usr/bin/env python
-
-from Priithon.all import N, U, Y, F, Mrc
-from scipy import optimize
-import mrcIO, imgFit
-import os
+from __future__ import print_function
 try:
-    from packages import Eext
-except:
-    pass
+    from ..Priithon.all import N, U, Y, F, Mrc
+except ValueError:
+    from Priithon.all import N, U, Y, F, Mrc
+from scipy import optimize
+from . import imgFit
+import os
+#try:
+#    from packages import Eext
+#except:
+#    pass
 
 # basic contrast operations
 
@@ -31,7 +34,7 @@ def arr_normalize(a, normalize_with='intens'):
     elif normalize_with == choices[1]:
         a = (a - me) / sd
     else:
-        raise ValueError, 'normalize only with %s' % choices
+        raise ValueError('normalize only with %s' % choices)
     return a
 
 def arr_histStretch(img, imgMin=None, imgMax=None, scaleMax=None):
@@ -171,7 +174,7 @@ forceSecondPeak=None, acceptOrigin=True, maskSigmaFact=1., removeY=None, removeX
     if not forceSecondPeak:
         forceSecondPeak = 0
     for i in range(int(forceSecondPeak)):
-        print '%i peak was removed' % (i+1) #, sigma: %.2f' % (i+1, s)
+        print('%i peak was removed' % (i+1)) #, sigma: %.2f' % (i+1, s)
         yx += center
         g = gaussianArr2D(c.shape, sigma=s/maskSigmaFact, peakVal=v, orig=yx)
         c = c - g
@@ -263,7 +266,7 @@ def fourierFilterF(af, func='gaussian', radius=1, operation='+', kwd={}, wiener=
         af = af.copy()
 
     kwd['orig'] = (sy2,0)
-    if type(func) in [type(''), type(u'')]:
+    if type(func) in [type(''), type('')]:
         if func.startswith('g'):
             g = gaussianArr2D(shape, radius, peakVal=1, **kwd)
         else:
@@ -272,7 +275,7 @@ def fourierFilterF(af, func='gaussian', radius=1, operation='+', kwd={}, wiener=
             try:
                 exec('g = F.%s(shape, radius, **kwd)' % func)
             except:
-                raise ValueError, '%s is not recognized' % func
+                raise ValueError('%s is not recognized' % func)
     else:
         g = func(shape, radius, **kwd)
 
@@ -372,7 +375,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
                 canvas = canvas[slc_edge]
             check = 1
         except IndexError:
-            print 'position ', pos, ' was skipped'
+            print('position ', pos, ' was skipped')
             check = 0
             raise
         if check:
@@ -402,8 +405,12 @@ def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
     if shift is None:
         shift = 0#[0] * len(shapeS)
     shapeL = shape#N.add(shapeS, center+shift)
-    start, stop = (shapeL - shapeS)/2., (shapeL + shapeS)/2.
-    slc = [slice(int(round(start[d])), int(round(stop[d])), None) for d in range(img.ndim)]
+    #start, stop = (shapeL - shapeS)/2., (shapeL + shapeS)/2.
+    start = N.round_((shapeL - shapeS)/2.).astype(N.int)
+    stop = shapeS + start
+    slc = [slice(start[d], stop[d], None) for d in range(img.ndim)]
+
+    #slc = [slice(int(round(start[d])), int(round(stop[d])), None) for d in range(img.ndim)]
     #print slc, shapeS, shapeL
 
     # shift if necessary
@@ -455,10 +462,10 @@ def _smoothBorder(arr, start, stop, smooth, value):
         # both side
         for s, side in enumerate([start, stop]):
             if s == 0:
-                rs = range(smooth_start[d], start[d])
+                rs = list(range(smooth_start[d], start[d]))
                 rs.sort(reverse=True)
             elif s == 1:
-                rs = range(stop[d], smooth_stop[d])
+                rs = list(range(stop[d], smooth_stop[d]))
             # smoothing
             for f,i in enumerate(rs):
                 slc = copy.copy(sliceTemplate)
@@ -566,7 +573,7 @@ def resolutionLimit(wave_nm, NA, n):
     """
     return (0.61 * wave_nm) / (n * NA) 
 
-def zoomFourier(arr, factor):
+def zoomFourier(arr, factor, use_abs=False):
     shape = N.array(arr.shape)
     target = [int(s) for s in shape * factor]
     #target[-1] //= 2
@@ -575,7 +582,10 @@ def zoomFourier(arr, factor):
     ap = paddingFourier(af, target)
     afp = F.ifft(ap)
     factor = target / shape
-    return N.real(afp) * N.product(factor)
+    if use_abs:
+        return N.abs(afp) * N.product(factor)
+    else:
+        return N.real(afp) * N.product(factor)
 
 def paddingFourier(af, shape, value=0):
     afo = N.fft.fftshift(af)
@@ -598,7 +608,7 @@ def gaussianArrND(shape=(256,256), sigma=2., peakVal=None, orig=None, rot=0):
 
     try:
         if len(sigma) != ndim:
-            raise ValueError, 'len(sigma) must be the same as len(shape)'
+            raise ValueError('len(sigma) must be the same as len(shape)')
     except TypeError:
         sigma = [sigma] * ndim
 
@@ -634,7 +644,7 @@ def gaussianArr2D(shape=(256,256), sigma=[2.,2.], peakVal=None, orig=None, rot=0
         elif len(sigma) == 1:
             sx = sy = 2*(sigma[0]*sigma[0])
         else:
-            raise ValueError, 'sigma must be scaler or [sigmay, sigmax]'
+            raise ValueError('sigma must be scaler or [sigmay, sigmax]')
     except TypeError: # sigma scaler
         sx = sy = 2*(sigma*sigma)
 
@@ -690,6 +700,49 @@ def findMaxWithGFit(img, sigma=0.5, win=11):
         sigma = ret[2+ndim:2+ndim*2]
         return [v,zyx,sigma]
 
+def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, win=11, mask_npxls=3):
+    """
+    find peaks until either
+    1. any pxls becomes below thre
+    2. the same peak was found as the maximum
+
+    mask_npxls: number of pixels to mask when Gaussian fitting failed
+
+    return poslist
+    """
+    img = img.copy()
+    imgFit.fitFailedClear()
+    ndim = img.ndim
+    sigma_peak = imgFit._scalerToSeq(sigma_peak, ndim)
+
+    poses = []
+    vzyx = U.findMax(img)
+    while vzyx[0] > thre:
+        prev = vzyx
+        try:
+            ret, check = imgFit.fitGaussianND(img, vzyx[-ndim:], sigma_peak, win)
+        except IndexError: # too close to the edge
+            imgFit.fitFailedAppend("at %s" % str(vzyx[-ndim:]))
+            mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
+            poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [list(sigma_peak)])
+
+        if check == 5:
+            imgFit.fitFailedAppend("at %s, %s, check=%i" % (str(vzyx[-ndim:]), str(ret), check))
+            mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
+            poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [sigma_peak])
+        else:
+            v = ret[1]
+            zyx = ret[2:2+ndim]
+            sigma = ret[2+ndim:2+ndim*2]
+            mask_gaussianND(img, zyx, v, sigma)
+            poses.append([v,zyx,sigma])
+
+        vzyx = U.findMax(img)
+        if N.all(vzyx == prev):
+            break
+        
+    return poses#, img
+    
 def centerOfMass(img, yx, window=5):
     """
     find peak by center of mass in a 2D image
@@ -724,7 +777,7 @@ def centerOfMass(img, yx, window=5):
 
 def mask_value(arr, zyx, r=2.5, value=0):
     ''' Edit the pixels around zyx to be zero '''
-    import imgGeo
+    from . import imgGeo
     sls = imgGeo.nearbyRegion(arr.shape, zyx, 2*N.asarray(r)+1)
     arr[sls] = value
 
@@ -734,13 +787,13 @@ def mask_gaussianND(arr, zyx, v, sigma=2., ret=None, rot=0, clipZero=True):
     subtract elliptical gaussian at y,x with peakVal v
     if ret, return arr, else, arr itself is edited
     '''
-    import imgGeo
+    from . import imgGeo
     zyx = N.asarray(zyx)
     ndim = arr.ndim
     shape = N.array(arr.shape)
     try:
         if len(sigma) != ndim:
-            raise ValueError, 'len(sigma) must be the same as len(shape)'
+            raise ValueError('len(sigma) must be the same as len(shape)')
         else:
             sigma = N.asarray(sigma)
     except TypeError:#(TypeError, ValueError):
@@ -780,7 +833,7 @@ def maskEdgeWithValue2D(arr, val=None):
 def mode(arr):
     arr1D = arr.ravel()
     y, x = N.histogram(arr1D, len(arr1D))
-    yx = zip(y,x)
+    yx = list(zip(y,x))
     return max(yx)[1]
 
 
@@ -797,7 +850,7 @@ def radialaverage(data, center=None, useMaxShape=False):
     if center is None:
         center = N.array(data.shape) // 2
     if len(center) != data.ndim:
-        raise ValueError, 'dimension of center (%i) does not match the dimension of data (%i)' % (len(center), data.ndim)
+        raise ValueError('dimension of center (%i) does not match the dimension of data (%i)' % (len(center), data.ndim))
 
     zyx = N.indices((data.shape))
     r = N.zeros(data.shape, N.float32)
@@ -862,7 +915,7 @@ def shiftFullFFT(arr, delta=None):
     elif not hasattr(delta, '__len__'):
         delta = (delta,)*len(shape)
     elif len(shape) != len(delta):
-        raise ValueError, "shape and delta not same dimension"
+        raise ValueError("shape and delta not same dimension")
 
     return F.ifft(F.fourierShiftArr(shape, delta) * F.fft(arr))
 
@@ -893,23 +946,24 @@ def polar2cart2D(r, theta, center):
     x = r  * np.cos(theta) + center[1]
     return y, x# x, y
 
-def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360):
+def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360, return_idx=False):
     """
     img: array
     center: coordinate y, x
     final_radius: ending radius
     initial_radius: starting radius
     phase_width: npixles / circle
+    return_idx: return transformation coordinates (y,x)
     """
     if img.ndim > 2 or len(center) > 2:
-        raise ValueError, 'this function only support 2D, you entered %i-dim array and %i-dim center coordinate' % (img.ndim, len(center))
+        raise ValueError('this function only support 2D, you entered %i-dim array and %i-dim center coordinate' % (img.ndim, len(center)))
     
     if initial_radius is None:
         initial_radius = 0
 
     if final_radius is None:
         rad0 = N.ceil(N.array(img.shape) - center)
-        final_radius = min((min(rad0), min(N.ceil(center))))
+        final_radius = min((int(min(rad0)), int(min(N.ceil(center)))))
 
     if phase_width is None:
         phase_width = N.sum(img.shape[-2:]) * 2
@@ -929,5 +983,8 @@ def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_wid
     polar_img = img[Ycart,Xcart]
     polar_img = np.reshape(polar_img,(final_radius-initial_radius,phase_width))
 
-    return polar_img
+    if return_idx:
+        return polar_img, Ycart, Xcart
+    else:
+        return polar_img
 

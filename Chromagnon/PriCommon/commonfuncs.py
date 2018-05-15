@@ -26,8 +26,11 @@ def readConfig():
         #with open(fn) as h:
         h = open(fn)
         for line in h:
+            if not line.strip():
+                continue
             key, val = line.split('=')
             val = val.replace(os.linesep, '')
+            val = val.replace('\n', '') # windows does not keep os.linesep \r\n but changes to \n
             if val in ('True', 'False'):
                 val = eval(val)
             kwds[key] = val
@@ -45,7 +48,10 @@ def saveConfig(**newkwds):
     fn = getConfigPath(newkwds.pop('confpath', CONFPATH))
     kwds = readConfig()
     kwds.update(newkwds)
-    h = open(fn, 'w')
-    for key, val in kwds.iteritems():
+    if sys.version_info.major == 3:
+        h = open(fn, 'w', newline='')
+    else:
+        h = open(fn, 'w')
+    for key, val in kwds.items():
         h.write('%s=%s%s' % (key, val, os.linesep))
     h.close()

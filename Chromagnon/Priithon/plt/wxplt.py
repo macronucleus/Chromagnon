@@ -3,8 +3,8 @@ import string
 from numpy import *
 import time
 
-from plot_utility import *
-from plot_objects import *
+from .plot_utility import *
+from .plot_objects import *
 
 def loop():
     global bub
@@ -70,10 +70,13 @@ class plot_canvas(wx.Window,property_object):
     def __init__(self, parent, id = -1, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, **attr):
         wx.Window.__init__(self, parent, id, pos,size)
-        wx.EVT_PAINT(self,self.on_paint)
+        self.Bind(wx.EVT_PAINT, self.on_paint)
 
         property_object.__init__(self, attr)
-        background = wx.NamedColour(self.background_color)
+        if wx.version().startswith('3'):
+            background = wx.NamedColour(self.background_color)
+        else:
+            background = wx.Colour(self.background_color)
         self.backgroundBrush = wx.Brush(background)
 
         self.SetBackgroundColour(background) 
@@ -109,12 +112,11 @@ class plot_canvas(wx.Window,property_object):
         self.on_zoom_forget()
 
         # mouse events
-        wx.EVT_RIGHT_DOWN(self,self.on_right_down)
-        wx.EVT_LEFT_DOWN(self, self.on_mouse_event)
-        wx.EVT_LEFT_UP(self, self.on_mouse_event)
-        wx.EVT_MOTION(self, self.on_mouse_event)
-        wx.EVT_MOTION(self, self.on_mouse_event)
-        wx.EVT_SIZE(self, self.update)
+        self.Bind(wx.EVT_RIGHT_DOWN, self.on_right_down)
+        self.Bind(wx.EVT_LEFT_DOWN, self.on_mouse_event)
+        self.Bind(wx.EVT_LEFT_UP, self.on_mouse_event)
+        self.Bind(wx.EVT_MOTION, self.on_mouse_event)
+        self.Bind(wx.EVT_SIZE, self.update)
 
     # event handler
 
@@ -224,16 +226,19 @@ class plot_canvas(wx.Window,property_object):
         menu.Append(502, 'X-Y any aspect ratio', 'X-Y equal - set aspect ratio to "normal"')
         menu.Append(503, 'make X-Y axes a tight fit', 'fit X-Y axes to a fraction of the grid spacing"')
         menu.Append(504, 'freeze X-Y axes bounds', 'freeze X-Y axes grid"')
-        wx.EVT_MENU(self, 505, self.on_prev_zoom)
-        wx.EVT_MENU(self, 506, self.on_next_zoom)
-        wx.EVT_MENU(self, 507, self.on_zoom_forget)
-        wx.EVT_MENU(self, 500, self.on_auto_zoom)
-        wx.EVT_MENU(self, 501, self.on_equal_aspect_ratio)
-        wx.EVT_MENU(self, 502, self.on_any_aspect_ratio)
-        wx.EVT_MENU(self, 503, self.on_axis_tight)
-        wx.EVT_MENU(self, 504, self.on_axis_freeze)
+        self.Bind(wx.EVT_MENU, self.on_prev_zoom, id=505)
+        self.Bind(wx.EVT_MENU, self.on_next_zoom, id=506)
+        self.Bind(wx.EVT_MENU, self.on_zoom_forget, id=507)
+        self.Bind(wx.EVT_MENU, self.on_auto_zoom, id=500)
+        self.Bind(wx.EVT_MENU, self.on_equal_aspect_ratio, id=501)
+        self.Bind(wx.EVT_MENU, self.on_any_aspect_ratio, id=502)
+        self.Bind(wx.EVT_MENU, self.on_axis_tight, id=503)
+        self.Bind(wx.EVT_MENU, self.on_axis_freeze, id=504)
         #20090603 (called by default) menu.UpdateUI()
-        self.PopupMenuXY(menu) #20090603 (default mouse cursor pos) ,pos[0],pos[1])        
+        if wx.version().startswith('3'):
+            self.PopupMenuXY(menu) #20090603 (default mouse cursor pos) ,pos[0],pos[1])
+        else:
+            self.PopupMenu(menu)
     # workers
     
     def rubberband(self, new):
@@ -278,8 +283,12 @@ class plot_canvas(wx.Window,property_object):
         #   self.SetBackgroundColour(background) 
            #self.Clear()
         #   print 'refreshing'  
-        if not dc: dc = wx.ClientDC(self)            
-        self.client_size = self.GetClientSizeTuple()#seb An array doesn't make sense as a truth value: array(self.GetClientSizeTuple())
+        if not dc:
+            dc = wx.ClientDC(self)
+        if wx.version().startswith('3'):
+            self.client_size = self.GetClientSizeTuple()#seb An array doesn't make sense as a truth value: array(self.GetClientSizeTuple())
+        else:
+            self.client_size = self.GetClientSize()
         # set the device context for all titles so they can
         # calculate their size
         for text_obj in self.all_titles:
@@ -423,7 +432,10 @@ class plot_canvas(wx.Window,property_object):
         return pts * scale + zero_offset + graph_offset
                    
     def reset_size(self, dc = None):
-        new_size = self.GetClientSizeTuple()
+        if wx.version().startswith('3'):
+            new_size = self.GetClientSizeTuple()
+        else:
+            new_size = self.GetClientSize()
         if new_size != self.client_size:
             self.layout_all(dc)
             self.client_size = new_size
@@ -669,7 +681,7 @@ class plot_window(plot_canvas):
         for group in groups:
             lines.extend(scipy.plt.lines_from_group(group))
         # check for hold here
-        for name in plot_objects.poly_marker._attributes.keys():
+        for name in list(plot_objects.poly_marker._attributes.keys()):
             value = keywds.get(name)
             if value is not None:
                 for k in range(len(lines)):
@@ -750,23 +762,23 @@ class plot_frame(wx.Frame):
         self.mainmenu = wx.MenuBar()
         menu = wx.Menu()
         menu.Append(200, '&Save As...', 'Save plot to image file')
-        wx.EVT_MENU(self, 200, self.file_save_as)
+        self.Bind(wx.EVT_MENU, self.file_save_as, id=200)
         menu.Append(201, '&Save As CSV ...', 'Save plot to CSV text file')
-        wx.EVT_MENU(self, 201, self.file_save_csv)
+        self.Bind(wx.EVT_MENU, self.file_save_csv, id=201)
         menu.Append(203, '&Print...', 'Print the current plot')
-        wx.EVT_MENU(self, 203, self.file_print)
+        self.Bind(wx.EVT_MENU, self.file_print, id=203)
         menu.Append(204, 'Print Pre&view', 'Preview the current plot')
-        wx.EVT_MENU(self, 204, self.file_preview)
+        self.Bind(wx.EVT_MENU, self.file_preview, id=204)
         menu.Append(205, 'Close', 'Close plot')
-        wx.EVT_MENU(self, 205, self.file_close)
+        self.Bind(wx.EVT_MENU, self.file_close, id=205)
         self.mainmenu.Append(menu, '&File')
         menu = wx.Menu()
         menu.Append(self.TITLE_TEXT, '&Graph Title', 'Title for plot')
-        wx.EVT_MENU(self,self.TITLE_TEXT,self.title)
+        self.Bind(wx.EVT_MENU, self.title, id=self.TITLE_TEXT)
         menu.Append(self.X_TEXT, '&X Title', 'Title for X axis')
-        wx.EVT_MENU(self,self.X_TEXT,self.title)
+        self.Bind(wx.EVT_MENU, self.title, id=self.X_TEXT)
         menu.Append(self.Y_TEXT, '&Y Title', 'Title for Y axis')
-        wx.EVT_MENU(self,self.Y_TEXT,self.title)
+        self.Bind(wx.EVT_MENU, self.title, id=self.Y_TEXT)
         self.mainmenu.Append(menu, '&Titles')
         #menu = wx.Menu()        
         #menu.Append(300, '&Profile', 'Check the hot spots in the program')
@@ -833,8 +845,8 @@ class plot_frame(wx.Frame):
         if not self.preview.Ok():
             #self.log.WriteText("Print Preview failed." \
             #                   "Check that default printer is configured\n")
-            print "Print Preview failed." \
-                  "Check that default printer is configured\n"
+            print("Print Preview failed." \
+                  "Check that default printer is configured\n")
             return
         frame = wx.PreviewFrame(self.preview, self, "Preview")
         frame.Initialize()
@@ -856,13 +868,13 @@ class plot_frame(wx.Frame):
             dummy, ftype = os.path.splitext(f)
             # strip .
             ftype = ftype[1:]
-            if ftype in image_type_map.keys():
+            if ftype in list(image_type_map.keys()):
                 self.client.save(dlg.GetPath(),ftype)
             else:
                 msg = "Extension is currently used to determine file type." \
                       "'%s' is not a valid extension."  \
                       "You may use one of the following extensions. %s" \
-                          % (ftype,image_type_map.keys())   
+                          % (ftype,list(image_type_map.keys()))   
                 d = wx.MessageDialog(self,msg,style=wx.OK)
                 d.ShowModal()
                 d.Destroy()
@@ -886,7 +898,7 @@ class plot_frame(wx.Frame):
                 ps = asanyarray( ps )
                 for x_y in ps.T:
                     for el in x_y:
-                        f.write(`el` + csv_sep)
+                        f.write(repr(el) + csv_sep)
                     f.write('\n')
             f.close()
         dlg.Destroy()
@@ -962,13 +974,13 @@ class plot_frame(wx.Frame):
 # global functions
 
 def lena_obj():
-    import cPickle
+    import pickle
     import wxplt, os
     d,junk = os.path.split(os.path.abspath(wxplt.__file__))
     fname = os.path.join(d,'lena.dat')
     f = open(fname,'rb')
-    import cPickle
-    lena = array(cPickle.load(f))
+    import pickle
+    lena = array(pickle.load(f))
     f.close()
     #x_bounds = array((0.,1))
     #y_bounds = array((0.,1))
@@ -976,13 +988,13 @@ def lena_obj():
     return image_object(lena,colormap='grey')
 
 def lena():
-    import cPickle
+    import pickle
     import wxplt, os
     d,junk = os.path.split(os.path.abspath(wxplt.__file__))
     fname = os.path.join(d,'lena.dat')
     f = open(fname,'rb')
-    import cPickle
-    lena = array(cPickle.load(f))
+    import pickle
+    lena = array(pickle.load(f))
     f.close()
     return lena
 
@@ -1016,14 +1028,14 @@ def test_axis():
     a.calculate_ticks(bounds)
     dummy_dc = 0
     a.layout(graph_area,dummy_dc)
-    print a.tick_points
+    print(a.tick_points)
     
     bounds = (0.,1.)
     a.calculate_ticks(bounds)
     a.layout(graph_area,dummy_dc)
-    print a.tick_points
-    print a.tick_start
-    print a.tick_stop
+    print(a.tick_points)
+    print(a.tick_start)
+    print(a.tick_stop)
 
 
 

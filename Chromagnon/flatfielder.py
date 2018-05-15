@@ -7,18 +7,28 @@
 ##################################################################################
 
 import sys, os
-
+import six
 import wx
-from PriCommon import guiFuncs as G, commonfuncs as C, flatConv, listbox, bioformatsIO
-from PriCommon.ndviewer import main as aui
+
+try:
+    from PriCommon import guiFuncs as G, commonfuncs as C, flatConv, listbox
+    from ndviewer import main as aui
+    import imgio
+except ImportError:
+    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, flatConv, listbox
+    from Chromagnon.ndviewer import main as aui
+    from Chromagnon import imgio
+
 try:
     from . import chromformat, aligner, chromeditor, threads
 except ValueError:
+    from Chromagnon import chromformat, aligner, chromeditor, threads
+except ImportError:
     import chromformat, aligner, chromeditor, threads
 
 #----------- Global constants
 
-LISTSIZE_X=sum([val for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')])
+LISTSIZE_X=sum([val for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')])
 FRAMESIZE_X= LISTSIZE_X
 FRAMESIZE_Y=0#110
 
@@ -190,7 +200,7 @@ class BatchPanel(wx.Panel):
         
     def _load_func(self, fn):
         try:
-            h = bioformatsIO.load(fn)
+            h = imgio.Reader(fn)#bioformatsIO.load(fn)
         except ValueError:
             dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
             if dlg.ShowModal() == wx.ID_OK:
@@ -284,7 +294,7 @@ class BatchPanel(wx.Panel):
                 return
             if os.name == 'posix':
                 wildcard = dlg.fnPat
-            if isinstance(fns, basestring):
+            if isinstance(fns, six.string_types):
                 fns = [fns]
 
             ll.addFiles(fns)
@@ -385,7 +395,7 @@ class BatchPanel(wx.Panel):
                 self.aui = self.parent.aui
 
         # draw
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
 
             if chromformat.is_chromagnon(target):
                 target_is_image = False
@@ -403,7 +413,7 @@ class BatchPanel(wx.Panel):
             #an.close()
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             name = os.path.basename(target)
         else:
             name = target.file

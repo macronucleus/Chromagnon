@@ -91,5 +91,5 @@ def LUTname(colorTuple):
         idx = COLOR_TABLE.index(colorTuple)
         return COLOR_NAME[idx]
     else:
-        raise ValueError, 'colorTuple %s not found in COLOR_NAME list' % colorTuple
+        raise ValueError('colorTuple %s not found in COLOR_NAME list' % colorTuple)
         

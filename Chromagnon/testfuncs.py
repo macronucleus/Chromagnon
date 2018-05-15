@@ -1,12 +1,17 @@
-from __future__ import with_statement
+from __future__ import print_function
 import numpy as N
-from Priithon.all import P, U, Mrc
 
-from PriCommon import xcorr, imgGeo, mrcIO
 try:
-    from . import aligner, alignfuncs
-except ValueError:
-    import aligner, alignfuncs
+    from Priithon.all import P, U, Mrc
+
+    from PriCommon import xcorr, imgGeo
+    import imgio
+except ImportError:
+    from Chromagnon.Priithon.all import P, U, Mrc
+    from Chromagnon.PriCommon import xcorr, imgGeo
+    from Chromagnon import imgio
+
+from . import aligner, alignfuncs
 
 import os, tempfile
 
@@ -20,7 +25,7 @@ def prepImg4AffineZ(fn, w=None, phaseContrast=True):
     #prefyz = U.project(ref, -1)
     
     if w is None:
-        waves = range(an.img.nw)
+        waves = list(range(an.img.nw))
         waves.remove(an.refwave)
         w = waves[0]
     img = an.img.get3DArr(w=w, t=0)
@@ -39,12 +44,12 @@ def prepImg4AffineZ(fn, w=None, phaseContrast=True):
      
     imgyz = alignfuncs.prep2D(img.T, zs=xs)
 
-    return an.refyz, imgyz
+    #return an.refyz, imgyz
 
     a1234 = alignfuncs.chopImg(an.refyz)
     b1234 = alignfuncs.chopImg(imgyz)
 
-    ab = zip(a1234, b1234)
+    ab = list(zip(a1234, b1234))
 
     yxcs = [xcorr.Xcorr(a, b, phaseContrast=phaseContrast) for a, b in ab]
     yxs = [yx for yx, c in yxcs]
@@ -61,7 +66,7 @@ def prepImg4Affine(fn, w=None, phaseContrast=True):
     prefyx = N.max(ref, axis=0)
     
     if w is None:
-        waves = range(an.img.nw)
+        waves = list(range(an.img.nw))
         waves.remove(an.refwave)
         w = waves[0]
     img = an.img.get3DArr(w=w, t=0)
@@ -90,7 +95,7 @@ def prepImg4Affine(fn, w=None, phaseContrast=True):
     a1234 = alignfuncs.chopImg(imgyx)
     b1234 = alignfuncs.chopImg(an.refyx)
 
-    ab = zip(a1234, b1234)
+    ab = list(zip(a1234, b1234))
 
     yxcs = [xcorr.Xcorr(a, b, phaseContrast=phaseContrast) for a, b in ab]
     yxs = [yx for yx, c in yxcs]
@@ -102,7 +107,7 @@ def getAffineyx(arr, ref):
     a1234 = alignfuncs.chopImg(arr)
     b1234 = alignfuncs.chopImg(ref)
 
-    ab = zip(a1234, b1234)
+    ab = list(zip(a1234, b1234))
     
     yxcs = [xcorr.Xcorr(a, b) for a, b in ab]
     yxs = [yx for yx, c in yxcs]
@@ -164,7 +169,7 @@ def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
             ref = an.img.getArr(w=an.refwave, z=z)
 
     if w is None:
-        waves = range(an.img.nw)
+        waves = list(range(an.img.nw))
         waves.remove(an.refwave)
         w = waves[0]
     if aligned:
@@ -202,10 +207,10 @@ def prepareImgSimple(fn, w=None):
     an.findBestChannel()
     an.setRefImg()
     if w is None:
-        waves = range(an.img.nw)
+        waves = list(range(an.img.nw))
         waves.remove(an.refwave)
         w = waves[0]
-        print 'wave: %i with refwave %i' % (w, an.refwave)
+        print('wave: %i with refwave %i' % (w, an.refwave))
     arr3D = an.get3DArr(w=w)
     arr = alignfuncs.prep2D(arr3D, zs=an.refzs)
 
@@ -213,9 +218,15 @@ def prepareImgSimple(fn, w=None):
         
 
 def testNonlinear(arr, ref, npxls=32, phaseContrast=True, centerDot=True):
+    """
+    fn = '***.dv'
+    chrom = '***.csv'
+    ar, an = prepareImg(fn, chrom=chrom, aligned=True)
+    yxs, abc, qual, yxq = testNonLinear(*ar)
+    """
     try:
         if len(npxls) != len(arr.shape):
-            raise ValueError, 'length of the list of npxls must be the same as len(shape)'
+            raise ValueError('length of the list of npxls must be the same as len(shape)')
     except TypeError:
         npxls = [npxls for d in range(len(arr.shape))]
 
@@ -318,11 +329,11 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
     return dic, zyx
     """
-    from PriCommon import mrcIO, imgFilters, imgFit, imgGeo, microscope
+    from PriCommon import imgFilters, imgFit, imgGeo, microscope
     from Priithon.all import Y
-    h = mrcIO.MrcReader(fn)
+    h = imgio.Reader(fn)#mrcIO.MrcReader(fn)
     if refwave >= h.nw:
-        raise ValueError, 'reference wave does not exists'
+        raise ValueError('reference wave does not exists')
     shape = h.hdr.Num[::-1].copy()
     shape[0] /= (h.hdr.NumTimes * h.hdr.NumWaves)
     pzyx = h.hdr.d[::-1]
@@ -331,7 +342,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
     NA = 1.35
     difflimitYX = microscope.resolution(NA, h.hdr.wave[refwave])/1000.
     difflimit = N.array([difflimitYX*3, difflimitYX, difflimitYX]) / pzyx
-    print 'diffraction limit (px) is:', difflimit
+    print('diffraction limit (px) is:', difflimit)
     simres = difflimit #/ 1.5#2.
 
     arr = h.get3DArr(w=refwave).copy()
@@ -366,14 +377,14 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
             if failed > nbeads:
                 #raise RuntimeError
-                print 'no more beads found...'
+                print('no more beads found...')
                 break
             elif amax == pmax:
                 arr[rmslice] = me
             elif N.any(done[rmslice]):
                 arr[rmslice] = me
                 done[rmslice] = 1
-                print 'Nearby region already examined'
+                print('Nearby region already examined')
                 failed += 1
                 continue
             elif amax > thre:
@@ -383,13 +394,13 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
                 except IndexError: # too close to the edge
                     arr[rmslice] = me
                     done[rmslice] = 1
-                    print 'Index Error, too close to the edge', z,y,x
+                    print('Index Error, too close to the edge', z,y,x)
                     failed += 1
                     continue
                 if check == 5:
                     arr[rmslice] = me
                     done[rmslice] = 1
-                    print 'fit failed', z,y,x
+                    print('fit failed', z,y,x)
                     failed += 1
                     continue
 
@@ -402,7 +413,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
                 # check if the result is inside the image
                 if N.any(zyx < 0) or N.any(zyx > (shape)):
-                    print 'fitting results outside the image', zyx, z,y,x, rmslice
+                    print('fitting results outside the image', zyx, z,y,x, rmslice)
                     arr[rmslice] = me
                     done[rmslice] = 1
                     failed += 1
@@ -428,7 +439,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
                 # remove beads too close to the edge
                 if N.any(zyx < 2) or N.any(zyx > (shape-2)):
-                    print 'too close to the edge', zyx
+                    print('too close to the edge', zyx)
                     if N.any(arr[rmslice] > thre):
                         arr[rmslice] = me
                     done[rmslice] = 1
@@ -437,7 +448,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
                 # remove beads with bad shape
                 elif N.any(sigma < beads_sigma_max/6.) or N.any(sigma > beads_sigma_max):#0.5) or N.any(sigma > 3):
-                    print 'sigma too different from expected', sigma, zyx
+                    print('sigma too different from expected', sigma, zyx)
                     if N.any(arr[rmslice] > thre):
                         arr[rmslice] = me
                     done[rmslice] = 1
@@ -447,7 +458,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
                 
                 elif N.any(arr[rmslice] > amax / 3.):
-                    print 'still too bright', arr[rmslice].max(), amax / 3.
+                    print('still too bright', arr[rmslice].max(), amax / 3.)
                     arr[rmslice] = me
                     done[rmslice] = 1
                     sigma = 1.5
@@ -506,15 +517,15 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
         del arr, done
 
         if not len(zyxs):
-            raise ValueError, 'No beads found for %s' % fn
+            raise ValueError('No beads found for %s' % fn)
 
         sigmas = N.array(sigmas)
         sigmaYX = N.mean(sigmas[:,1:], axis=1)
         sigmaZ = sigmas[:,0]
         idxyx = sigmaYX.argmax()
         idxz = sigmaZ.argmax()
-        print 'sigmaYX', round(sigmaYX.mean(), 3), round(sigmaYX.min(), 3), round(sigmaYX.std(), 3), round(sigmaYX.max(), 3), zyxs[idxyx]
-        print 'sigmaZ', round(sigmaZ.mean(), 3), round(sigmaZ.min(), 3), round(sigmaZ.std(), 3), round(sigmaZ.max(), 3), zyxs[idxz]
+        print('sigmaYX', round(sigmaYX.mean(), 3), round(sigmaYX.min(), 3), round(sigmaYX.std(), 3), round(sigmaYX.max(), 3), zyxs[idxyx])
+        print('sigmaZ', round(sigmaZ.mean(), 3), round(sigmaZ.min(), 3), round(sigmaZ.std(), 3), round(sigmaZ.max(), 3), zyxs[idxz])
 
 
         # remove overlaps
@@ -531,7 +542,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
         zyxs, mst0 = zyxs
         zyxs = N.asarray(zyxs)
     
-    waves = range(h.nw)
+    waves = list(range(h.nw))
     #waves.remove(refwave)
 
     difdic = {}
@@ -544,7 +555,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
     #mst = mst0 - mst1
     #mst[1:] = 0
     mst = mst1 - mst0
-    print 'mst diff', mst
+    print('mst diff', mst)
     
     for w in waves:
         if w == refwave:
@@ -587,7 +598,7 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
                 #    raise ValueError
                 #raise RuntimeError
                 removes.append(key)
-                if difdic.has_key(key):
+                if key in difdic:
                     del difdic[key]
                 #elif not N.sum(dif) or N.any(dif > 10):
                 #raise RuntimeError, 'something is wrong'
@@ -601,14 +612,14 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
     del arr
     del h
 
-    print 'check:', checks, 'zeros:', zeros, 'toofars', toofars
+    print('check:', checks, 'zeros:', zeros, 'toofars', toofars)
 
     if not len(difdic):
-        raise ValueError, 'No beads found!!'
+        raise ValueError('No beads found!!')
     
     # subtracting the center
     newdic = {}
-    keys = difdic.keys()
+    keys = list(difdic.keys())
     newkeys = N.array(keys)
     zmin = N.min(newkeys[:,0])
     center = (shape * pzyx) / 2.
@@ -618,12 +629,12 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
     newkeys = [tuple(key) for key in newkeys]
 
     items = [difdic[key] for key in keys]
-    newdic = dict(zip(newkeys, items))
+    newdic = dict(list(zip(newkeys, items)))
     difdic = newdic
 
     # plot
     P.figure(0, figsize=(8,8))
-    keys = N.array(difdic.keys())
+    keys = N.array(list(difdic.keys()))
     P.hold(0)
     P.scatter(keys[:,2], keys[:,1], alpha=0.5)
     P.xlabel('X (nm)')
@@ -639,12 +650,12 @@ def beads_summarize_dics(dics, waves=None):
     return a combined dictionary
     """
     if waves is None:
-        keys = dics[0].keys()
-        waves = xrange(len(dics[0][keys[0]]))
+        keys = list(dics[0].keys())
+        waves = range(len(dics[0][keys[0]]))
         
     rdic = {}
     for dic in dics:
-        for pos, wpos in dic.iteritems():
+        for pos, wpos in dic.items():
             for w in waves:
                 rdic.setdefault(pos, []).append(wpos[w])
     return rdic
@@ -659,7 +670,7 @@ def beads_plotdic(dic, out=None, overwrite=False, colors = ['b', 'orange'], dept
     # ['#005900', '#ff7400']
     #'b', 'r', 'y']#(0,255,0), (0,0,255), (255,255,0), (255,255,255)]
 
-    keys = dic.keys()
+    keys = list(dic.keys())
 
     # measure depth
     zzs = N.array([zyx[0] for zyx in keys])
@@ -674,11 +685,11 @@ def beads_plotdic(dic, out=None, overwrite=False, colors = ['b', 'orange'], dept
             if len(depth) == 2:
                 keys = [key for key in keys if key[0] > depth[0] and key[0] < depth[1]]
             else:
-                raise ValueError, 'depth should be (min, max) or just max'
+                raise ValueError('depth should be (min, max) or just max')
         except TypeError:
             keys = [key for key in keys if key[0] < depth]
             
-        print 'number of beads', len(keys)
+        print('number of beads', len(keys))
         
     # constants and arrays to store data
     ns = len(keys)            # samples
@@ -780,18 +791,18 @@ def beads_plotdic(dic, out=None, overwrite=False, colors = ['b', 'orange'], dept
     sds = [d.std() for d in diffs]
     sd2d = [d.std() for d in diffs2d]
 
-    zes = [error[w,:,0].mean() for w in xrange(nw)]
-    yes = [error[w,:,1].mean() for w in xrange(nw)]
-    xes = [error[w,:,2].mean() for w in xrange(nw)]
+    zes = [error[w,:,0].mean() for w in range(nw)]
+    yes = [error[w,:,1].mean() for w in range(nw)]
+    xes = [error[w,:,2].mean() for w in range(nw)]
 
-    zss = [error[w,:,0].std() for w in xrange(nw)]
-    yss = [error[w,:,1].std() for w in xrange(nw)]
-    xss = [error[w,:,2].std() for w in xrange(nw)]
+    zss = [error[w,:,0].std() for w in range(nw)]
+    yss = [error[w,:,1].std() for w in range(nw)]
+    xss = [error[w,:,2].std() for w in range(nw)]
 
     # file output
     if out:
         if not overwrite and os.path.isfile(out):
-            yn = raw_input('overwrite? %s (y/n)' % os.path.basename(out))
+            yn = input('overwrite? %s (y/n)' % os.path.basename(out))
             if yn.startswith('n'):
                 return
         import csv
@@ -800,15 +811,15 @@ def beads_plotdic(dic, out=None, overwrite=False, colors = ['b', 'orange'], dept
 
             cw.writerow(['# wavelength', 'n', len(dic), 'zthick', round(zgap, 3)])# + ['']*(nd-1))
             cw.writerow(['#mean', 'z', 'y', 'x', 'zyx', 'yx'])
-            for w in xrange(nw):
-                cw.writerow([w]+[round(error[w,:,d].mean(), 1) for d in xrange(nd)] + [round(mes[w], 3), round(me2d[w], 3)])
+            for w in range(nw):
+                cw.writerow([w]+[round(error[w,:,d].mean(), 1) for d in range(nd)] + [round(mes[w], 3), round(me2d[w], 3)])
                 
             cw.writerow(['#std']+[]*(nd+2))
-            for w in xrange(nw):
-                cw.writerow([w]+[round(error[w,:,d].std(), 1) for d in xrange(nd)] + [round(sds[w], 3), round(sd2d[w], 3)])
+            for w in range(nw):
+                cw.writerow([w]+[round(error[w,:,d].std(), 1) for d in range(nd)] + [round(sds[w], 3), round(sd2d[w], 3)])
 
             cw.writerow(['#pearson']+[]*(nd+2))
-            for w in xrange(nw):
+            for w in range(nw):
                 cw.writerow([w]+list(pears[w]))
 
             cw.writerow(['#raw data'] + []*(nd+2))
@@ -830,8 +841,7 @@ def beads_view_mark(vid, zyxs, edge=30, color=(1,0,0), mstdif=[0,0,0]):
     return ids
 
 def beads_pearson(fns, chroms=None, refwave=None):
-    from PriCommon import mrcIO
-    import alignfuncs as af
+    from . import alignfuncs as af
 
     if refwave is None:
         refwave0 = 0
@@ -842,15 +852,15 @@ def beads_pearson(fns, chroms=None, refwave=None):
     for i, fn in enumerate(fns):
         if chroms:
             chrom = chroms[i]
-            h = mrcIO.MrcReader(chrom)
+            h = imgio.Reader(chrom)#mrcIO.MrcReader(chrom)
             if refwave is not None and h.hdr.n1 != refwave:
                 h.close()
                 continue
             h.close()
 
         ps.append([])
-        h = mrcIO.MrcReader(fn)
-        waves = xrange(h.hdr.NumWaves)
+        h = imgio.Reader(fn) #mrcIO.MrcReader(fn)
+        waves = range(h.hdr.NumWaves)
         a = h.get3DArr(w=refwave0)
 
         for w in waves:
@@ -881,12 +891,12 @@ def beads_zyx4decon(zyx):
 
 ### 8-well comparison
 
-def beads_well_process(zyxs, prefix='Well%02d', suffix='_?LOCAL', welllist=range(1,9), maxdist=200, edge=60):
+def beads_well_process(zyxs, prefix='Well%02d', suffix='_?LOCAL', welllist=list(range(1,9)), maxdist=200, edge=60):
     import glob
     fns = [sorted(glob.glob(prefix % i + '*' + suffix+'.dv')) for i in welllist]
     #print fns
     if 0:#len(fns[0]) != len(welllist):
-        raise RuntimeError, 'files not found %s' % (prefix % i + '*' + suffix+'.dv')
+        raise RuntimeError('files not found %s' % (prefix % i + '*' + suffix+'.dv'))
     name_pre = suffix[-5:]+'%02d'
     x = [beads_Do2(fns[i], zyxs[i], maxdist, edge, name_pre % j + '_image%02d.csv') for i, j in enumerate(welllist)]#, fnlist in #enumerate(fns)]
 
@@ -915,11 +925,11 @@ def csv_summarize(csvs):
         for i, fn in enumerate(csvs):
             with open(fn) as h:
                 r = csv.reader(h)
-                title = r.next()
+                title = next(r)
                 ntitle, nstr = title[1:3]
                 titles = r.next()[1:]
                 res = r.next()[1:]
-                r.next() # std
+                next(r) # std
                 stds = r.next()[1:]
 
             if i == 0:
@@ -940,7 +950,7 @@ def compare_pearson(fns, mergin=2):
     
     return list of pearson correlation
     """
-    hs = [mrcIO.MrcReader(fn) for fn in fns]
+    hs = [imgio.Reader(fn) for fn in fns]#mrcIO.MrcReader(fn) for fn in fns]
     shapes = N.array([(h.nz,)+h.shape for h in hs])
     starts0 = N.array([h.hdr.mst[::-1] for h in hs])
     stops0 = starts0 + shapes
@@ -959,7 +969,7 @@ def compare_pearson(fns, mergin=2):
         slcs.append(slc)
 
     if N.sum(hs[0].get3DArr(w=0)[slcs[0]] - hs[1].get3DArr(w=0)[slcs[1]]):
-        raise ValueError, 'probably slicing is wrong with %s and %s' % (fns[0], fns[1])
+        raise ValueError('probably slicing is wrong with %s and %s' % (fns[0], fns[1]))
 
     ps = []
     for i, h in enumerate(hs):
@@ -985,11 +995,11 @@ def chrom_stats(fns, nw=3):
         rpos = N.array((0,data.mid), N.float32) * data.pxlsiz[:2][::-1]
         mpos = N.array((65,data.mid,data.mid), N.float32) * data.pxlsiz[::-1]
 
-        for w in xrange(1, data.nw):
+        for w in range(1, data.nw):
             shift = data.getShift(w=w,t=t,refwave=refwave)
             shift[:3] *= data.pxlsiz[::-1]
             shift[3] = imgGeo.euclideanDist(imgGeo.rotate(rpos, shift[3]), rpos)
-            for j in xrange(3):
+            for j in range(3):
                 shift[4+j] = abs(imgGeo.zoom(mpos[j], shift[4+j]) - mpos[j])
             
             results[i,w-1] = shift
@@ -1064,7 +1074,7 @@ class AlignDataHolder(object):
 
         shift[:3] *= self.pxlsiz[::-1]
         shift[3] = imgGeo.euclideanDist(imgGeo.rotate(rpos, shift[3]), rpos) * N.sign(shift[3])
-        for j in xrange(3):
+        for j in range(3):
             shift[4+j] = imgGeo.zoom(mpos[j], shift[4+j]) - mpos[j]
             
         return shift, N.sqrt(N.sum(N.power(shift, 2)))#N.sum(N.sqrt(N.power(shift, 2)))
@@ -1075,7 +1085,7 @@ def chrom_stat_write(fns, out=None, nw=3, refwave=1):
     if not out and common:
         out = common + '.csv'
     elif not out:
-        raise ValueError, 'please supply the output filename'
+        raise ValueError('please supply the output filename')
 
     with open(out, 'w') as h:
         o = csv.writer(h)
@@ -1163,14 +1173,14 @@ def estimate2D(a2d, ref, center=None, cqthre=alignfuncs.CTHRE/10., max_shift_pxl
     ycm = N.mean([ycms[0], ycms[1], ycm2, ycm3])
     
     cm = N.array((ycm, xcm))
-    print cm
+    print(cm)
 
     # quadrisection cross correlation
-    ab = zip(a1234p, b1234p)
+    ab = list(zip(a1234p, b1234p))
     try:
         yxcs = [xcorr.Xcorr(a, b, phaseContrast=False, searchRad=max_shift_pxl) for a, b in ab]
     except IndexError:
-        return N.array((0,0,0,1,1), N.float32), [0,0], [(i, 0) for i in xrange(4)]
+        return N.array((0,0,0,1,1), N.float32), [0,0], [(i, 0) for i in range(4)]
     except (ValueError, ZeroDivisionError):
         raise AlignError
     yxs = [yx for yx, c in yxcs]
@@ -1298,7 +1308,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
     return [ty,tx,r,my,mx] if_failed is 'terminate' and failed, return None
     """
-    import cutoutAlign
+    from . import cutoutAlign
     
     shape = N.array(a2d.shape)
     center = shape // 2
@@ -1309,7 +1319,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
     else:
-        print 'in iteration, initial geuss is', initguess
+        print('in iteration, initial geuss is', initguess)
         ret[:] = initguess[:]
 
     if if_failed == alignfuncs.IF_FAILED[2]:#force_simplex':
@@ -1371,14 +1381,14 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             ret[3:] *= ll[3:]
             
         elif goodImg == 0:
-            print 'doing simplex'
+            print('doing simplex')
             ll = simplex(b, c, phaseContrast, rough=rough)
             ret[:3] += ll[:3]
             ret[3:] *= ll[3:]
             rough = False
             #if echofunc:
             #echofunc('%i: %s' % (i, ll))#ref))
-        print i, ret
+        print(i, ret)
         errs = alignfuncs.errPxl(ll, center)
         try:
             if len(maxErr) ==2:
@@ -1405,7 +1415,7 @@ def intensitySpectrum(fns, out=None):
         
     for fn in fns:
         h = io.load(fn)
-        mes = [h.get3DArr(w=w).mean() for w in xrange(h.nw)]
+        mes = [h.get3DArr(w=w).mean() for w in range(h.nw)]
         ma = max(mes)
         nme = [me / ma for me in mes]
         [waves.add(round(w)) for w in h.wave]
@@ -1427,7 +1437,7 @@ def intensitySpectrum(fns, out=None):
     return out
 
 def sumSpec(fns, out=None):
-    from PriCommon import bioformatsIO as io, mrcIO
+    #from PriCommon import bioformatsIO as io, mrcIO
     
     if not out:
         out = os.path.commonprefix(fns) + '_maxAU_waveSum.dv'
@@ -1435,7 +1445,7 @@ def sumSpec(fns, out=None):
     waves = [488,561,640]
         
     for i, fn in enumerate(fns):
-        h = io.load(fn)
+        h = imgio.Reader(fn) #io.load(fn)
         if not i:
             hdr = makeHdrFromRdr(h)
             hdr.NumWaves = len(fns)
@@ -1443,10 +1453,11 @@ def sumSpec(fns, out=None):
             hdr.Num[-1] /= h.nw
             hdr.Num[-1] *= hdr.NumWaves
 
-            wtr = mrcIO.MrcWriter(out, hdr)
+            wtr = imgio.Writer(out, hdr=hdr)#mrcIO.MrcWriter(out, hdr)
+            #wtr.setDimFromMrcHdr(hdr)
 
         arr = N.empty((h.nw, h.nz, h.ny, h.nx), N.dtype)
-        for w in xrange(h.nw):
+        for w in range(h.nw):
             arr[w] = h.get3DArr(w=w)
         arr = N.average(arr, axis=0)
         wtr.write3DArr(arr.astype(h.dtype), w=i)
@@ -1475,26 +1486,26 @@ def makeHdrFromRdr(rdr):
         #    else:
         #        hdr.wave[:rdr.nw] = rdr.wave[:rdr.nw]
         hdr.d = rdr.pxlsiz[::-1]
-        if rdr.metadata.has_key('Instrument'):
+        if 'Instrument' in rdr.metadata:
             hdr.LensNum = eval(rdr.metadata['Instrument']['Objective']['ID'].split(':')[1])
 
     return hdr
 
 def convertImg2Mrc(fns):
-    from PriCommon import bioformatsIO as io, mrcIO
+    #from PriCommon import bioformatsIO as io, mrcIO
     outs = []
     for fn in fns:
         base, ext = os.path.splitext(fn)
         out = base + '.dv'
-        h = io.load(fn)
+        h = imgio.Reader(fn) #io.load(fn)
 
-        hdr = mrcIO.makeHdrFromRdr(h)
+        hdr = imgio.mrcIO.makeHdrFromRdr(h)
         hdr.LensNum = 10612
         hdr.wave[2] = 625
-        wtr = mrcIO.MrcWriter(out, hdr)
+        wtr = imgio.Writer(out, hdr=hdr)#mrcIO.MrcWriter(out, hdr)
 
-        for t in xrange(h.nt):
-            for w in xrange(h.nw):
+        for t in range(h.nt):
+            for w in range(h.nw):
                 arr = h.get3DArr(w=w, t=t)
                 wtr.write3DArr(arr, w=w, t=t)
         h.close()
@@ -1504,12 +1515,12 @@ def convertImg2Mrc(fns):
     return outs
 
 ## 8 well ###
-WELL01 = {1: range(2, 9)}
+WELL01 = {1: list(range(2, 9))}
 NEIGHBORS={1: [2, 3], 2: [1, 4], 3: [1, 4, 5], 4: [2, 3, 6], 5: [3, 6, 7], 6: [4, 5, 8], 7: [5, 8], 8: [6, 7]}
 NOCONTACT={1: [5, 6, 7, 8], 2: [5, 6, 7, 8], 3: [7, 8], 4: [7, 8], 5: [1, 2], 6: [1, 2], 7: [1, 2, 3, 4, 5, 6], 8: [1, 2, 3, 4]}
 
 def well_neighbors(fns, outbase='', refwave=0, npxls=(64,1024,1024)):
-    import chromformat
+    from . import chromformat
     if not outbase:
         outbase = os.path.commonprefix(fns)
     
@@ -1545,7 +1556,7 @@ def _well_neighbors(data, pxlsizs, center, wellset, outfn, evalfunc):
         wtr = csv.writer(h)
         wtr.writerow(('well', 'neighbor', 'tz', 'ty', 'tx', 'r', 'mz', 'my', 'mx', 'SUM'))
         
-        for well, neis in wellset.iteritems():
+        for well, neis in wellset.items():
             if len(data) == 7 and well == 7:
                 continue
             elif len(data) == 7 and well == 8:
@@ -1592,3 +1603,286 @@ def evalfunc_neigh(wid, nid):
     if nid >= wid:
         return True
 
+
+### ------- local alignemnt evaluation
+
+def makeWarp(fn):
+    from Priithon.all import F
+    h = aligner.Chromagnon(fn)
+    warp = N.zeros((h.nt, h.nw, 2, h.ny, h.nx), N.float32)
+    warp[0,1,0] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(h.ny/2, h.nx/2))
+    warp[0,1,0] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(h.ny/5, h.nx/5))
+    warp[0,1,0] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(h.ny/5, 4*h.nx/5))
+    #warp[0,1,0] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=-0.5, orig=(4*h.ny/5, 4*h.nx/5))
+    warp[0,1,0] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=-0.5, orig=(4*h.ny/5, h.nx/5))
+
+    warp[0,1,1] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(h.ny/2, h.nx/2))
+    warp[0,1,1] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(h.ny/4, h.nx/4))
+    warp[0,1,1] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=0.5, orig=(3*h.ny/4, h.nx/4))
+    #warp[0,1,1] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=-0.5, orig=(3*h.ny/4, 3*h.nx/4))
+    warp[0,1,1] += F.gaussianArr((h.ny, h.nx), sigma=30, peakVal=-0.5, orig=(h.ny/4, 3*h.nx/4))
+
+    #h.alignParms[0,1] = [0, -3., -2., 0.5, 1., 0.999, 0.998]
+    h.mapyx = warp
+
+    h.saveParm()
+
+    out = fn+'_WARP.dv'
+    h.setRegionCutOut()
+    h.saveAlignedImage(out)
+
+    return out
+    
+def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
+    import csv
+    from . import chromformat
+    from PriCommon import imgFilters
+    # output file
+    if not out:
+        out = fn + '_summary.csv'
+
+    with open(out, 'w') as h:
+        wtr = csv.writer(h)
+        title = ['name', 'noise type', 'noise value', 'window size (pxl)', 'dx (nm)', 'dy (nm)', 'dmx (nm)', 'dmy (nm)', 'dr (nm)', 'total (nm)', 'nregions', 'me (nm)', 'ma (nm)', 'sd (nm)', 'pearson']
+        wtr.writerow(title)
+
+        # constants
+        warpst = '_WARP.dv'
+        suffix = '.chromagnon.tif'
+
+        noise_steps = [''] + ['%04d' % noise for noise in range(div_step, div_max+div_step, div_step)]
+
+        init = False
+
+        # reference
+        ansfn = fn + suffix
+
+        #varianceMap = """
+        if use_varianceMap:
+            #npxl= 30
+            ar, an = prepareImg(fn, chrom=ansfn, aligned=True)
+            arr, ref = ar
+            variance = alignfuncs.getVar(arr, ref)
+            threshold = variance * 0.1 #threfact=0.1
+
+        # 
+        noise0 = fn + '_WARP.dv' + suffix
+        wins = [30 * 2**i for i in range(3)]
+
+        for npxls in wins:
+            if use_varianceMap:
+                yx, regions, cs = alignfuncs.xcorNonLinear(arr, ref, npxls=npxls, threshold=threshold)
+                #region = regions[1] > threshold
+                factor = an.img.nx / regions[1].shape[-1]
+                region = imgFilters.zoomFourier(regions[1], factor, use_abs=True)
+                from Priithon.all import Mrc
+                Mrc.save((region > (threshold * 2.5)).astype(N.uint16), 'region%s_win%i.mrc' % (fn[-1], npxls), ifExists='overwrite')
+                continue
+                ind = N.nonzero(region > threshold)
+                ans = chromformat.ChromagnonReader(ansfn, an.img, an)
+                #ansarr = (region * ans.readMap3D(t=0, w=1) * -1)[0]
+
+            else:#all_region = """
+                ind = None
+                ans = chromformat.ChromagnonReader(ansfn)
+            ansarr = (ans.readMap3D(t=0, w=1) * -1)[0]#"""
+
+            truth = ans.alignParms[0,1]
+            truth[:4] *= -1
+            truth[4:] = 1/truth[4:]
+        
+            for noise in noise_steps:
+                if not noise: # noise 0
+                    nfn = fn + warpst
+                    chm = align2D(nfn, npxls)
+                    names = [fn[-1], '', 0, npxls]
+                    
+                    writeWarpSingle(ansarr, chm, wtr, truth, names=names, ind=ind)
+                else:
+                    for noiseModel in ['Gaussian', 'Poisson']:
+                        nfn = fn + warpst + noiseModel + noise
+                        chm = align2D(nfn, npxls)
+                        names = [fn[-1], noiseModel, noise, npxls]
+
+                        writeWarpSingle(ansarr, chm, wtr, truth, names=names, ind=ind)
+    h.close()
+    return out
+
+                    
+def writeWarpSingle(ansarr, chm, wtr, truth, names, ind=None):
+    # global
+    imgSize = N.array((0,chm.img.nx/2), N.float32)
+    pxlsiz = chm.pxlsiz[-2:]
+    diff = N.abs(truth - chm.alignParms[0,1])
+    dy,dx = diff[1:2] * (pxlsiz * 1000)
+    dr = (imgGeo.euclideanDist(imgGeo.rotate(imgSize, N.radians(diff[3])), imgSize))*(N.mean(pxlsiz)*1000)
+    dmy = diff[-2] * imgSize[1] * pxlsiz[-2] * 1000
+    dmx = diff[-1] * imgSize[1] * pxlsiz[-1] * 1000
+
+    total = N.sqrt(dy**2 + dx**2 + dr**2 + dmy**2 + dmx**2)
+
+    # local
+    arr = chm.mapyx[0,1]#readMap3D(t=0, w=1)
+    ansarr = alignfuncs.resizeLocal2D(ansarr, arr.shape[-2:])
+    #print('shape', arr.shape, ansarr.shape)
+    dif = N.abs(ansarr - arr)
+    dif[0] *= pxlsiz[0] * 1000
+    dif[1] *= pxlsiz[1] * 1000
+    if ind is not None:
+        #print('before', dif.shape, dif.mean())
+        dif = dif[:,ind[0],ind[1]]
+        #print('size', dif.shape, len(ind[0]))
+        #print(dif.shape, dif.mean())
+        #raise
+    #return arr, ansarr
+    
+    me = dif.mean()
+    ma = dif.max()
+    sd = dif.std()
+    pc = calcPearsonSimple(ansarr, arr)
+    
+    wtr.writerow(names + [dx,dy,dmx,dmy,dr,total,len(ind[0]),me,ma,sd, pc])
+    
+def align2D(fn, npxls, t=0):
+    
+    def _echo(msg, skip_notify=False):
+        pass
+    
+    an = aligner.Chromagnon(fn)
+    an.setMaxError(0.0000001)
+
+    an.findBestChannel()
+    an.setEchofunc(_echo)
+
+    an.setRefImg()
+
+    for w in range(an.img.nw):
+        if (w == an.refwave):
+            continue
+
+        if an.img.nz > 1:
+            img = an.img.get3DArr(w=w, t=t)
+
+            zs = N.round_(N.array(an.refzs)).astype(N.int)
+
+            if zs.max() >= an.img.nz:
+                zsbool = (zs < an.img.nz)
+                zsinds = N.nonzero(zsbool)[0]
+                zs = zs[zsinds]
+
+            imgyx = alignfuncs.prep2D(img, zs=zs)
+            del img
+
+        else:
+            imgyx = an.img.getArr(w=w, t=t, z=0)
+
+        initguess = N.zeros((5,), N.float32)
+        initguess[3:] = 1
+
+        old="""
+        parm, check = alignfuncs.iteration(imgyx, an.refyx, maxErr=an.maxErrYX, niter=an.niter, phaseContrast=an.phaseContrast, initguess=initguess, echofunc=an.echofunc, max_shift_pxl=an.max_shift_pxl)
+
+        ty,tx,r,my,mx = parm
+
+        an.alignParms[0,w,1] = ty
+        an.alignParms[0,w,2] = tx
+        an.alignParms[0,w,3] = r
+        an.alignParms[0,w,5] = my
+        an.alignParms[0,w,6] = mx"""
+        
+        #self.setRegionCutOut()
+        
+        #yx, c = xcorr.Xcorr(, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+
+        an.findNonLinear2D(npxls=npxls)
+
+        #an.saveParm()
+
+    return an
+
+def calcPearsonSimple(a0, a1):
+    a0 = a0.ravel()
+    a1 = a1.ravel()
+
+    i0 = N.nonzero(a0)[0]
+
+    b0 = a0[i0]
+    b1 = a1[i0]
+
+    a0div = b0 - N.average(b0)
+    a1div = b1 - N.average(b1)
+
+    r0 = N.sum(a0div * a1div)
+    r1 = (N.sum(a0div**2) * N.sum(a1div**2)) ** 0.5
+    #print('r0, r1', r0, r1)
+    if r1:
+        return r0 / r1
+    else:
+        return 0
+
+def repeatCompWarp(fns, n=6, div_step=20, div_max=200):
+    from . import test_compareReg as reg
+    fnwps = [fn + '_WARP.dv' for fn in fns]
+    for i in range(n):
+        reg.makeFiles(fnwps, std=10, div_step=div_step, div_max=div_max)
+        for fn in fns:
+            out = fn + '_summary_%i.csv' % (i + 1)
+            print(compareWarp(fn, out=out, div_step=div_step, div_max=div_max))
+            
+
+def plotCompWarp(tif, axis=0, minus=False, pxlsizYX=0.08, vmin=-50, vmax=50, colorbar=False):
+    if isinstance(tif, str):
+        h = imgio.Reader(tif)
+        a = h.get3DArr(w=1)[...,::-1,:]
+    else:
+        a = tif[1]
+    if minus:
+        a *= -1
+    a *= pxlsizYX * 1000
+    print('max', N.max(a))
+    print('min', N.min(a))
+    print('mean', N.mean(N.abs(a)))
+
+    fig = P.figure(1)
+    P.hold(0)
+    im = P.imshow(a[axis], vmin=vmin, vmax=vmax)
+    P.hold(1)
+    cont = P.contour(a[axis], colors=['white'])
+    cont.clabel(fmt='%1.1f', fontsize=12)
+    if colorbar:
+        fig.colorbar(im)
+
+def imshow(fn, z=23, mi=6, ma=200):
+
+    
+    P.hold(0)
+    h = imgio.Reader(fn)
+    b = N.zeros((h.ny, h.nx, 3), N.float32)
+
+    # channel 1
+    w = 0
+    a = h.getArr(z=z, w=w)[...,::-1,:]
+    a = normalizeP(a, mi, ma)
+    
+    # cyan
+    b[...,1] += a / 2.
+    b[...,2] += a / 2.
+
+    # channel 2
+    w = 1
+    a = h.getArr(z=z, w=w)[...,::-1,:]
+    a = normalizeP(a, mi, ma)
+    
+    # magenta
+    b[...,0] += a / 2.
+    b[...,2] += a / 2.
+
+    return P.imshow(b)
+    
+def normalizeP(a, mi=6, ma=200):
+    a = a.astype(N.float32)
+    mi = N.min(a)
+    aa = N.where(a < mi, 0, a - mi)
+    aa = N.where(aa > ma-mi, ma-mi, aa)
+
+    return aa / ma

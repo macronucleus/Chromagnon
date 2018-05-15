@@ -1,14 +1,23 @@
-from __future__ import with_statement
-from PriCommon.ndviewer import main as aui
-from PriCommon import guiFuncs as G, mrcIO, commonfuncs as C, microscope
+import os, sys, csv, itertools
+import numpy as N
 import wx, wx.lib.mixins.listctrl as listmix
-import os, sys, csv
-from Priithon import Mrc
+import wx.lib.agw.aui as wxaui # from wxpython4.0, wx.aui does not work well, use this instead
+
+try:
+    from ndviewer import main as aui
+    from PriCommon import guiFuncs as G, commonfuncs as C, microscope
+    from Priithon import Mrc
+except ImportError:
+    from Chromagnon.ndviewer import main as aui
+    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, microscope
+    from Chromagnon.Priithon import Mrc
+    
 try:
     from . import aligner, alignfuncs as af, chromformat
 except ValueError:
+    from Chromagnon import aligner, alignfuncs as af, chromformat
+except ImportError:
     import aligner, alignfuncs as af, chromformat
-import numpy as N
 
 SIZE_COL0=70
 SIZE_COLS=90
@@ -28,10 +37,10 @@ class ChromagnonEditor(aui.ImagePanel):
         #self.parent = parent # overwrite self.parent
         
         self.cpanel = ChromagnonPanel(self, fn)
-        self._mgr.AddPane(self.cpanel, wx.aui.AuiPaneInfo().Name('cpanel').Caption("cpanel").CenterPane().Position(0))
+        self._mgr.AddPane(self.cpanel, wxaui.AuiPaneInfo().Name('cpanel').Caption("cpanel").CenterPane().Position(0))
 
         self.tpanel = TestViewPanel(self)
-        self._mgr.AddPane(self.tpanel, wx.aui.AuiPaneInfo().Name('tpanel').Caption("tpanel").CenterPane().Position(1))
+        self._mgr.AddPane(self.tpanel, wxaui.AuiPaneInfo().Name('tpanel').Caption("tpanel").CenterPane().Position(1))
         
         self._mgr.Update()
 
@@ -74,6 +83,8 @@ class ChromagnonPanel(wx.Panel):
             self.originalFileButton = G.makeButton(self, box, self.onChooseOriginalFile, title='original image file', tip='')
 
             default = os.path.splitext(fn)[0]
+            if default.endswith('chromagnon'):
+                default = os.path.splitext(default)[0]
             if not os.path.isfile(default):
                 default = ''
             label, self.originalFileTxt = G.makeTxtBox(self, box, '', defValue=default, tip='', sizeX=200)
@@ -138,10 +149,8 @@ class ChromagnonPanel(wx.Panel):
         save a '.local' file and opens new image viewer
         """
         import wx, tempfile
-        from PriCommon import imgfileIO
+        import imgio
         from Priithon.all import Y
-        #from Priithon.all import Y
-        #import matplotlib.pyplot as plt
 
         if w is None:
             wave = int(self.wavechoice.GetStringSelection())
@@ -164,12 +173,11 @@ class ChromagnonPanel(wx.Panel):
 
         if originalFn:
             try:
-                img = imgfileIO.load(originalFn)
+                img = imgio.Reader(originalFn)#imgfileIO.load(originalFn)
             except:
                 G.openMsg(self, 'Is this file really a image file?', title='Error')
                 return
             if N.any(N.array(img.shape[-2:]) != N.array(self.clist.mapyx.shape[-2:])):
-                print 
                 G.openMsg(self, 'Please choose original image file BEFORE alignment', title='Error')
                 return
             a = N.zeros(self.clist.mapyx.shape[-3:], img.dtype)
@@ -183,22 +191,18 @@ class ChromagnonPanel(wx.Panel):
                 b = N.max(b, 0)
 
             a[1] = af.applyShift(b, self.clist.alignParms[t,w])
-            
-            hdr = mrcIO.makeHdrFromRdr(img)
+            pz, py, px = img.pxlsiz
         else:
             a = N.zeros(self.clist.mapyx.shape[-3:], N.uint8)
-            hdr = Mrc.makeHdrArray()
-            mrcIO.init_simple(hdr, Mrc.dtype2MrcMode(a.dtype.type), a.shape)
-        hdr.Num[-1]=2
-        hdr.NumWaves = 2
-        hdr.NumTimes = 1
-        hdr.wave[0] = self.clist.wave[self.clist.refwave]
-        hdr.wave[1] = self.clist.wave[w]
+            pz = py = px = 1
 
-        out = os.path.join(tempfile.gettempdir(), 'Chromagnon.local')
+        out = os.path.join(tempfile.gettempdir(), 'Chromagnon.local.tif')
 
-        wtr = mrcIO.MrcWriter(out, hdr)
-        wtr.writeArr(a)
+        wtr = imgio.Writer(out)
+        wtr.setPixelSize(pz=pz, py=py, px=px)
+        wtr.setDim(nx=a.shape[-1], ny=a.shape[-2], nz=1, nt=1, nw=2, dtype=a.dtype.type, wave=[self.clist.wave[self.clist.refwave], self.clist.wave[w]], imgSequence=1)
+        for w, a2d in enumerate(a):
+            wtr.writeArr(a2d, w=w)
         wtr.close()
         
         an = aligner.Chromagnon(out)
@@ -208,20 +212,20 @@ class ChromagnonPanel(wx.Panel):
         wx.Yield()
 
         inds = N.indices(mapyx.shape[-2:], N.float32)
-        slcs1 = [slice(gridStep//2, -gridStep//2, gridStep) for d in xrange(2)]
+        slcs1 = [slice(gridStep//2, -gridStep//2, gridStep) for d in range(2)]
 
         #for w in xrange(self.clist.nw):
         vs = []
-        for d in xrange(2):
+        for d in range(2):
             slcs = [slice(d,d+1)] + slcs1
             vs.append(inds[slcs].ravel())
-        iis = N.array(zip(*vs))
+        iis = N.array(list(zip(*vs)))
 
         vs = []
-        for d in xrange(2):
+        for d in range(2):
             slcs = [slice(t,t+1), slice(w,w+1), slice(d,d+1)] + slcs1
             vs.append(mapyx[slcs].ravel())
-        yxs = N.array(zip(*vs))
+        yxs = N.array(list(zip(*vs)))
 
         wave = self.clist.wave[w]
         #col = microscope.LUT(wave)
@@ -328,7 +332,7 @@ class ChromagnonPanel(wx.Panel):
         with open(out, 'w') as w:
             writer = csv.writer(w)
             writer.writerow(['time','wavelength']+aligner.ZYXRM_ENTRY)
-            for t in xrange(self.clist.nt):
+            for t in range(self.clist.nt):
                 for w, wave in enumerate(self.clist.waves):
                     l = list(self.clist.alignParms[t,w])
                     writer.writerow([t,wave]+l)
@@ -376,8 +380,11 @@ class ChromagnonPanel(wx.Panel):
         if self.clist.nw >= 5:
             G.openMsg(self, 'The maximum wavelength is 5', 'I am sorry for that')
             return 
-        
-        index = self.clist.InsertStringItem(sys.maxint, '0')
+
+        if wx.version().startswith('3'):
+            index = self.InsertStringItem(sys.maxsize, '0')
+        else:
+            index = self.clist.InsertItem(sys.maxsize, '0')
 
         self.clist.alignParms = N.insert(self.clist.alignParms, self.clist.alignParms.shape[1], 0, axis=1)
         self.clist.alignParms[:,-1,-3:] = 1
@@ -388,7 +395,7 @@ class ChromagnonPanel(wx.Panel):
         self.clist.nw = len(self.clist.waves)
         
         for i, p in enumerate(self.clist.alignParms[self.clist.t,index]):
-            self.clist.SetStringItem(index, i+1, str(p))
+            self.clist.SetItem(index, i+1, str(p))#SetStringItem(index, i+1, str(p))
         
 class ChromagnonList(wx.ListCtrl,
                      listmix.ListCtrlAutoWidthMixin,
@@ -403,16 +410,26 @@ class ChromagnonList(wx.ListCtrl,
         """
         sizeX = SIZE_COL0 + SIZE_COLS * aligner.NUM_ENTRY
         sizeY = 23 * 5 # 5 is the maximum number of wavelengths
-        wx.ListCtrl.__init__(self, parent, wx.NewId(), pos=wx.DefaultPosition, size=(sizeX, sizeY), style=wx.LC_REPORT|wx.BORDER_NONE|wx.LC_SORT_ASCENDING)
+        wx.ListCtrl.__init__(self, parent, wx.NewId(), pos=wx.DefaultPosition, size=(sizeX, sizeY), style=wx.LC_REPORT|wx.BORDER_NONE)#|wx.LC_SORT_ASCENDING)
         listmix.ListCtrlAutoWidthMixin.__init__(self)
 
         self.fn = fn
         self.dirname, self.basename = os.path.split(fn)
+        self.counter = itertools.count()
         
         self.readFile()
         self.populate()
         listmix.TextEditMixin.__init__(self)
 
+    def getWaveListIndex(self, wave):
+        count = self.GetItemCount()
+        waves = [eval(self.GetItem(row, 0).GetText()) for row in range(count)]
+        return waves.index(wave)
+
+    def getWaveIndex(self, index):
+        wave = eval(self.GetItem(index, 0).GetText())
+        return self.waves.index(wave)
+        
     def readFile(self):
         """
         get header information
@@ -426,10 +443,10 @@ class ChromagnonList(wx.ListCtrl,
         if not hasattr(self, 'mapyx'):
             self.map_str = 'None'
         else:
-            maxval = [self.mapyx[:,w].max() for w in xrange(self.nw)]
+            maxval = [self.mapyx[:,w].max() for w in range(self.nw)]
             if self.nz == 1:
                 self.map_str = 'Projection (max shift '#%.3f pixel)' % maxval
-                addstrs = ['%i %.3f' % (self.wave[w], maxval[w]) for w in xrange(self.nw)]
+                addstrs = ['%i %.3f' % (self.wave[w], maxval[w]) for w in range(self.nw)]
                 self.map_str += ', '.join(addstrs) + '(pixels))'
             else:
                 self.map_str = 'Section-wise'
@@ -449,10 +466,12 @@ class ChromagnonList(wx.ListCtrl,
 
         for w, wave in enumerate(self.waves):
             # column 0
-            index = self.InsertStringItem(sys.maxint, str(wave))
+            ii = next(self.counter)
+            print('inserting item', ii, wave)
+            index = self.InsertItem(ii, str(wave))#sys.maxsize, str(wave))
             # subsequent columns
             for i, p in enumerate(self.alignParms[self.t,w]):
-                self.SetStringItem(index, i+1, str(p))
+                self.SetItem(index, i+1, str(p))
 
     def set_tSlice(self, t=0):
         """
@@ -466,14 +485,16 @@ class ChromagnonList(wx.ListCtrl,
             parent.set_tSlice(t)
         
         self.t = t
-        for index in xrange(len(self.waves)):
-            for i, p in enumerate(self.alignParms[t, index]):
-                self.SetStringItem(index, i+1, str(p))
-        for w in range(self.nw):
+        for w, wave in enumerate(self.waves):
+            index = self.getWaveListIndex(wave)
+            for i, p in enumerate(self.alignParms[t, w]):
+                print('setting item', index, wave)
+                self.SetItem(index, i+1, str(p))#SetStringItem(index, i+1, str(p))
+
             self.applyGraphics(w)
 
         
-    def SetStringItem(self, index, col, data):
+    def SetItem(self, index, col, data):#StringItem(self, index, col, data):
         """
         Called when the user try to edit the list
         (also called in populate())
@@ -485,14 +506,18 @@ class ChromagnonList(wx.ListCtrl,
         data: string
         """
         val = eval(data)
+        w = self.getWaveIndex(index)
         if col:
-            self.alignParms[self.t, index, col-1] = val
+            self.alignParms[self.t, w, col-1] = val
         else:
-            self.waves[index] = val
+            self.waves[w] = val
 
         self.applyGraphics(index)
 
-        wx.ListCtrl.SetStringItem(self, index, col, data)
+        if wx.version().startswith('3'):
+            wx.ListCtrl.StringItem(self, index, col, data)
+        else:
+            wx.ListCtrl.SetItem(self, index, col, data)#StringItem(self, index, col, data)
 
 
     def applyGraphics(self, w=0):
@@ -508,7 +533,7 @@ class ChromagnonList(wx.ListCtrl,
             for v in parent.viewers:
                 v.updateAlignParm(w, alignParm)
 
-            parent.updateGLGraphics(range(len(parent.viewers)))
+            parent.updateGLGraphics(list(range(len(parent.viewers))))
 
         
 class TestViewPanel(wx.Panel):
@@ -564,6 +589,7 @@ class TestViewPanel(wx.Panel):
         """
         try:
             self.doc = aligner.Chromagnon(fn)
+            self.doc.zlast = 0
         except:
             G.openMsg(self, 'This file is not a valid image file', 'Error')
             return
@@ -655,5 +681,5 @@ class ViewFileDropTarget(wx.FileDropTarget):
 
     def OnDropFiles(self, x, y, filenames):
         self.testViewPanel.view(filenames[0])
-
+        return True
 

@@ -46,9 +46,9 @@ class viewerRubberbandMode:
             return self.ind()
         else:
             data = args[0]
-            takeAxes = range(data.ndim-2, data.ndim)
+            takeAxes = list(range(data.ndim-2, data.ndim))
             dataSubReg = data.take(self.ind(), takeAxes)
-            dataSubReg.transpose(range(2,data.ndim)+range(2))
+            dataSubReg.transpose(list(range(2,data.ndim))+list(range(2)))
             return dataSubReg
 
     def ind(self): # , compress=False):
@@ -133,7 +133,7 @@ class viewerRubberbandMode:
             m[self.slice] = 1
         elif self.rubberWhat == 'line':
             m = N.zeros(data.shape[-2:], dtype=N.bool)
-            from all import F
+            from .all import F
             F.drawLine(m, self.yx0, self.yx1, 1)
         elif self.rubberWhat == 'circle':
             y0,x0 = self.yx0

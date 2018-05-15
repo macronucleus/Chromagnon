@@ -9,8 +9,8 @@ import os, string, sys
 # Use the gzip module for Python version 1.5.2 or higher
 gzip = None
 try:
-    _version = map(string.atoi,
-                   string.split(string.split(sys.version)[0], '.'))
+    _version = list(map(string.atoi,
+                   string.split(string.split(sys.version)[0], '.')))
     if _version >= [1, 5, 2]:
         try:
             import gzip
@@ -43,14 +43,14 @@ class TextFile:
     def __init__(self, filename, mode = 'r'):
         if string.find(filename, ':/') > 1: # URL
             if mode != 'r':
-                raise IOError, "can't write to a URL"
-            import urllib
-            self.file = urllib.urlopen(filename)
+                raise IOError("can't write to a URL")
+            import urllib.request, urllib.parse, urllib.error
+            self.file = urllib.request.urlopen(filename)
         else:
             filename = os.path.expanduser(filename)
             if mode == 'r':
                 if not os.path.exists(filename):
-                    raise IOError, (2, 'No such file or directory: '
+                    raise IOError(2, 'No such file or directory: '
                                     + filename)
                 if filename[-2:] == '.Z':
                     self.file = os.popen("uncompress -c " + filename, mode)
@@ -64,10 +64,10 @@ class TextFile:
                 else:
                     try:
                         self.file = open(filename, "rU") #  universal newline !  seb !!  mode)
-                    except IOError, details:
+                    except IOError as details:
                         if type(details) == type(()):
                             details = details + (filename,)
-                        raise IOError, details
+                        raise IOError(details)
             elif mode == 'w':
                 if filename[-2:] == '.Z':
                     self.file = os.popen("compress > " + filename, mode)
@@ -81,13 +81,13 @@ class TextFile:
                 else:
                     try:
                         self.file = open(filename, mode)
-                    except IOError, details:
+                    except IOError as details:
                         if type(details) == type(()):
                             details = details + (filename,)
-                        raise IOError, details
+                        raise IOError(details)
             elif mode == 'a':
                 if filename[-2:] == '.Z':
-                    raise IOError, (0, "Can't append to .Z files")
+                    raise IOError(0, "Can't append to .Z files")
                 elif filename[-3:] == '.gz':
                     if gzip is None:
                         self.file = os.popen("gzip >> " + filename, "w")
@@ -96,7 +96,7 @@ class TextFile:
                 else:
                     self.file = open(filename, mode)
             else:
-                raise IOError, (0, 'Illegal mode: ' + repr(mode))
+                raise IOError(0, 'Illegal mode: ' + repr(mode))
 
     def __del__(self):
         self.close()

@@ -8,7 +8,7 @@ class DbfilenameShelf(Shelf):
     """
     
     def __init__(self, filename, flag='c'):
-        import dumbdbm_patched
+        from . import dumbdbm_patched
         Shelf.__init__(self, dumbdbm_patched.open(filename, flag))
 
 

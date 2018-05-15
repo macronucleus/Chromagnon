@@ -62,7 +62,7 @@ def _getsolMultiType(a, *args):
     elif a.dtype == _N.float64:
         return  _CCG_d.getsol(a, *args)
     else:
-        raise TypeError, "dtype must be either float32 or float64"
+        raise TypeError("dtype must be either float32 or float64")
 
 bufSize=-1
 
@@ -131,12 +131,12 @@ def getsol(xo, xmin, xmax, _ivec, CG_iter, fmin, df0, CCG_tolerance,
     xmax = _N.array(xmax, dtype, ndmin=1)
     if xmin.size == 1:
         if xmax.size != 1:
-            raise ValueError, "xmin is a single value, but xmax is not"
+            raise ValueError("xmin is a single value, but xmax is not")
     else:
         if xmin.size != xo.size:
-            raise ValueError, "xmin must be either single value or same size as xo"
+            raise ValueError("xmin must be either single value or same size as xo")
         elif xmax.size != xo.size:
-            raise ValueError, "xmax must same size as xmin"
+            raise ValueError("xmax must same size as xmin")
 
     #no!! ivec gets changed in-place !!  ivec = na.asarray(ivec, na.UInt8)
     if type(_ivec) is int:

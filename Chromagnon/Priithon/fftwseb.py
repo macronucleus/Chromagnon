@@ -30,7 +30,7 @@ def rfft(a,af=None, inplace=0, nthreads=1):
     dir = _sfftw.FFTW_FORWARD
     if a.dtype == _N.float32:
         if af is not None and (not af.flags.carray or af.dtype != _N.complex64):
-            raise RuntimeError, "af needs to be well behaved Complex64 array"
+            raise RuntimeError("af needs to be well behaved Complex64 array")
         key = ("sr%d"%inplace, shape )
 
         try:
@@ -40,7 +40,7 @@ def rfft(a,af=None, inplace=0, nthreads=1):
             p = _sfftw.rfftwnd_create_plan(len(shape), ashape, dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _splans[ key ] = p
 
         if inplace:
@@ -69,7 +69,7 @@ def rfft(a,af=None, inplace=0, nthreads=1):
 
     elif a.dtype == _N.float64:
         if af is not None and (not af.flags.carray or af.dtype != _N.complex128):
-            raise RuntimeError, "af needs to be well behaved Complex64 array"
+            raise RuntimeError("af needs to be well behaved Complex64 array")
         key = ("dr%d"%inplace, shape )
 
         try:
@@ -78,7 +78,7 @@ def rfft(a,af=None, inplace=0, nthreads=1):
             p = _dfftw.rfftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _dplans[ key ] = p
 
         if inplace:
@@ -97,9 +97,9 @@ def rfft(a,af=None, inplace=0, nthreads=1):
                 _dfftw.rfftwnd_one_real_to_complex(p,a,af)  
 
     else:
-        raise TypeError, "(c)float32 and (c)float64 must be used consistently (%s %s)"%\
+        raise TypeError("(c)float32 and (c)float64 must be used consistently (%s %s)"%\
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
-               (af is None and "af is None" or "af.dtype=%s"%af.dtype))
+               (af is None and "af is None" or "af.dtype=%s"%af.dtype)))
 
 def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
     """if copy==1 (and inplace==0 !!) fftw uses a copy of af to prevent overwriting the original
@@ -120,7 +120,7 @@ def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
     dir = _sfftw.FFTW_BACKWARD
     if af.dtype == _N.complex64:
         if a is not None and (not a.flags.carray or a.dtype != _N.float32):
-            raise RuntimeError, "a needs to be well behaved float32 array"
+            raise RuntimeError("a needs to be well behaved float32 array")
         key = ("sir%d"%inplace, shape )
 
         try:
@@ -129,7 +129,7 @@ def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
             p = _sfftw.rfftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _splans[ key ] = p
             
 
@@ -151,7 +151,7 @@ def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
 
     elif af.dtype == _N.complex128:
         if a is not None and (not a.flags.carray or a.dtype != _N.float64):
-            raise RuntimeError, "a needs to be well behaved float64 array"
+            raise RuntimeError("a needs to be well behaved float64 array")
         key = ("dir%d"%inplace, shape )
 
         try:
@@ -160,7 +160,7 @@ def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
             p = _dfftw.rfftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _dplans[ key ] = p
 
         if inplace:
@@ -179,17 +179,17 @@ def irfft(af, a=None, inplace=0, copy=1, nthreads=1):
                 _dfftw.rfftwnd_one_complex_to_real(p,af,a)  
 
     else:
-        raise TypeError, "(c)float32 and (c)float64 must be used consistently (%s %s)"%\
+        raise TypeError("(c)float32 and (c)float64 must be used consistently (%s %s)"%\
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
-               (af is None and "af is None" or "af.dtype=%s"%af.dtype))
+               (af is None and "af is None" or "af.dtype=%s"%af.dtype)))
 
 
 def destroy_plans():
-    for k in _splans.keys():
+    for k in list(_splans.keys()):
         _sfftw.rfftwnd_destroy_plan( _splans[ k ] )
         del _splans[ k ]
 
-    for k in _dplans.keys():
+    for k in list(_dplans.keys()):
         _dfftw.rfftwnd_destroy_plan( _dplans[ k ] )
         del _dplans[ k ]
 
@@ -239,7 +239,7 @@ def fft(a,af=None, inplace=0, nthreads=1):
     dir = _sfftw.FFTW_FORWARD
     if a.dtype == _N.complex64:
         if af is not None and (not af.flags.carray or af.dtype != _N.complex64):
-            raise RuntimeError, "af needs to be well behaved complex64 array"
+            raise RuntimeError("af needs to be well behaved complex64 array")
         key = ("s%d"%inplace, shape )
 
         try:
@@ -248,7 +248,7 @@ def fft(a,af=None, inplace=0, nthreads=1):
             p = _sfftw.fftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _splans[ key ] = p
 
         if inplace:
@@ -269,7 +269,7 @@ def fft(a,af=None, inplace=0, nthreads=1):
 
     elif a.dtype == _N.complex128:
         if af is not None and (not af.flags.carray or af.dtype != _N.complex128):
-            raise RuntimeError, "af needs to be well behaved complex128 array"
+            raise RuntimeError("af needs to be well behaved complex128 array")
         key = ("d%d"%inplace, shape )
 
         try:
@@ -278,7 +278,7 @@ def fft(a,af=None, inplace=0, nthreads=1):
             p = _dfftw.fftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _dplans[ key ] = p
 
         if inplace:
@@ -297,9 +297,9 @@ def fft(a,af=None, inplace=0, nthreads=1):
                 _dfftw.fftwnd_one(p,a,af)   
 
     else:
-        raise TypeError, "complex64 and complex128 must be used consistently (%s %s)"%\
+        raise TypeError("complex64 and complex128 must be used consistently (%s %s)"%\
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
-               (af is None and "af is None" or "af.dtype=%s"%af.dtype))
+               (af is None and "af is None" or "af.dtype=%s"%af.dtype)))
 
 def ifft(af, a=None, inplace=0, nthreads=1):
     #CHECK b type size
@@ -314,7 +314,7 @@ def ifft(af, a=None, inplace=0, nthreads=1):
     dir = _sfftw.FFTW_BACKWARD
     if af.dtype == _N.complex64:
         if a is not None and (not a.flags.carray or a.dtype != _N.complex64):
-            raise RuntimeError, "a needs to be well behaved complex64 array"
+            raise RuntimeError("a needs to be well behaved complex64 array")
         key = ("si%d"%inplace, shape )
 
         try:
@@ -323,7 +323,7 @@ def ifft(af, a=None, inplace=0, nthreads=1):
             p = _sfftw.fftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _splans[ key ] = p
 
         if inplace:
@@ -344,7 +344,7 @@ def ifft(af, a=None, inplace=0, nthreads=1):
 
     elif af.dtype == _N.complex128:
         if a is not None and (not a.flags.carray or a.dtype != _N.complex128):
-            raise RuntimeError, "a needs to be well behaved complex128 array"
+            raise RuntimeError("a needs to be well behaved complex128 array")
         key = ("di%d"%inplace, shape )
 
         try:
@@ -353,7 +353,7 @@ def ifft(af, a=None, inplace=0, nthreads=1):
             p = _dfftw.fftwnd_create_plan(len(shape), _N.array(shape, dtype=_N.int32), dir,
                     _measure | inplace)
             if p is None:
-                raise RuntimeError, "could not create plan"
+                raise RuntimeError("could not create plan")
             _dplans[ key ] = p
 
         if inplace:
@@ -372,7 +372,7 @@ def ifft(af, a=None, inplace=0, nthreads=1):
                 _dfftw.fftwnd_one(p,af,a)   
 
     else:
-        raise TypeError, "complex64 and complex128 must be used consistently (%s %s)"%\
+        raise TypeError("complex64 and complex128 must be used consistently (%s %s)"%\
               ((a is None and "a is None" or "a.dtype=%s"%a.dtype),
-               (af is None and "af is None" or "af.dtype=%s"%af.dtype))
+               (af is None and "af is None" or "af.dtype=%s"%af.dtype)))
 

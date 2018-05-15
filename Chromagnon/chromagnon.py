@@ -8,62 +8,69 @@
 
 
 import sys, os
+import six
 
 #### javabridge for py2exe
 # following workaround should be put before importing anything involved.
 INIT = False
 import imp
 def main_is_frozen():
-   return (hasattr(sys, "frozen") or # new py2exe
+   return (getattr(sys, "frozen", False) or # new py2exe + pyinstaller
            hasattr(sys, "importers") # old py2exe
            or imp.is_frozen("__main__")) # tools/freeze
 
 def init_java_home():
     global INIT
     if not INIT:
-        if sys.platform.startswith('win'):
-            # py2exe emit warnings as error messages if it is not supressed.
-            import warnings
-            warnings.simplefilter('ignore')
-
-        if main_is_frozen(): # py2exe
-            cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
+        if main_is_frozen():
             if sys.platform.startswith('win'):
-                jdk = os.path.join(cwd, 'jdk')
-            elif sys.platform.startswith('darwin'):
-                jdk = os.path.join(os.path.dirname(cwd), 'Resources', 'jdk')
-            #print 'jdk is', jdk
-            if not os.getenv('JDK_HOME'):
+                # py2exe emit warnings as error messages if it is not supressed.
+                import warnings
+                warnings.simplefilter('ignore')
+
+            if 0: # JDK was excluede from V0.6 # py2exe/py2app
+                cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
+                if sys.platform.startswith('win'):
+                    jdk = os.path.join(cwd, 'jdk')
+                elif sys.platform.startswith('darwin'):
+                    jdk = os.path.join(os.path.dirname(cwd), 'Resources', 'jdk')
+
                 os.environ['JDK_HOME'] = jdk
-            if not os.getenv('JAVA_HOME'):
-                os.environ['JAVA_HOME'] = jdk
+                os.environ['JAVA_HOME'] = os.path.join(jdk, 'jre')
                 
-            INIT = True
+        INIT = True
+
 
 init_java_home()
 
-import wx, threading
+import wx
 try:
-    from PriCommon import guiFuncs as G, bioformatsIO, commonfuncs as C, listbox
-    from PriCommon.ndviewer import main as aui
+    from PriCommon import guiFuncs as G, commonfuncs as C, listbox
+    from ndviewer import main as aui
     from Priithon.all import U, N, Mrc
-except:
-    from Chromagnon.PriCommon import guiFuncs as G, bioformatsIO, commonfuncs as C, listbox
-    from Chromagnon.PriCommon.ndviewer import main as aui
+    import imgio
+except (ValueError, ImportError):
+    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, listbox
+    from Chromagnon.ndviewer import main as aui
     from Chromagnon.Priithon.all import U, N, Mrc
+    from Chromagnon import imgio
+
 ## for py2exe, here the relative import was impossible to run this script as __main__
 try:
+    from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+except (ValueError, ImportError):
     from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
-except:
+except ImportError:
     import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
 
+            
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
 
-LISTSIZE_X=sum([val for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')])
+LISTSIZE_X=sum([val for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')])
 LISTSPACE=10
 FRAMESIZE_X= LISTSIZE_X * 2 + LISTSPACE
-FRAMESIZE_Y=220#250
+FRAMESIZE_Y=220
 
 if sys.platform.startswith('win'):
     LIST_Y=140
@@ -102,7 +109,7 @@ def main(sysarg=None, title="Chromagnon v%s" % version.version):
         frame = _main(sysarg=sysarg, title=title)
         sys.app.MainLoop()
         
-        bioformatsIO.uninit_javabridge()
+        imgio.uninit_javabridge()
 
     return frame
 
@@ -141,6 +148,7 @@ class BatchPanel(wx.Panel):
 
         parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
 
+        #self.refwave = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Ref channel', tip='', enable=True)
         # ---- target ------
 
         refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + maxShiftLabel.GetSize()[0] + self.maxShift.GetSize()[0]
@@ -150,12 +158,12 @@ class BatchPanel(wx.Panel):
         
         self.tgtClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'tareget'), title='Clear selected', tip='', enable=False)
 
-        self.cutoutCb = G.makeCheck(self, box, "crop margins", tip='', defChecked=confdic.get('cutout', True))
+        self.cutoutCb = G.makeCheck(self, box, "crop margins", tip='', defChecked=bool(confdic.get('cutout', True)))
 
         label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
 
-        choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
-        label, self.outextch = G.makeListChoice(self, box, '', choices, defValue=confdic.get('format', aligner.WRITABLE_FORMATS[0]), tip='Choose image file formats, for reading with ImageJ, dv is recommended.')
+        self.outext_choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
+        label, self.outextch = G.makeListChoice(self, box, '', self.outext_choices, defValue=confdic.get('format', aligner.WRITABLE_FORMATS[0]), tip='tif: ImageJ format, dv: DeltaVision format, ome.tif: OME-tif format (slow)', targetFunc=self.OnOutFormatChosen)
         if not self.outextch.GetStringSelection():
             self.outextch.SetSelection(0)
         
@@ -165,8 +173,8 @@ class BatchPanel(wx.Panel):
         
         self.listRef = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
-                                 | wx.BORDER_NONE
-                                 | wx.LC_SORT_ASCENDING,
+                                 | wx.BORDER_NONE,
+                                 #| wx.LC_SORT_ASCENDING,
                                  size=(LISTSIZE_X, LIST_Y)
                                  )
         box.Add(self.listRef)
@@ -178,8 +186,8 @@ class BatchPanel(wx.Panel):
 
         self.listTgt = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
-                                 | wx.BORDER_NONE
-                                 | wx.LC_SORT_ASCENDING,
+                                 | wx.BORDER_NONE,
+                                # | wx.LC_SORT_ASCENDING,
         size=(LISTSIZE_X, LIST_Y)
                                  )
         box.Add(self.listTgt)
@@ -220,48 +228,17 @@ class BatchPanel(wx.Panel):
         
         self.label = G.makeTxt(self, box, ' ')
 
-        _col_sizes=[(key, val) for key, val in listbox.__dict__.iteritems() if key.startswith('SIZE_COL')]
+        _col_sizes=[(key, val) for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')]
         _col_sizes.sort()
 
         LISTSIZE_X2 = sum([val for key, val in _col_sizes[:3]])
         LIST_Y2 = 30
         
-        old="""
-        #------ initial guess -------
-        # \n
-        box = G.newSpaceV(sizer)
-        
-        self.initguessButton = G.makeButton(self, box, self.OnChooseInitGuess, title='Initial guess', tip='', enable=True)
-
-
-        self.initGuess = listbox.BasicFileListCtrl(self, wx.NewId(),
-                                 style=wx.LC_REPORT
-                                 | wx.BORDER_NONE
-                                 | wx.LC_SORT_ASCENDING
-                                 | wx.LC_NO_HEADER,
-                                 size=(LISTSIZE_X2, LIST_Y2),
-                                 multiple=False
-                                 )
-        self.initGuess.setDefaultFileLoadFunc(chromformat.ChromagnonReader)
-        
-        initguess = confdic.get('initguess', '')
-        if os.path.isfile(initguess):
-            self.initGuess.addFile(initguess)
-        
-        box.Add(self.initGuess)
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, lambda ev:self.OnItemSelected(ev, 'initGuess'), self.initGuess)
-        self.initGuess.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
-
-        
-        self.clearInitguessButton = G.makeButton(self, box, self.OnClearInitGuess, title='Clear', tip='', enable=True)
-        self.clearInitguessButton.Enable(0)"""
-
         #------ flat fielder --------
 
         self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
-        self.flatButton.SetToolTipString('Open a graphical interphase to flat field images')
+        self.flatButton.SetToolTip(wx.ToolTip('Open a graphical interphase to flat field images'))
 
-        #flatsize = self.initguessButton.GetSize()[0] + LISTSIZE_X2 + self.clearInitguessButton.GetSize()[0] + self.flatButton.GetSize()[0]
         flatsize = self.goButton.GetSize()[0] + self.zmaglabel.GetSize()[0] + self.zmagch.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
 
         G.newSpaceH(box, FRAMESIZE_X-flatsize)
@@ -281,9 +258,12 @@ class BatchPanel(wx.Panel):
             h = chromformat.ChromagnonReader(fn)
         else:
             try:
-                h = bioformatsIO.load(fn)
-            except ValueError:
-                dlg = wx.MessageDialog(self, '%s is not a valid image file!' % ff, 'Error reading image file', wx.OK | wx.ICON_EXCLAMATION)
+                h = imgio.Reader(fn)
+            except ValueError as e:
+                return listbox.imgio_dialog(e, self)
+
+            if aligner.hasSameWave(h):
+                dlg = wx.MessageDialog(self, 'The image contains multiple channels with the same wavelength. Please use a unique wavelength for each channel', 'Error in channel wavelengths', wx.OK | wx.ICON_EXCLAMATION)
                 if dlg.ShowModal() == wx.ID_OK:
                     return
                 
@@ -291,6 +271,8 @@ class BatchPanel(wx.Panel):
                 dlg = wx.MessageDialog(self, 'Multiple series data sets are not allowed, please make a file with a single image in a file', 'Error in image file', wx.OK | wx.ICON_EXCLAMATION)
                 if dlg.ShowModal() == wx.ID_OK:
                     return
+        self.lastpath = os.path.dirname(fn)
+        C.saveConfig(lastpath=self.lastpath)
         return h
 
     def OnItemSelected(self, evt=None, rt='reference'):
@@ -301,7 +283,6 @@ class BatchPanel(wx.Panel):
         """
         self.refselected = [i for i in range(self.listRef.GetItemCount()) if self.listRef.IsSelected(i)]
         self.tgtselected = [i for i in range(self.listTgt.GetItemCount()) if self.listTgt.IsSelected(i)]
-        #self.initselected = [i for i in range(self.initGuess.GetItemCount()) if self.initGuess.IsSelected(i)]
 
         if self.refselected:
             self.refClearButton.Enable(1)
@@ -313,18 +294,13 @@ class BatchPanel(wx.Panel):
         else:
             self.tgtClearButton.Enable(0)
 
-        #if self.initselected:
-        #    self.clearInitguessButton.Enable(1)
-        #else:
-        #    self.clearInitguessButton.Enable(0)
-            
         if evt:
-            self.currentItem = [rt, evt.m_itemIndex] # for doubleclick
+            self.currentItem = [rt, evt.Index]
 
     def OnDoubleClick(self, evt=None):
         # on windows
         if not hasattr(self, 'currentItem'):
-            self.currentItem = [None, evt.m_itemIndex]
+            self.currentItem = [None, evt.Index]
             
         if self.currentItem[0] == 'reference':
             ll = self.listRef
@@ -351,7 +327,7 @@ class BatchPanel(wx.Panel):
         if os.name == 'posix':
             dlg = G.FileSelectorDialog(self, self.lastpath, wildcard=wildcard)
         else:
-            dlg = wx.FileDialog(self, 'Choose %s files' % listtype, defaultDir=self.lastpath, style=wx.FD_MULTIPLE)#, wildcard=wildcard)
+            dlg = wx.FileDialog(self, 'Choose %s files' % listtype, defaultDir=self.lastpath, style=wx.FD_MULTIPLE)
             
         if dlg.ShowModal() == wx.ID_OK:
             fns = dlg.GetPaths()
@@ -360,14 +336,14 @@ class BatchPanel(wx.Panel):
                 return
             if os.name == 'posix':
                 wildcard = dlg.fnPat
-            if isinstance(fns, basestring):
+            if isinstance(fns, six.string_types):#str):
                 fns = [fns]
 
             ll.addFiles(fns)
             if listtype != 'ref':
-                if any([nw > 5 for nw in ll.nws]) and self.outextch.GetStringSelection() == (os.path.extsep + aligner.WRITABLE_FORMATS[0]):
-                    self.outextch.SetStringSelection(os.path.extsep + aligner.WRITABLE_FORMATS[1])
-                    G.openMsg(parent=self, msg='Since number of wavelength in some image file is more than 5,\nthe output file format was changed to ome.tiff.', title="Output file format change")
+                if any([nw > 5 for nw in ll.nws]) and self.outextch.GetStringSelection() == (os.path.extsep + aligner.WRITABLE_FORMATS[1]):
+                    self.outextch.SetStringSelection(os.path.extsep + aligner.WRITABLE_FORMATS[0])
+                    G.openMsg(parent=self, msg='Since number of wavelength in some image file is more than 5,\nthe output file format was changed to tiff', title="Output file format change")
             
             self.lastpath = os.path.dirname(fns[0])
             if listtype == 'ref':
@@ -437,11 +413,18 @@ class BatchPanel(wx.Panel):
         """
         enable or disable buttons that should not be hit while running the program
         """
-        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb]#, self.initguessButton, self.clearInitguessButton]
+        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb]
 
         [button.Enable(enable) for button in buttons]
 
-    #old="""
+    def OnOutFormatChosen(self, evt=None):
+        outext = self.outextch.GetStringSelection()
+        if outext == self.outext_choices[-1] and not imgio.bioformatsIO.HAS_JDK:
+            listbox.imgio_dialog('Writing the file format (%s) requres Java Development Kit (JDK)' % outext)
+            confdic = C.readConfig()
+            outext = confdic.get('format', aligner.WRITABLE_FORMATS[0])
+            self.outextch.SetStringSelection(outext)
+        
     def OnLocalListChose(self, evt=None):
         local = self.localListChoice.GetStringSelection()
         if local == self.localChoice[0]:
@@ -449,7 +432,8 @@ class BatchPanel(wx.Panel):
             self.min_pxls_choice.Enable(0)
         else:
             self.min_pxls_label.Enable(1)
-            self.min_pxls_choice.Enable(1)#"""
+            self.min_pxls_choice.Enable(1)
+
         
     def OnGo(self, ev=None):
         """
@@ -466,11 +450,6 @@ class BatchPanel(wx.Panel):
 
 
             # other parameters
-            old="""
-            if self.initGuess.columnkeys:
-                initguess = os.path.join(*self.initGuess.getFile(0)[:2])
-            else:
-                initguess = ''"""
             initguess = ''
 
             form = self.outextch.GetStringSelection()
@@ -489,7 +468,6 @@ class BatchPanel(wx.Panel):
                      [nt for nt in self.listRef.nts], # copy
                      form,
                      int(self.min_pxls_choice.GetStringSelection())] 
-                         #af.MIN_PXLS_YX]
 
             # check the user-inputs
             try:
@@ -505,7 +483,7 @@ class BatchPanel(wx.Panel):
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
-            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], initguess=initguess, min_pxls_yx=parms[9])
+            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
 
             # run program
             gui = threads.GUImanager(self, __name__)
@@ -528,12 +506,12 @@ class BatchPanel(wx.Panel):
             self.aui.Show()
 
 
-        if isinstance(target, basestring) and chromformat.is_chromagnon(target):#target.endswith('chromagnon'):
+        if isinstance(target, six.string_types) and chromformat.is_chromagnon(target):
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
         else:
             newpanel = aui.ImagePanel(self.aui, target)
 
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             name = os.path.basename(target)
         else:
             name = target.file
@@ -552,18 +530,9 @@ if __name__ == '__main__':
     ## windows support for py2exe
     import multiprocessing
     multiprocessing.freeze_support()
-    
+
     if len(sys.argv) == 1:
         main()
-        old="""
-        if wx.GetApp():
-            main()
-        else:
-            sys.app = wx.App()
-            main()
-            sys.app.MainLoop()"""
-        #from Priithon import PriApp
-        #PriApp._maybeExecMain()
 
     else:
         import argparse, glob
@@ -580,8 +549,8 @@ if __name__ == '__main__':
                      help='a reference image or chromagnon file (required)')
         p.add_argument('--local', '-l', default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
                      help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
-        p.add_argument('--initguess', '-I', default=None,
-                     help='a chromagnon file name for initial guess (default=None)')
+        #p.add_argument('--initguess', '-I', default=None,
+        #             help='a chromagnon file name for initial guess (default=None)')
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
                      help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
         p.add_argument('--zmag', '-z', default=aligner.ZMAG_CHOICE[0], choices=aligner.ZMAG_CHOICE,
@@ -599,12 +568,12 @@ if __name__ == '__main__':
             fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
         nts = []
         for fn in fns:
-            h = bioformatsIO.load(fn)
+            h = imgio.Reader(fn) #bioformatsIO.load(fn)
             nts.append(h.nt)
             h.close()
 
         parms = [True, # crop mergins
-                options.initguess,
+                None,#options.initguess,
                 options.local,
                 options.maxShift,
                 options.zmag,
@@ -614,4 +583,5 @@ if __name__ == '__main__':
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, ref, fns, parms)
         th.start()
-        bioformatsIO.uninit_javabridge()
+        #bioformatsIO.uninit_javabridge()
+        imgio.uninit_javabridge()

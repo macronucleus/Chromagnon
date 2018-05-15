@@ -1,6 +1,10 @@
 import os
+import six
 import wx
-from Priithon import viewerRubberbandMode
+try:
+    from ..Priithon import viewerRubberbandMode
+except ValueError: # interactive mode
+    from Priithon import viewerRubberbandMode
 
 SIZER_KWDS={'flag': wx.ALIGN_CENTRE|wx.ALL|wx.GROW, 'border': 0}
 
@@ -49,7 +53,7 @@ def makeButton(panel, horizontalSizer, targetFunc, title='', tip='', enable=True
     """
     button = wx.Button(panel, -1, str(title))
     if tip is not '':
-        button.SetToolTipString(str(tip))
+        button.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(button, **sizerKwds)
     frame = panel.GetTopLevelParent()
     frame.Bind(wx.EVT_BUTTON, targetFunc, button)
@@ -62,7 +66,7 @@ def makeToggleButton(panel, horizontalSizer, targetFunc, title, tip='', enable=T
     """
     toggle = wx.ToggleButton(panel, -1, str(title), size=size)
     if tip is not None:
-        toggle.SetToolTipString(str(tip))
+        toggle.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(toggle, **sizerKwds)
     frame = panel.GetTopLevelParent()
     frame.Bind(wx.EVT_TOGGLEBUTTON, targetFunc, toggle)
@@ -90,7 +94,7 @@ def makeTxtBox(panel, horizontalSizer, labelTxt, defValue='', tip='', sizeX=40, 
     label = makeTxt(panel, horizontalSizer, labelTxt, **sizerKwds)
     txt = wx.TextCtrl(panel, -1, str(defValue), size=(sizeX,sizeY), style=style)
     if tip is not '':
-        txt.SetToolTipString(str(tip))
+        txt.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(txt, **sizerKwds)
     return label, txt
 
@@ -104,7 +108,7 @@ def makeListChoice(panel, horizontalSizer, labelTxt, choicelist, defValue='', ti
         label = None
     choice = wx.Choice(panel, -1, choices = choicelist, size=size)
     if tip is not '':
-        choice.SetToolTipString(tip)
+        choice.SetToolTip(wx.ToolTip(tip))
     horizontalSizer.Add(choice, **sizerKwds)
     if targetFunc:
         frame = panel.GetTopLevelParent()
@@ -119,7 +123,7 @@ def makeCheck(panel, horizontalSizer, labelTxt, tip='', defChecked=0, targetFunc
     """
     check = wx.CheckBox(panel, -1, labelTxt)
     if tip is not None:
-        check.SetToolTipString(str(tip))
+        check.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(check, **sizerKwds)
     check.SetValue(defChecked)
 
@@ -135,7 +139,7 @@ def makeSpin(panel, horizontalSizer, labelTxt, Range=None, defVal=None, tip='', 
     label = makeTxt(panel, horizontalSizer, labelTxt)
     spn = wx.SpinCtrl(panel, -1, '', size=size)
     if tip:
-        spn.SetToolTipString(tip)
+        spn.SetToolTip(wx.ToolTip(tip))
     horizontalSizer.Add(spn, **sizerKwds)
     if Range is not None: # if None, max=100
         spn.SetRange(*Range)
@@ -156,7 +160,7 @@ def makeCombo(panel, horizontalSizer, labelTxt, choices, defVal='', tip='', size
     else:
         comb = wx.ComboBox(panel, -1, defVal, choices=choices, size=size)#style=wx.CB_DROPDOWN | wx.WANTS_CHARS, size=size)
     if tip:
-        comb.SetToolTipString(tip)
+        comb.SetToolTip(wx.ToolTip(tip))
     horizontalSizer.Add(comb, **sizerKwds)
 
     if targetFunc:
@@ -170,7 +174,7 @@ def makeRadioButtons(panel, horizontalSizer, labelTxts, targetFunc=None, size=wx
     """
     returns list of radioButtons number of which is determined by labelTxts
     """
-    if isinstance(labelTxts, basestring):
+    if isinstance(labelTxts, six.string_types):
         nbuts = 1
         labelTxts = [labelTxts]
     else:
@@ -235,11 +239,13 @@ class FileSelectorDialog(wx.Dialog):
 
         self.up_button = wx.Button(self, wx.ID_UP, style=wx.BU_EXACTFIT)
         hsz.Add(self.up_button)
-        wx.EVT_BUTTON(self, self.up_button.GetId(), self.onUp)
+        #wx.EVT_BUTTON(self, self.up_button.GetId(), self.onUp)
+        self.Bind(wx.EVT_BUTTON, self.onUp, id=self.up_button.GetId())
         
         self.txt = wx.TextCtrl(self, wx.ID_ANY, os.path.join(self.direc, self.fnPat))
         hsz.Add(self.txt, 1, wx.EXPAND|wx.ALL, 2)
-        wx.EVT_TEXT(self, self.txt.GetId(), self.refreshList)
+        #wx.EVT_TEXT(self, self.txt.GetId(), self.refreshList)
+        self.Bind(wx.EVT_TEXT, self.refreshList, id=self.txt.GetId())
 
         hsz = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(hsz, 0, wx.EXPAND)
@@ -251,7 +257,8 @@ class FileSelectorDialog(wx.Dialog):
         self.lb = wx.ListBox(self, wx.ID_ANY, size=(350,400), style=style)
         sizer.Add(self.lb, 1, wx.EXPAND | wx.ALL, 5)
         
-        wx.EVT_LISTBOX_DCLICK(self, self.lb.GetId(), self.onDClick)
+        #wx.EVT_LISTBOX_DCLICK(self, self.lb.GetId(), self.onDClick)
+        self.Bind(wx.EVT_LISTBOX_DCLICK, self.onDClick, id=self.lb.GetId())
 
         bsz = wx.StdDialogButtonSizer()
         sizer.Add(bsz, 0, wx.EXPAND)

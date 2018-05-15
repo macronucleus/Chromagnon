@@ -1,5 +1,5 @@
 #! /usr/local/bin python2.5
-
+from __future__ import print_function
 # modified from pprocess.py
 # woks only on unix-based os (includeing mac)
 # got idea from
@@ -11,10 +11,10 @@ import select # polling works on pipes on Unix
 #import socket
 import traceback
 import time
-import pprocess, logger
+from . import pprocess, logger
 
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except ImportError:
     import pickle
 
@@ -120,12 +120,12 @@ class ChannelBiDir(pprocess.Channel):
         obj = pickle.load(self.read_pipe_out)
         try: # since traceback object cannot be pickled, this is a little dirty
             if isinstance(obj[0], Exception):
-                print
-                print '*** error in child process %i***' % self.pid
+                print()
+                print('*** error in child process %i***' % self.pid)
                 for tbstr in obj[1]:
-                    print tbstr,
-                print 
-                print '*** error of the parent process ***'
+                    print(tbstr, end=' ')
+                print() 
+                print('*** error of the parent process ***')
                 raise obj[0] # this is not the best way, but ...
             else:
                 return obj
@@ -222,7 +222,7 @@ class ExchangeLargeData(pprocess.Exchange):
         """
         debug('before polling')# self.readables %s' % self.readables)
         
-        channels = self.readables.values()
+        channels = list(self.readables.values())
         for channel in channels:
             if channel.exited:
                 self.remove(channel)
@@ -374,7 +374,7 @@ class ExchangeLargeData(pprocess.Exchange):
                     elif type(self.data) == tuple:
                         self.data += (ret)
             elif x != DONE:
-                raise RuntimeError, 'got this %s' % x
+                raise RuntimeError('got this %s' % x)
         return channels
             
 
@@ -481,9 +481,9 @@ def create_socket():
 
     pid = os.fork()
     if pid == 0:
-        return ChannelBiDir(pid, child.makefile("r", 0), child.makefile("w", 0), parent.makefile('r', 0), parent.makefile('w', 0))
+        return ChannelBiDir(pid, child.makefile("r", 0), child.makefile("wb", 0), parent.makefile('r', 0), parent.makefile('wb', 0))
     else:
-        return ChannelBiDir(pid, parent.makefile("r", 0), parent.makefile("w", 0), child.makefile('r', 0), child.makefile('w', 0))
+        return ChannelBiDir(pid, parent.makefile("r", 0), parent.makefile("wb", 0), child.makefile('r', 0), child.makefile('wb', 0))
 
 
 
@@ -499,9 +499,9 @@ def create():
     pid = os.fork()
 
     ClientReceive = os.fdopen(ClientReceive)
-    ServerSend = os.fdopen(ServerSend, 'w')
+    ServerSend = os.fdopen(ServerSend, 'wb')
     ServerReceive = os.fdopen(ServerReceive)
-    ClientSend = os.fdopen(ClientSend, 'w')
+    ClientSend = os.fdopen(ClientSend, 'wb')
 
     return ChannelBiDir(pid, ClientReceive, ServerSend, ServerReceive, ClientSend)
 
@@ -647,7 +647,7 @@ def test(limit=2):
     global log
     level = log.getEffectiveLevel()
     logger.setLevel('debug')
-    ret = pmapLarge(func, range(8), limit)
+    ret = pmapLarge(func, list(range(8)), limit)
     logger.setLevel(level)
     return ret
 
@@ -679,4 +679,4 @@ pversion = sys.version_info
 #print 'python version', pversion
 if 0:#pversion[0] == 2 and pversion[1] >= 6:
     #print 'importing ppro26'
-    from ppro26 import *
+    from .ppro26 import *

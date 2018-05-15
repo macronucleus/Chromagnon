@@ -3,7 +3,10 @@
 #from Data import data as D
 import os
 #exec('import %s as O' % os.path.basename(D.WORKDIR))
-from Priithon.all import N, U, F
+try:
+    from ..Priithon.all import N, U, F
+except ValueError:
+    from Priithon.all import N, U, F
 from . import imgFilters, imgFit, imgGeo
 
 # cross-correlation
@@ -149,12 +152,12 @@ def mexhatFilter(a, mexSize=1):#, trimRatio=0.9):
     from Priithon.all import F as fftw
     try:
         if mexhatC.shape != a.shape:
-            raise ValueError, 'go to except'
+            raise ValueError('go to except')
         if mexhatC_size != mexSize:
-            raise ValueError, 'go to except'
-    except NameError, ValueError:
+            raise ValueError('go to except')
+    except NameError as ValueError:
         mexhatC_size = mexSize
-        shape = N.asarray(a.shape, N.float32)
+        shape = N.asarray(a.shape, N.int)#N.float32)
         mexhatC = F.shift(F.mexhatArr(shape, scaleHalfMax=mexhatC_size, orig=None)) # orig 0.5 pixel does not work...
         mexhatCf = fftw.rfft(mexhatC) / N.multiply.reduce( shape )
 
@@ -340,9 +343,9 @@ def apodize(img, napodize=10, doZ=True):
     shape = N.array(img.shape) // 2
     napodize = N.where(shape < napodize, shape, napodize)
     if doZ and img.ndim >= 3 and img.shape[0] > 3:
-        rr = range(-3,0)
+        rr = list(range(-3,0))
     else:
-        rr = range(-2,0)
+        rr = list(range(-2,0))
     for idx in rr:
         fact = N.arange(1./napodize[idx],napodize[idx],1./napodize[idx], dtype=N.float32)[:napodize[idx]]
         for napo in range(napodize[idx]):

@@ -1,6 +1,6 @@
+from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
-
 import wx
 # ID_ZSLIDER = 1000
 
@@ -60,14 +60,14 @@ class ZSlider( wx.Frame):
                 try:
                     f( zz, event )
                 except:
-                    import PriConfig
+                    from . import PriConfig
                     if PriConfig.raiseEventHandlerExceptions:
                         raise
                     else:
                         import sys, traceback
-                        print >>sys.stderr, " *** error in doOnZchange **"
+                        print(" *** error in doOnZchange **", file=sys.stderr)
                         traceback.print_exc()
-                        print >>sys.stderr, " *** error in doOnZchange **"
+                        print(" *** error in doOnZchange **", file=sys.stderr)
 
     #20080707 def doOnZchange(self, newZ):
     #20080707     print newZ

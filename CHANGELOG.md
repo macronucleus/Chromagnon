@@ -1,3 +1,38 @@
+v0.6 (Feb. 2018)
+----
+1. Updated to Python3.6, wxpython, OpenGL, bioformats
+2. The ndviewer package was moved to the higher level in the directory structure.
+3. image IO modules were moved to imgIO package.
+4. Added MultitifIO (for `ImageJ` format) and ImgSeqIO (for `file
+   sequence`) to `imgio`.
+5. Multitiff (ome and imageJ) file formats were now read by `MultitifReader` instead of
+previously used `BioformatsReader`
+6. empty -> zeros in `imgResample` to prevent values outside the
+shifted image.
+7. ndviewer uses isotropic magnification for orthgonal view, changes
+in `main.py`, `viewerCommon.py`, `glfunc.py`.
+8. chromeditor view magZ was fixed (`ndviewer.viewer2.py`).
+9. ImageJ file format is written by `MultitifReader`.
+10. Chromagnon tif format was changed to a custom `imageJ` format.
+11. `pyfftw3` was changed to `pyfftw`.
+12. Replaced functions of `opencv` with `scipy`.
+13. Log file time was fixed and now contains more information.
+14. Lastpath was changed when files were read by Drag and Drop.
+15. Fixed Y axis orientation for non-MRC images.
+16. `open(newline='')` in `commonfuncs.py` and `chromformat.py`
+17. Fixed autosort on Windows (`listbox.py` and `chromeditor.py`)
+18. Used nomkl numpy and scipy
+19. JDK removed and added a dialog to navigate to download
+(`PriCommon.listbox.py`)
+20. Added functions to detect and fix saturated pixels
+(`alignfuncs.py` and `aligner.py`)
+21. Fixed imgSequence bug for uint8 data type in
+`imgio.bioformatsIO.py`.
+22. Added calcuration for min and max for dv files (`imgio.mrcIO.py`)
+23. The lsm format is read by `imgio.multitifIO.py`
+24. Fixed wrong unit conversion for pixel size in
+`imgio.multitifIO.py` and `imgio.bioformatsIO.py`
+25. Fixed AttributeError for `mouse_last_x` in `ndvierwer.viewer2.py`
 
 v0.5 (Jan. 2017)
 ----

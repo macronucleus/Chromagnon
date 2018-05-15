@@ -1,10 +1,11 @@
 import sys
-from seb import *
+from .seb import *
 from numpy import *
-import wxplt
+from . import wxplt
+import six
 
 
-import plot_objects
+from . import plot_objects
 
 plot_module = wxplt
 #seb plot_class = gui_thread.register(plot_module.plot_frame)
@@ -26,7 +27,7 @@ def figure(which_one = None):
             _active.Raise()
         except IndexError:
             msg = "There are currently only %d active figures" % len(_figure)
-            raise IndexError, msg
+            raise IndexError(msg)
     elif which_one in _figure:
         _active = which_one
         _active.Raise()
@@ -37,7 +38,7 @@ def figure(which_one = None):
                 _figure.append(_active)
                 _active.Raise()
             else:
-                raise ValueError, "The specified figure or index is not not known"
+                raise ValueError("The specified figure or index is not not known")
         except (AttributeError):
             pass
     fig = current()
@@ -48,10 +49,13 @@ def validate_active():
     global _active
     if _active is None: figure()
     try:
+        notworking="""
         # seb-20050723-noGui_Thread if not _active.proxy_object_alive:
         if not hasattr(_active, 'Show'): # is _active wxFrame not deleted ?
             _active = None
-            figure()
+            figure()"""
+        _active.IsActive() # -> wx error
+        #figure()
     except:
         _active = None  # seb-20040824
         figure()        # seb-20040824
@@ -84,8 +88,8 @@ def close(which_one = None):
         for fig in _figure: fig.Close()
         _active = None
     else:
-        raise NotImplementedError, "currently close only works with"\
-                                   " _active window or 'all'"
+        raise NotImplementedError("currently close only works with"\
+                                   " _active window or 'all'")
         #try: 
         #   _figure.remove(which_one)
         #   which_one.close()
@@ -169,8 +173,8 @@ def grid(state=None):
         _active.x_axis.grid_visible = state
         _active.y_axis.grid_visible = state
     else:
-        raise ValueError, 'grid argument can be "on","off",'\
-                          '"yes","no". Not ' + state        
+        raise ValueError('grid argument can be "on","off",'\
+                          '"yes","no". Not ' + state)        
     _active.update()
 
 def hold(state):
@@ -178,8 +182,8 @@ def hold(state):
     if state in ['on','off','yes','no']:
         _active.hold = state
     else:
-        raise ValueError, 'holds argument can be "on","off",'\
-                          '"yes","no". Not ' + state        
+        raise ValueError('holds argument can be "on","off",'\
+                          '"yes","no". Not ' + state)        
     
 def axis(setting):
     validate_active()
@@ -249,7 +253,7 @@ BIG = 1e20
 SMALL = 1e-20
 
 #------------ plot group parsing -----------------
-from types import *
+#from types import *
 
 def plot_groups(data):
     remains = data; groups = []
@@ -269,18 +273,18 @@ def get_plot_group(data):
             el = asarray(el)
             state = 1 
         elif(state == 1):
-            if(type(el) == StringType):
+            if isinstance(el, six.string_types):
                 finished = 1
             else:
                 el = asarray(el)
             state = 2
         elif(state == 2):
             finished = 1
-            if(type(el) != StringType):
+            if not isinstance(el, six.string_types):
                 break
         try:
             if el.typecode() == 'D':
-                print 'warning plotting magnitude of complex values'
+                print('warning plotting magnitude of complex values')
                 el = abs(el)
         except:
             pass
@@ -306,7 +310,7 @@ def lines_from_group(group):
     x = group[0]
     ar_num = 1
     if len(group) > 1:
-        if type(group[1]) == StringType:
+        if isinstance(group[1], six.string_types):
             plotinfo = group[1]
         else:
             ar_num = 2
@@ -325,11 +329,11 @@ def lines_from_group(group):
     if ar_num == 2:
         #check that each array has the same number of rows
         if(xs[0] != ys[0] ):
-            raise SizeMismatch, ('rows', xs, ys)
+            raise SizeMismatch('rows', xs, ys)
         #check that x.cols = y.cols
         #no error x has 1 column
         if(xs[1] > 1 and xs[1] != ys[1]):
-            raise SizeMismatch, ('cols', xs, ys)
+            raise SizeMismatch('cols', xs, ys)
     
     #plot x against index
     if(ar_num == 1):
@@ -428,11 +432,11 @@ def stem(*data):
         x = data[0]
         ltype = ['b-','mo']
     if len(data) == 2:
-        if type(data[1]) is types.StringType:
+        if type(data[1]) is bytes:
             ltype = [data[1],'mo']
             n = arange(len(data[0]))
             x = data[0]
-        elif type(data[1]) in [types.ListType, types.TupleType]:
+        elif type(data[1]) in [list, tuple]:
             n = arange(len(data[0]))
             x = data[0]            
             ltype = data[1][:2]
@@ -444,13 +448,13 @@ def stem(*data):
         n = data[0]
         x = data[1]
         ltype = data[2]
-        if type(ltype) is types.StringType:
+        if type(ltype) is bytes:
             ltype = [ltype,'mo']
     else:
-        raise ValueError, "Invalid input arguments."
+        raise ValueError("Invalid input arguments.")
 
     if len(n) != len(x):
-        raise SizeMismatch, ('lengths', len(n), len(x))
+        raise SizeMismatch('lengths', len(n), len(x))
     # line at zero:
     newdata = []
     newdata.extend([[n[0],n[-1]],[0,0],ltype[0]])
@@ -474,7 +478,7 @@ def plot(*data,**keywds):
         #default to markers being invisible
         #lines[-1].markers.visible = 'no'
     # check for hold here
-    for name in plot_objects.poly_marker._attributes.keys():
+    for name in list(plot_objects.poly_marker._attributes.keys()):
         value = keywds.get(name)
         if value is not None:
             for k in range(len(lines)):

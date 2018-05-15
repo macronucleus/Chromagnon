@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as N
 
 def _data_withAndorSIF(info):
@@ -64,7 +65,7 @@ def readSIF(fn, read_Back_ref=0):
     f = open(fn, "rb")
     l = f.readline()[:-1]
     if l != 'Andor Technology Multi-Channel File':
-        raise IOError, 'Not an Andor SIF image file.'
+        raise IOError('Not an Andor SIF image file.')
 
     f.readline() #skipLine # 65538 1
 
@@ -142,7 +143,7 @@ temperature[C]: %(temperature)s\
     f.readline() # skip rest of line
 
     s = f.readline().split()
-    info.detectorSize=map(int, s[:2])
+    info.detectorSize=list(map(int, s[:2]))
     n=int(s[-1])
     info.fileName = f.read(n)
     f.readline() # skip rest of line (just a space and \n")
@@ -152,7 +153,7 @@ temperature[C]: %(temperature)s\
 
     f.read(14) # skip 14 bytes
     s = f.readline().split()
-    info.shutterTime=map(float, s[:2])
+    info.shutterTime=list(map(float, s[:2]))
 
     for _ in range(8):
         f.readline() # skip rest of line
@@ -181,7 +182,7 @@ temperature[C]: %(temperature)s\
     assert int(s[0]) == 65538
 
     #info.imageArea = map(int, s[1:7])
-    o = map(int, s[1:7])
+    o = list(map(int, s[1:7]))
     info.imageArea = N.array(((o[0],o[3],o[5]),(o[2],o[1],o[4])))
     sizeStack = int(s[7])
     size2dSect = int(s[8])
@@ -189,16 +190,16 @@ temperature[C]: %(temperature)s\
     s = f.readline().split()
     assert int(s[0]) == 65538
 
-    o=map(int, s[1:5])
+    o=list(map(int, s[1:5]))
     info.frameArea=N.array(((o[0],o[3]),(o[2],o[1])))
-    o=map(int, s[5:7])
+    o=list(map(int, s[5:7]))
     info.frameBins=N.array((o[1],o[0]))
 
 
     shape2d=tuple((1 + N.diff(info.frameArea, axis=0))[0]//info.frameBins)
     nSects=(1 + N.diff(info.imageArea[:,2]))[0]
     if N.prod(shape2d) != size2dSect or size2dSect*nSects != sizeStack:
-        raise IOError, 'Andor SIF: Inconsistent image header.'
+        raise IOError('Andor SIF: Inconsistent image header.')
 
     shape3d = (nSects,)+shape2d
 
@@ -229,7 +230,7 @@ temperature[C]: %(temperature)s\
     n=int(s[-1])
     if n:
         s = f.read(n)
-        print s  # ???
+        print(s)  # ???
 
     s = f.readline().split()
     next =int(s[0])

@@ -80,7 +80,7 @@ except:
         (it's not part of the standard Python distribution). See the
         Python site (http://www.python.org) for information on
         downloading source or binaries."""
-        raise ImportError, "Numeric or numarray not found. \n" + msg
+        raise ImportError("Numeric or numarray not found. \n" + msg)
 
 try:
     True
@@ -103,9 +103,9 @@ class PolyPoints:
         self.scaled = self.points
         self.attributes = {}
         self.attributes.update(self._attributes)
-        for name, value in attr.items():   
-            if name not in self._attributes.keys():
-                raise KeyError, "Style attribute incorrect. Should be one of %s" %self._attributes.keys()
+        for name, value in list(attr.items()):   
+            if name not in list(self._attributes.keys()):
+                raise KeyError("Style attribute incorrect. Should be one of %s" %list(self._attributes.keys()))
             self.attributes[name] = value
         
     def boundingBox(self):
@@ -297,7 +297,7 @@ class PlotGraphics:
         yLabel - label shown on y-axis
         """
         if type(objects) not in [list,tuple]:
-            raise TypeError, "objects argument should be list or tuple"
+            raise TypeError("objects argument should be list or tuple")
         self.objects = objects
         self.title= title
         self.xLabel= xLabel
@@ -576,7 +576,7 @@ class PlotCanvas(wx.wxWindow):
     def SetEnableZoom(self, value):
         """Set True to enable zooming."""
         if value not in [True,False]:
-            raise TypeError, "Value should be True or False"
+            raise TypeError("Value should be True or False")
         self._zoomEnabled= value
 
     def GetEnableZoom(self):
@@ -598,7 +598,7 @@ class PlotCanvas(wx.wxWindow):
     def SetEnableLegend(self, value):
         """Set True to enable legend."""
         if value not in [True,False]:
-            raise TypeError, "Value should be True or False"
+            raise TypeError("Value should be True or False")
         self._legendEnabled= value 
         self.Redraw()
 
@@ -690,9 +690,9 @@ class PlotCanvas(wx.wxWindow):
 
         #check Axis is either tuple or none
         if type(xAxis) not in [type(None),tuple]:
-            raise TypeError, "xAxis should be None or (minX,maxX)"
+            raise TypeError("xAxis should be None or (minX,maxX)")
         if type(yAxis) not in [type(None),tuple]:
-            raise TypeError, "yAxis should be None or (minY,maxY)"
+            raise TypeError("yAxis should be None or (minY,maxY)")
              
         #check case for axis = (a,b) where a==b caused by improper zooms
         if xAxis != None:
@@ -930,7 +930,7 @@ class PlotCanvas(wx.wxWindow):
                 pnt2= (trhc[0]+legendLHS+legendSymExt[0], trhc[1]+s+lineHeight/2.)
                 o.draw(dc, self.printerScale, coord= Numeric.array([pnt1,pnt2]))
             else:
-                raise TypeError, "object is neither PolyMarker or PolyLine instance"
+                raise TypeError("object is neither PolyMarker or PolyLine instance")
             #draw legend txt
             pnt= (trhc[0]+legendLHS+legendSymExt[0], trhc[1]+s+lineHeight/2.-legendTextExt[1]/2)
             dc.DrawText(o.getLegend(),pnt[0],pnt[1])
@@ -1041,7 +1041,7 @@ class PlotCanvas(wx.wxWindow):
             else:
                 return upper, lower
         else:
-            raise ValueError, str(spec) + ': illegal axis specification'
+            raise ValueError(str(spec) + ': illegal axis specification')
 
     def _drawAxes(self, dc, p1, p2, scale, shift, xticks, yticks):
         
@@ -1107,10 +1107,10 @@ class PlotCanvas(wx.wxWindow):
             format = '%+7.1e'        
         elif power >= 0:
             digits = max(1, int(power))
-            format = '%' + `digits`+'.0f'
+            format = '%' + repr(digits)+'.0f'
         else:
             digits = -int(power)
-            format = '%'+`digits+2`+'.'+`digits`+'f'
+            format = '%'+repr(digits+2)+'.'+repr(digits)+'f'
         ticks = []
         t = -grid*Numeric.floor(-lower/grid)
         while t <= upper:

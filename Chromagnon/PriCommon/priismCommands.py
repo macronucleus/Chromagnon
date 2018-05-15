@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import print_function
 import os, sys
 
 PRII='priism-4.2.7'
@@ -26,10 +27,10 @@ def PriismSetup():
         
         if os.path.exists(setup):
             com = '. %s' % setup
-            print com
+            print(com)
             err = os.system(com)
             if err:
-                raise RuntimeError, 'Priism setup failed, exit status %s' % err
+                raise RuntimeError('Priism setup failed, exit status %s' % err)
     else:
         pass
         #print 'Priism already set up'
@@ -55,13 +56,13 @@ def objFinder(infile, polfile=None, border=1, spacing=4, minpts=100, outerOnly=T
     if outerOnly:
         excStr += '-outer_only '
 
-    for key, value in kwds.iteritems():
+    for key, value in kwds.items():
         excStr += '-%s=%s '% (key, value)
 
     # execute command
     status = os.system(excStr)
     if status:
-        raise RuntimeError, '2DObjectFinder, exit status %i, check if the input image is binary or maybe you are running without X?\ncommad: %s' % (status, excStr)
+        raise RuntimeError('2DObjectFinder, exit status %i, check if the input image is binary or maybe you are running without X?\ncommad: %s' % (status, excStr))
     #print excStr
     return polfile
 
@@ -79,7 +80,7 @@ def findMethod(method='b'):
     if len(method) <= 2:
         method = FILTER_METHODS.get(method)
     if not method:
-        raise ValueError, 'Filter3D methods not found'
+        raise ValueError('Filter3D methods not found')
     return method
 
 def Filter3D(fn, out=None, filterMethod='b', kernel='3:3:3', sigma='1:1:1', sigma_inten=5, iterations=1, **kwds):
@@ -100,7 +101,7 @@ def Filter3D(fn, out=None, filterMethod='b', kernel='3:3:3', sigma='1:1:1', sigm
         #-gauss1=0:0.6:5 -gauss2=0:0.1:-4
         options = _generalOptions(**kwds)
         g = 0
-        for key, value in kwds.iteritems():
+        for key, value in kwds.items():
             if key.startswith('gauss') and value:
                 g += 1
         if g:
@@ -166,7 +167,7 @@ def _execCom(com, log=None):
     #print com
     if err:
         program = com.split()[0]
-        raise RuntimeError, '%s had exit status %s\ncommand is: %s' % (program, err, com)
+        raise RuntimeError('%s had exit status %s\ncommand is: %s' % (program, err, com))
 
     if log:
         h = open(log, 'a')
@@ -201,7 +202,7 @@ def _generalOptions(zyxslc=None, tslc=None, ws=[], *args, **kwds):
     if ws:
         options += ' -w='+ ':'.join([str(w) for w in ws])
 
-    for key, value in kwds.iteritems():
+    for key, value in kwds.items():
         options += ' -%s=%s' % (key, value)
 
     return options

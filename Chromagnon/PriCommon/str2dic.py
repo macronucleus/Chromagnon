@@ -1,3 +1,4 @@
+import six
 SEP=' '
 WSP=':'
 
@@ -6,7 +7,7 @@ def str2dic(ss, sep=SEP, wsep=WSP):
     ss: wave:value wave:value (careful with space)
     func: int or float or eval
     """
-    if isinstance(ss, basestring):
+    if isinstance(ss, six.string_types):
         ss = ss.strip()
         if wsep in ss:
             dic = []
@@ -22,26 +23,27 @@ def str2dic(ss, sep=SEP, wsep=WSP):
         dic = ss
     return dic
 
-def dic2str(dic, sep=SEP, wsep=WSP):
+def dic2str(dic, sep=SEP, wsep=WSP, digit=None):
     """
     return wave:value wave:value
     """
+    if digit is None:
+        digit = 2
     if type(dic) == dict:
         ss = []
-        for wave, value in dic.iteritems():
-            if value % 1:#type(value) == float:
-                ss.append('%i%s%.4f' % (wave, wsep, value))
-            else:#if type(value) == int:
+        for wave, value in dic.items():
+            if value % 1:
+                sformat = '%i%s%.' + str(digit) + 'f'
+                ss.append(sformat % (wave, wsep, value))
+            else:
                 ss.append('%i%s%i' % (wave, wsep, value))
-                #else:
-                #raise ValueError, 'the values in dic has to be float or int, you gave %s' % type(value)
         return sep.join(ss)
-    elif dic % 1:#type(dic) == float:
-        return '%.4f' % dic
-    else:#if type(dic) == int:
+    elif dic % 1:
+        
+        sformat = '%.' + str(digit) + 'f'
+        return sformat % dic
+    else:
         return str(dic)
-    #else:
-    #    raise ValueError, 'dic has to be dict or float or int'
 
 def dic2val(dic, key):
     """
@@ -60,7 +62,7 @@ def numberSeq(vstr, removeOverlap=True):
     return [29, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]
     """
     if not vstr:
-        return None
+        return []
     slist = [s.strip() for s in vstr.split(SEP[0])]
     for sep in SEP[1:]:
         slist2 = []
@@ -71,7 +73,7 @@ def numberSeq(vstr, removeOverlap=True):
     for s in slist:
         if RANGE in s:
             start, stop = s.split(RANGE)
-            slist2 += range(eval(start), eval(stop)+1)
+            slist2 += list(range(eval(start), eval(stop)+1))
         else:
             slist2 += [s]
     slist = [int(s) for s in slist2]

@@ -4,7 +4,8 @@
 A simple parallel processing API for Python, inspired somewhat by the thread
 module, slightly less by pypar, and slightly less still by pypvm.
 
-Copyright (C) 2005, 2006, 2007 Paul Boddie <paul@boddie.org.uk>
+Copyright (C) 2005, 2006, 2007, 2008, 2009, 2013 Paul Boddie <paul@boddie.org.uk>
+Copyright (C) 2013 Yaroslav Halchenko <debian@onerussian.com>
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -20,17 +21,29 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-__version__ = "0.3.1"
+__version__ = "0.5.1"
 
 import os
 import sys
 import select
 import socket
+import platform
+
+from warnings import warn
 
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except ImportError:
     import pickle
+
+try:
+    set
+except NameError:
+    from sets import Set as set
+
+# Special values.
+
+class Undefined: pass
 
 # Communications.
 
@@ -52,7 +65,6 @@ class Channel:
         self.pid = pid
         self.read_pipe = read_pipe
         self.write_pipe = write_pipe
-        self.closed = 0
 
     def __del__(self):
 
@@ -65,11 +77,13 @@ class Channel:
 
         "Explicitly close the channel."
 
-        if not self.closed:
-            self.closed = 1
+        if self.read_pipe is not None:
             self.read_pipe.close()
+            self.read_pipe = None
+        if self.write_pipe is not None:
             self.write_pipe.close()
-            #self.wait(os.WNOHANG)
+            self.write_pipe = None
+        #self.wait(os.WNOHANG)
 
     def wait(self, options=0):
 
@@ -99,7 +113,7 @@ class Channel:
 
         self._send(obj)
         if self._receive() != "OK":
-            raise AcknowledgementError, obj
+            raise AcknowledgementError(obj)
 
     def _receive(self):
 
@@ -126,6 +140,97 @@ class Channel:
         finally:
             self._send("OK")
 
+class PersistentChannel(Channel):
+
+    """
+    A persistent communications channel which can handle peer disconnection,
+    acting as a server, meaning that this channel is associated with a specific
+    address which can be contacted by other processes.
+    """
+
+    def __init__(self, pid, endpoint, address):
+        Channel.__init__(self, pid, None, None)
+        self.endpoint = endpoint
+        self.address = address
+        self.poller = select.poll()
+
+        # Listen for connections before this process is interested in
+        # communicating. It is not desirable to wait for connections at this
+        # point because this will block the process.
+
+        self.endpoint.listen(1)
+
+    def close(self):
+
+        "Close the persistent channel and remove the socket file."
+
+        Channel.close(self)
+        try:
+            os.unlink(self.address)
+        except OSError:
+            pass
+
+    def _ensure_pipes(self):
+
+        "Ensure that the channel is capable of communicating."
+
+        if self.read_pipe is None or self.write_pipe is None:
+
+            # Accept any incoming connections.
+
+            endpoint, address = self.endpoint.accept()
+            self.read_pipe = endpoint.makefile("r", 0)
+            self.write_pipe = endpoint.makefile("w", 0)
+
+            # Monitor the write pipe for error conditions.
+
+            fileno = self.write_pipe.fileno()
+            self.poller.register(fileno, select.POLLOUT | select.POLLHUP | select.POLLNVAL | select.POLLERR)
+
+    def _reset_pipes(self):
+
+        "Discard the existing connection."
+
+        fileno = self.write_pipe.fileno()
+        self.poller.unregister(fileno)
+        self.read_pipe = None
+        self.write_pipe = None
+        self.endpoint.listen(1)
+
+    def _ensure_communication(self, timeout=None):
+
+        "Ensure that sending and receiving are possible."
+
+        while 1:
+            self._ensure_pipes()
+            fileno = self.write_pipe.fileno()
+            fds = self.poller.poll(timeout)
+            for fd, status in fds:
+                if fd != fileno:
+                    continue
+                if status & (select.POLLHUP | select.POLLNVAL | select.POLLERR):
+
+                    # Broken connection: discard it and start all over again.
+
+                    self._reset_pipes()
+                    break
+            else:
+                return
+
+    def _send(self, obj):
+
+        "Send the given object 'obj' through the channel."
+
+        self._ensure_communication()
+        Channel._send(self, obj)
+
+    def _receive(self):
+
+        "Receive an object through the channel, returning the object."
+
+        self._ensure_communication()
+        return Channel._receive(self)
+
 # Management of processes and communications.
 
 class Exchange:
@@ -134,9 +239,13 @@ class Exchange:
     A communications exchange that can be used to detect channels which are
     ready to communicate. Subclasses of this class can define the 'store_data'
     method in order to enable the 'add_wait', 'wait' and 'finish' methods.
+
+    Once exchanges are populated with active channels, use of the principal
+    methods of the exchange typically cause the 'store' method to be invoked,
+    resulting in the processing of any incoming data.
     """
 
-    def __init__(self, channels=None, limit=None, reuse=0, autoclose=1):
+    def __init__(self, channels=None, limit=None, reuse=0, continuous=0, autoclose=1):
 
         """
         Initialise the exchange with an optional list of 'channels'.
@@ -147,7 +256,13 @@ class Exchange:
         this class and define a working 'store_data' method.
 
         If the optional 'reuse' parameter is set to a true value, channels and
-        processes will be reused for waiting computations.
+        processes will be reused for waiting computations, but the callable will
+        be invoked for each computation.
+
+        If the optional 'continuous' parameter is set to a true value, channels
+        and processes will be retained after receiving data sent from such
+        processes, since it will be assumed that they will communicate more
+        data.
 
         If the optional 'autoclose' parameter is set to a false value, channels
         will not be closed automatically when they are removed from the exchange
@@ -157,32 +272,38 @@ class Exchange:
         self.limit = limit
         self.reuse = reuse
         self.autoclose = autoclose
+        self.continuous = continuous
+
         self.waiting = []
         self.readables = {}
         self.removed = []
         self.poller = select.poll()
+
         for channel in channels or []:
             self.add(channel)
+
+    # Core methods, registering and reporting on channels.
 
     def add(self, channel):
 
         "Add the given 'channel' to the exchange."
 
-        self.readables[channel.read_pipe.fileno()] = channel
-        self.poller.register(channel.read_pipe.fileno(), select.POLLIN | select.POLLHUP | select.POLLNVAL | select.POLLERR)
+        fileno = channel.read_pipe.fileno()
+        self.readables[fileno] = channel
+        self.poller.register(fileno, select.POLLIN | select.POLLHUP | select.POLLNVAL | select.POLLERR)
 
     def active(self):
 
         "Return a list of active channels."
 
-        return self.readables.values()
+        return list(self.readables.values())
 
     def ready(self, timeout=None):
 
         """
-        Wait for a period of time specified by the optional 'timeout' (or until
-        communication is possible) and return a list of channels which are ready
-        to be read from.
+        Wait for a period of time specified by the optional 'timeout' in
+        milliseconds (or until communication is possible) and return a list of
+        channels which are ready to be read from.
         """
 
         fds = self.poller.poll(timeout)
@@ -214,13 +335,26 @@ class Exchange:
         Remove the given 'channel' from the exchange.
         """
 
-        del self.readables[channel.read_pipe.fileno()]
-        self.poller.unregister(channel.read_pipe.fileno())
+        fileno = channel.read_pipe.fileno()
+        del self.readables[fileno]
+        self.poller.unregister(fileno)
         if self.autoclose:
             channel.close()
             channel.wait()
 
     # Enhanced exchange methods involving channel limits.
+
+    def unfinished(self):
+
+        "Return whether the exchange still has work scheduled or in progress."
+
+        return self.active() or self.waiting
+
+    def busy(self):
+
+        "Return whether the exchange uses as many channels as it is allowed to."
+
+        return self.limit is not None and len(self.active()) >= self.limit
 
     def add_wait(self, channel):
 
@@ -241,17 +375,68 @@ class Exchange:
 
         # If limited, block until channels have been closed.
 
-        while self.limit is not None and len(self.active()) >= self.limit:
+        while self.busy():
             self.store()
 
-    def start_waiting(self, channel):
+    def finish(self):
 
         """
-        Start a waiting process given the reception of data on the given
-        'channel'.
+        Finish the use of the exchange by waiting for all channels to complete.
         """
 
-        if self.waiting:
+        while self.unfinished():
+            self.store()
+
+    def store(self, timeout=None):
+
+        """
+        For each ready channel, process the incoming data. If the optional
+        'timeout' parameter (a duration in milliseconds) is specified, wait only
+        for the specified duration if no channels are ready to provide data.
+        """
+
+        # Either process input from active channels.
+
+        if self.active():
+            for channel in self.ready(timeout):
+                try:
+                    self.store_data(channel)
+                    self.start_waiting(channel)
+                except IOError as exc:
+                    self.remove(channel)
+                    warn("Removed channel %r due to IOError: %s" % (channel, exc))
+
+        # Or schedule new processes and channels.
+
+        else:
+            while self.waiting and not self.busy():
+                callable, args, kw = self.waiting.pop()
+                self.start(callable, *args, **kw)
+
+    def store_data(self, channel):
+
+        """
+        Store incoming data from the specified 'channel'. In subclasses of this
+        class, such data could be stored using instance attributes.
+        """
+
+        raise NotImplementedError("store_data")
+
+    # Support for the convenience methods.
+
+    def _get_waiting(self, channel):
+
+        """
+        Get waiting callable and argument information for new processes, given
+        the reception of data on the given 'channel'.
+        """
+
+        # For continuous channels, no scheduling is requested.
+
+        if self.waiting and not self.continuous:
+
+            # Schedule this callable and arguments.
+
             callable, args, kw = self.waiting.pop()
 
             # Try and reuse existing channels if possible.
@@ -263,8 +448,9 @@ class Exchange:
 
                 self.add(channel)
                 channel.send((args, kw))
+
             else:
-                self.add(start(callable, *args, **kw))
+                return callable, args, kw
 
         # Where channels are being reused, but where no processes are waiting
         # any more, send a special value to tell them to quit.
@@ -272,44 +458,59 @@ class Exchange:
         elif self.reuse:
             channel.send(None)
 
-    def finish(self):
+        return None
+
+    def _set_waiting(self, callable, args, kw):
 
         """
-        Finish the use of the exchange by waiting for all channels to complete.
+        Support process creation by returning whether the given 'callable' has
+        been queued for later invocation.
         """
 
-        while self.active():
-            self.store()
+        if self.busy():
+            self.waiting.insert(0, (callable, args, kw))
+            return 1
+        else:
+            return 0
 
-    def store(self):
-
-        "For each ready channel, process the incoming data."
-
-        for channel in self.ready():
-            self.store_data(channel)
-            self.start_waiting(channel)
-
-    def store_data(self, channel):
+    def _get_channel_for_process(self, channel):
 
         """
-        Store incoming data from the specified 'channel'. In subclasses of this
-        class, such data could be stored using instance attributes.
+        Support process creation by returning the given 'channel' to the
+        creating process, and None to the created process.
         """
 
-        raise NotImplementedError, "store_data"
+        if channel.pid == 0:
+            return channel
+        else:
+            self.add_wait(channel)
+            return None
+
+    # Methods for overriding, related to the convenience methods.
+
+    def start_waiting(self, channel):
+
+        """
+        Start a waiting process given the reception of data on the given
+        'channel'.
+        """
+
+        details = self._get_waiting(channel)
+        if details is not None:
+            callable, args, kw = details
+            self.add(start(callable, *args, **kw))
 
     # Convenience methods.
 
     def start(self, callable, *args, **kw):
 
         """
-        Using pprocess.start, create a new process for the given 'callable'
-        using any additional arguments provided. Then, monitor the channel
-        created between this process and the created process.
+        Create a new process for the given 'callable' using any additional
+        arguments provided. Then, monitor the channel created between this
+        process and the created process.
         """
 
-        if self.limit is not None and len(self.active()) >= self.limit:
-            self.waiting.insert(0, (callable, args, kw))
+        if self._set_waiting(callable, args, kw):
             return
 
         self.add_wait(start(callable, *args, **kw))
@@ -317,18 +518,14 @@ class Exchange:
     def create(self):
 
         """
-        Using pprocess.create, create a new process and return the created
-        communications channel to the created process. In the creating process,
-        return None - the channel receiving data from the created process will
-        be automatically managed by this exchange.
+        Create a new process and return the created communications channel to
+        the created process. In the creating process, return None - the channel
+        receiving data from the created process will be automatically managed by
+        this exchange.
         """
 
         channel = create()
-        if channel.pid == 0:
-            return channel
-        else:
-            self.add_wait(channel)
-            return None
+        return self._get_channel_for_process(channel)
 
     def manage(self, callable):
 
@@ -339,6 +536,67 @@ class Exchange:
         """
 
         return ManagedCallable(callable, self)
+
+class Persistent:
+
+    """
+    A mix-in class providing methods to exchanges for the management of
+    persistent communications.
+    """
+
+    def start_waiting(self, channel):
+
+        """
+        Start a waiting process given the reception of data on the given
+        'channel'.
+        """
+
+        details = self._get_waiting(channel)
+        if details is not None:
+            callable, args, kw = details
+            self.add(start_persistent(channel.address, callable, *args, **kw))
+
+    def start(self, address, callable, *args, **kw):
+
+        """
+        Create a new process, located at the given 'address', for the given
+        'callable' using any additional arguments provided. Then, monitor the
+        channel created between this process and the created process.
+        """
+
+        if self._set_waiting(callable, args, kw):
+            return
+
+        start_persistent(address, callable, *args, **kw)
+
+    def create(self, address):
+
+        """
+        Create a new process, located at the given 'address', and return the
+        created communications channel to the created process. In the creating
+        process, return None - the channel receiving data from the created
+        process will be automatically managed by this exchange.
+        """
+
+        channel = create_persistent(address)
+        return self._get_channel_for_process(channel)
+
+    def manage(self, address, callable):
+
+        """
+        Using the given 'address', publish the given 'callable' in an object
+        which can then be called in the same way as 'callable', but with new
+        processes and communications managed automatically.
+        """
+
+        return PersistentCallable(address, callable, self)
+
+    def connect(self, address):
+
+        "Connect to a process which is contactable via the given 'address'."
+
+        channel = connect_persistent(address)
+        self.add_wait(channel)
 
 class ManagedCallable:
 
@@ -363,6 +621,57 @@ class ManagedCallable:
 
         self.exchange.start(self.callable, *args, **kw)
 
+class PersistentCallable:
+
+    "A callable which sets up a persistent communications channel."
+
+    def __init__(self, address, callable, exchange):
+
+        """
+        Using the given 'address', wrap the given 'callable', using the given
+        'exchange' to monitor the channels created for communications between
+        this and the created processes, so that when it is called, a background
+        process is started within which the 'callable' will run. Note that the
+        'callable' must be parallel-aware (that is, have a 'channel' parameter).
+        Use the MakeParallel class to wrap other kinds of callable objects.
+        """
+
+        self.callable = callable
+        self.exchange = exchange
+        self.address = address
+
+    def __call__(self, *args, **kw):
+
+        "Invoke the callable with the supplied arguments."
+
+        self.exchange.start(self.address, self.callable, *args, **kw)
+
+class BackgroundCallable:
+
+    """
+    A callable which sets up a persistent communications channel, but is
+    unmanaged by an exchange.
+    """
+
+    def __init__(self, address, callable):
+
+        """
+        Using the given 'address', wrap the given 'callable'. This object can
+        then be invoked, but the wrapped callable will be run in a background
+        process. Note that the 'callable' must be parallel-aware (that is, have
+        a 'channel' parameter). Use the MakeParallel class to wrap other kinds
+        of callable objects.
+        """
+
+        self.callable = callable
+        self.address = address
+
+    def __call__(self, *args, **kw):
+
+        "Invoke the callable with the supplied arguments."
+
+        start_persistent(self.address, self.callable, *args, **kw)
+
 # Abstractions and utilities.
 
 class Map(Exchange):
@@ -380,6 +689,7 @@ class Map(Exchange):
         self.channel_number = 0
         self.channels = {}
         self.results = []
+        self.current_index = 0
 
     def add(self, channel):
 
@@ -392,24 +702,24 @@ class Map(Exchange):
     def start(self, callable, *args, **kw):
 
         """
-        Using pprocess.start, create a new process for the given 'callable'
-        using any additional arguments provided. Then, monitor the channel
-        created between this process and the created process.
+        Create a new process for the given 'callable' using any additional
+        arguments provided. Then, monitor the channel created between this
+        process and the created process.
         """
 
-        self.results.append(None) # placeholder
+        self.results.append(Undefined) # placeholder
         Exchange.start(self, callable, *args, **kw)
 
     def create(self):
 
         """
-        Using pprocess.create, create a new process and return the created
-        communications channel to the created process. In the creating process,
-        return None - the channel receiving data from the created process will
-        be automatically managed by this exchange.
+        Create a new process and return the created communications channel to
+        the created process. In the creating process, return None - the channel
+        receiving data from the created process will be automatically managed by
+        this exchange.
         """
 
-        self.results.append(None) # placeholder
+        self.results.append(Undefined) # placeholder
         return Exchange.create(self)
 
     def __call__(self, callable, sequence):
@@ -432,14 +742,6 @@ class Map(Exchange):
 
         return self
 
-    def __getitem__(self, i):
-        self.finish()
-        return self.results[i]
-
-    def __iter__(self):
-        self.finish()
-        return iter(self.results)
-
     def store_data(self, channel):
 
         "Accumulate the incoming data, associating results with channels."
@@ -447,6 +749,58 @@ class Map(Exchange):
         data = channel.receive()
         self.results[self.channels[channel]] = data
         del self.channels[channel]
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+
+        "Return the next element in the map."
+
+        try:
+            return self._next()
+        except IndexError:
+            pass
+
+        while self.unfinished():
+            self.store()
+            try:
+                return self._next()
+            except IndexError:
+                pass
+        else:
+            raise StopIteration
+
+    def __getitem__(self, i):
+
+        "Return element 'i' from the map."
+
+        try:
+            return self._get(i)
+        except IndexError:
+            pass
+
+        while self.unfinished():
+            self.store()
+            try:
+                return self._get(i)
+            except IndexError:
+                pass
+        else:
+            raise IndexError(i)
+
+    # Helper methods for the above access methods.
+
+    def _next(self):
+        result = self._get(self.current_index)
+        self.current_index += 1
+        return result
+
+    def _get(self, i):
+        result = self.results[i]
+        if result is Undefined or isinstance(i, slice) and Undefined in result:
+            raise IndexError(i)
+        return result
 
 class Queue(Exchange):
 
@@ -469,18 +823,25 @@ class Queue(Exchange):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
 
         "Return the next element in the queue."
 
         if self.queue:
             return self.queue.pop()
-        while self.active():
+
+        while self.unfinished():
             self.store()
             if self.queue:
                 return self.queue.pop()
         else:
             raise StopIteration
+
+    def __len__(self):
+
+        "Return the current length of the queue."
+
+        return len(self.queue)
 
 class MakeParallel:
 
@@ -521,9 +882,116 @@ class MakeReusable(MakeParallel):
             channel.send(self.callable(*args, **kw))
             t = channel.receive()
 
+# Persistent variants.
+
+class PersistentExchange(Persistent, Exchange):
+
+    "An exchange which manages persistent communications."
+
+    pass
+
+class PersistentQueue(Persistent, Queue):
+
+    "A queue which manages persistent communications."
+
+    pass
+
+# Convenience functions.
+
+def BackgroundQueue(address):
+
+    """
+    Connect to a process reachable via the given 'address', making the results
+    of which accessible via a queue.
+    """
+
+    queue = PersistentQueue(limit=1)
+    queue.connect(address)
+    return queue
+
+def pmap(callable, sequence, limit=None):
+
+    """
+    A parallel version of the built-in map function with an optional process
+    'limit'. The given 'callable' should not be parallel-aware (that is, have a
+    'channel' parameter) since it will be wrapped for parallel communications
+    before being invoked.
+
+    Return the processed 'sequence' where each element in the sequence is
+    processed by a different process.
+    """
+
+    mymap = Map(limit=limit)
+    return mymap(callable, sequence)
+
 # Utility functions.
 
-def create():
+_cpuinfo_fields = "processor", "physical id", "core id"
+
+def _get_number_of_cores():
+
+    """
+    Return the number of distinct, genuine processor cores. If the platform is
+    not supported by this function, None is returned.
+    """
+
+    try:
+        f = open("/proc/cpuinfo")
+        try:
+            processors = set()
+
+            # Use the _cpuinfo_field values as "digits" in a larger unique
+            # core identifier.
+
+            processor = [None, None, None]
+
+            for line in f:
+                for i, field in enumerate(_cpuinfo_fields):
+
+                    # Where the field is found, insert the value into the
+                    # appropriate location in the processor identifier.
+
+                    if line.startswith(field):
+                        t = line.split(":")
+                        processor[i] = int(t[1].strip())
+                        break
+
+                # Where a new processor description is started, record the
+                # identifier.
+
+                if line.startswith("processor") and processor[0] is not None:
+                    processors.add(tuple(processor))
+                    processor = [None, None, None]
+
+            # At the end of reading the file, add any unrecorded processors.
+
+            if processor[0] is not None:
+                processors.add(tuple(processor))
+
+            return len(processors)
+
+        finally:
+            f.close()
+
+    except OSError:
+        return None
+
+def _get_number_of_cores_solaris():
+
+    """
+    Return the number of cores for OpenSolaris 2008.05 and possibly other
+    editions of Solaris.
+    """
+
+    f = os.popen("psrinfo -p")
+    try:
+        return int(f.read().strip())
+    finally:
+        f.close()
+
+# Low-level functions.
+
+def create_socketpair():
 
     """
     Create a new process, returning a communications channel to both the
@@ -541,6 +1009,77 @@ def create():
     else:
         child.close()
         return Channel(pid, parent.makefile("r", 0), parent.makefile("w", 0))
+
+def create_pipes():
+
+    """
+    Create a new process, returning a communications channel to both the
+    creating process and the created process.
+
+    This function uses pipes instead of a socket pair, since some platforms
+    seem to have problems with poll and such socket pairs.
+    """
+
+    pr, cw = os.pipe()
+    cr, pw = os.pipe()
+
+    pid = os.fork()
+    if pid == 0:
+        os.close(pr)
+        os.close(pw)
+        return Channel(pid, os.fdopen(cr, "r", 0), os.fdopen(cw, "w", 0))
+    else:
+        os.close(cr)
+        os.close(cw)
+        return Channel(pid, os.fdopen(pr, "r", 0), os.fdopen(pw, "w", 0))
+
+if platform.system() == "SunOS":
+    create = create_pipes
+    get_number_of_cores = _get_number_of_cores_solaris
+else:
+    create = create_socketpair
+    get_number_of_cores = _get_number_of_cores
+
+def create_persistent(address):
+
+    """
+    Create a new process, returning a persistent communications channel between
+    the creating process and the created process. This channel can be
+    disconnected from the creating process and connected to another process, and
+    thus can be used to collect results from daemon processes.
+
+    In order to be able to reconnect to created processes, the 'address' of the
+    communications endpoint for the created process needs to be provided. This
+    should be a filename.
+    """
+
+    parent = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    child = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    child.bind(address)
+
+    for s in [parent, child]:
+        s.setblocking(1)
+
+    pid = os.fork()
+    if pid == 0:
+        parent.close()
+        return PersistentChannel(pid, child, address)
+    else:
+        child.close()
+        #parent.connect(address)
+        return Channel(pid, parent.makefile("r", 0), parent.makefile("w", 0))
+
+def connect_persistent(address):
+
+    """
+    Connect via a persistent channel to an existing created process, reachable
+    at the given 'address'.
+    """
+
+    parent = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    parent.setblocking(1)
+    parent.connect(address)
+    return Channel(0, parent.makefile("r", 0), parent.makefile("w", 0))
 
 def exit(channel):
 
@@ -576,6 +1115,47 @@ def start(callable, *args, **kw):
     else:
         return channel
 
+def start_persistent(address, callable, *args, **kw):
+
+    """
+    Create a new process which shall be reachable using the given 'address' and
+    which will start running in the given 'callable'. Additional arguments to
+    the 'callable' can be given as additional arguments to this function.
+
+    Return a communications channel to the creating process. For the created
+    process, supply a channel as the 'channel' parameter in the given 'callable'
+    so that it may send data back to the creating process.
+
+    Note that the created process employs a channel which is persistent: it can
+    withstand disconnection from the creating process and subsequent connections
+    from other processes.
+    """
+
+    channel = create_persistent(address)
+    if channel.pid == 0:
+        close_streams()
+        try:
+            try:
+                callable(channel, *args, **kw)
+            except:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                channel.send(exc_value)
+        finally:
+            exit(channel)
+    else:
+        return channel
+
+def close_streams():
+
+    """
+    Close streams which keep the current process attached to any creating
+    processes.
+    """
+
+    os.close(sys.stdin.fileno())
+    os.close(sys.stdout.fileno())
+    os.close(sys.stderr.fileno())
+
 def waitall():
 
     "Wait for all created processes to terminate."
@@ -585,20 +1165,5 @@ def waitall():
             os.wait()
     except OSError:
         pass
-
-def pmap(callable, sequence, limit=None):
-
-    """
-    A parallel version of the built-in map function with an optional process
-    'limit'. The given 'callable' should not be parallel-aware (that is, have a
-    'channel' parameter) since it will be wrapped for parallel communications
-    before being invoked.
-
-    Return the processed 'sequence' where each element in the sequence is
-    processed by a different process.
-    """
-
-    mymap = Map(limit=limit)
-    return mymap(callable, sequence)
 
 # vim: tabstop=4 expandtab shiftwidth=4

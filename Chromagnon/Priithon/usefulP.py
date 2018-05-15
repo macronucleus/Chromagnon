@@ -23,10 +23,10 @@ def plotSetColorsDefault(colString="rgbkcm"):
 plotSetColorsDefault()
 
 def _col(c, overwriteHold=False):
-    import plt
+    from . import plt
     plt.validate_active()
     fig = plt.interface._active
-    figwxid = fig.GetId()
+    #figwxid = fig.GetId()
 
     if c[0].isalpha() and c[0] not in 'xo':   #start colorString with letter to specify color
         if len(c) == 1:
@@ -54,7 +54,7 @@ def _col(c, overwriteHold=False):
     return plot_colors[ i % len(plot_colors) ]+c
 
 def _getFig(figureNo):
-    import plt
+    from . import plt
     if figureNo is None:
         plt.validate_active()
         fig = plt.interface._active
@@ -260,7 +260,7 @@ def plotSliderX(plotXWidth=None, xmax=None, figureNo=None):
     if nz < 1:     # what now
         nz = xmax  # better idea ?
 
-    import zslider
+    from . import zslider
 
     if not hasattr(fig, "seb_xslider") or \
        not hasattr(fig.seb_xslider, "Show"):
@@ -280,23 +280,23 @@ def plotFigure(which_one = None):
        if which_one is 'integer' : select that figure as active
     """
     import wx
-    import plt
+    from . import plt
     try:
-        plt.figure(which_one)
-        if which_one is None:
-            plothold(on=0)
+        return plt.figure(which_one)
+        #if which_one is None:
+        #    plothold(on=0)
     except wx.PyDeadObjectError:
-        print "** figure '%s' invalid - made new one **"%which_one
+        print("** figure '%s' invalid - made new one **"%which_one)
 
 def plotFigureGetNo(createNewIfNeeded=False):
     """
     return figureNo of current figure
     """
-    import plt
+    from . import plt
     try:
         figNo = plt.interface._figure.index(plt.interface._active)
         if not plt.interface._figure[figNo]:
-            raise RuntimeError, "active figure was probably closed"
+            raise RuntimeError("active figure was probably closed")
         return figNo
         
     except:
@@ -304,7 +304,7 @@ def plotFigureGetNo(createNewIfNeeded=False):
             plotFigure()
             return plt.interface._figure.index(plt.interface._active)
         if plt.interface._active is None:
-            raise RuntimeError, "no figure window open (active)"
+            raise RuntimeError("no figure window open (active)")
         raise
 
 def plotRaise(figureNo=None):
@@ -330,7 +330,7 @@ def plotClose(which_one = None):
     """
     close plot window
     """
-    import plt
+    from . import plt
     plt.close(which_one)
 
 def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None):
@@ -386,7 +386,7 @@ def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None
     if logY:
         arr = N.log10(abs(arr)+logZeroOffset)
 
-    import plt
+    from . import plt
     if figureNo is not None:
         _oldActive = plt.interface._active
         #plotFigure(figureNo)  # would Raise !!
@@ -409,7 +409,7 @@ def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None
     if figureNo is not None:
         plt.interface._active = _oldActive
 
-def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None):
+def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None, symbolSize=0):
     """
     arrY is a "table" of y1,...,yn values
     x-values of 0,1,2,3,4 are used as needed
@@ -439,7 +439,7 @@ def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTra
         #if logX:
         #    raise ValueError, 'Cannot use logX=True to plot x="axis-index"'
         #plotxy(arrY) # CHECK
-        import plt
+        from . import plt
         if figureNo is not None:
             _oldActive = plt.interface._active
             #plotFigure(figureNo)  # would Raise !!

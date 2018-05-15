@@ -1,18 +1,20 @@
 #!/usr/bin/env priithon
-
+from __future__ import print_function
 import os
+import six
 import numpy as N
-import guiFuncs as G, bioformatsIO
+from . import guiFuncs as G
+import imgio
 
 # GUI
 import wx, time
 
 # Constants
-EXT='flat'
+EXT='flat.ome.tif'
 IDTYPE = '101'
 
-if EXT not in bioformatsIO.OMETIFF:
-    bioformatsIO.OMETIFF = tuple(list(bioformatsIO.OMETIFF) + [EXT])
+#if EXT not in bioformatsIO.OMETIFF:
+#    bioformatsIO.OMETIFF = tuple(list(bioformatsIO.OMETIFF) + [EXT])
 
 
 # functions
@@ -22,7 +24,7 @@ def is_flat(fn, check_img_to_open=True):
         check = True
     else:
         if check_img_to_open:
-            rdr = bioformatsIO.BioformatsReader(fn)
+            rdr = imgio.Reader(fn)#bioformatsIO.BioformatsReader(fn)
             if hasattr(rdr, 'ome') and \
                 rdr.ome.get_structured_annotation('idtype') == IDTYPE:
                     check = True
@@ -41,10 +43,10 @@ def makeFlatConv(fn, out=None, suffix=''):
     elif not out.endswith(EXT):
         out = os.path.extsep.join(os.path.splitext(out)[0], EXT)
 
-    h = bioformatsIO.load(fn)
+    h = imgio.Reader(fn) #bioformatsIO.load(fn)
     ntz = h.nz * h.nt
     
-    o = bioformatsIO.getWriter(out)
+    o = imgio.Writer(fn) #bioformatsIO.getWriter(out)
     o.setFromReader(h)
     o.nt = 1
     o.nz = 1
@@ -74,10 +76,10 @@ def flatConv(fn, flatFile, out=None, suffix='_'+EXT.upper()):
         base, ext = os.path.splitext(fn)
         out = base + suffix + ext
 
-    h = bioformatsIO.load(fn)
+    h = imgio.Reader(fn) #bioformatsIO.load(fn)
 
-    f = bioformatsIO.load(flatFile)
-    o = bioformatsIO.getWriter(out)
+    f = imgio.Reader(flatFile) #bioformatsIO.load(flatFile)
+    o = imgio.Writer(out) #bioformatsIO.getWriter(out)
     o.setFromReader(h)
     if out.endswith('ome.tif'):
         o.imgSequence = 0
@@ -251,11 +253,11 @@ class BatchPanel(wx.Panel):
             self.aui.Show()
 
         # draw
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             newpanel = ndviewer.main.ImagePanel(self.aui, target)
             #newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
-        if isinstance(target, basestring):
+        if isinstance(target, six.string_types):
             name = os.path.basename(target)
         else:
             name = target.file
@@ -281,7 +283,7 @@ if __name__ == '__main__':
     options, arguments = p.parse_args()
 
     if not arguments:
-        from Priithon import PriApp
+        from ..Priithon import PriApp
         PriApp._maybeExecMain()
     else:
         make = options.make
@@ -304,7 +306,7 @@ if __name__ == '__main__':
                 [os.remove(out) for out in outs]
             else:
                 out = outs[0]
-            print out, ' saved'
+            print(out, ' saved')
         else:
             for fn in fns:
-                print flatConv(fn, **options.__dict__), ' done'
+                print(flatConv(fn, **options.__dict__), ' done')

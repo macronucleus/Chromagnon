@@ -71,7 +71,7 @@ def readSection(m, offsetSect = 0):
     try:
         hisHdr = hisHdr[0]
     except IndexError:
-        raise EOFError, "End of HIS file reached"
+        raise EOFError("End of HIS file reached")
 
 
     assert hisHdr['magic'] == 'IM'

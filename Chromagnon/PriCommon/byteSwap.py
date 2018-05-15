@@ -1,8 +1,9 @@
 #!/usr/bin/env priithon
-
+from __future__ import print_function
 from Priithon.all import Mrc
 import OMXlab as O
 import os
+import six
 
 DEF_BYTE = '<'
 DEF_EXT = 'dv'
@@ -58,7 +59,7 @@ def decideDtype(pxtype, byteOrder=DEF_BYTE):
     elif pxtype == 2:
         dt = '%sf4'
     elif pxtype == 3:
-        raise ValueError, 'Complex 2 signed 16-bit integers??'
+        raise ValueError('Complex 2 signed 16-bit integers??')
     elif pxtype == 4:
         dt = '%sc8'
     elif pxtype == 5:
@@ -77,13 +78,13 @@ def main(*args):
     tells you finished files using shell Messages
     """
     import wx
-    from Priithon.all import Y
+    from ..Priithon.all import Y
     
     dlg = wx.FileDialog(None, 'Choose image files', style=wx.OPEN|wx.MULTIPLE|wx.CHANGE_DIR)
     if dlg.ShowModal() == wx.ID_OK:
         fns = dlg.GetPaths()
         if fns:
-            if isinstance(fns, basestring):
+            if isinstance(fns, six.string_types):
                 fns = [fns]
             for fn in fns:
                 #out = os.path.extsep.join((fn, DEF_EXT))
@@ -91,7 +92,7 @@ def main(*args):
                 if hasattr(Y, 'shellMessage'):
                     Y.shellMessage(out.join(('#', '---done\n')))
                 else:
-                    print out.join(('#', '---done\n'))
+                    print(out.join(('#', '---done\n')))
                 Y.refresh()
     
 
@@ -105,7 +106,7 @@ if __name__ == '__main__':
 
     options, arguments = p.parse_args()
     if not arguments:
-        from Priithon import PriApp
+        from ..Priithon import PriApp
         PriApp._maybeExecMain()
     else:
         fns = []
@@ -114,4 +115,4 @@ if __name__ == '__main__':
             
         for fn in fns:
             out = byteSwap(fn, **options.__dict__)
-            print out, 'saved'
+            print(out, 'saved')

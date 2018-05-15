@@ -1,13 +1,28 @@
-import sys, os
+from __future__ import print_function
+import sys, os, threading
 
 iWORK_VERSION=['09', '08']
 MSOFFICE_VERSION=['2011', '2008', 'X'] # newer has the priority
 
 def openTable(fn):
+    """
+    return threading.Thread
+    """
+    return _open(_openTable, (fn,))
+
+def _open(func, args):
+    """
+    Since some programs locks the main thread, this function creates a thread to run the program
+    """
+    th = threading.Thread(target=func, args=args)
+    th.start()
+    return th
+    
+def _openTable(fn):
     if sys.platform.startswith('linux'):
         for prog in ['oocalc', 'libreoffice --calc']:
             #pass # not working now
-            error = os.system('%s %s' % (prog, fn))
+            error = os.system('%s "%s"' % (prog, fn))
             if not error:
                 break
 
@@ -36,9 +51,9 @@ def openTable(fn):
                 if os.path.exists(openoffice):
                     prog = openoffice
         if prog:
-            err=os.system(r'open -a %s %s' % (prog, fn))
+            err=os.system(r'open -a %s "%s"' % (prog, fn))
             if err:
-                print 'program %s exit status %s' % (prog, err)
+                print('program %s exit status %s' % (prog, err))
 
     elif 'win' in sys.platform:
         try:
@@ -57,4 +72,4 @@ def openImage(fn):
         if prog:
             err=os.system(r'open -a %s %s' % (prog, fn))
             if err:
-                print 'program %s exit status %s' % (prog, err)
+                print('program %s exit status %s' % (prog, err))

@@ -148,7 +148,7 @@ class BasicFileListCtrl(wx.ListCtrl,
         fill in the first 4 columns
         """
         if not os.path.isfile(fn):
-            raise ValueError, 'The input file is not a valid file'
+            raise ValueError('The input file is not a valid file')
         
         dd, ff = os.path.split(fn)
 
@@ -162,7 +162,7 @@ class BasicFileListCtrl(wx.ListCtrl,
 
         # column 0
         index0 = len(self.columnkeys)
-        index = self.InsertStringItem(sys.maxint, dd)
+        index = self.InsertStringItem(sys.maxsize, dd)
 
         # column 1
         self.SetStringItem(index, 1, ff)
@@ -301,7 +301,7 @@ class FileListCtrl(BasicFileListCtrl):
         fill in the first 4 columns
         """
         if not os.path.isfile(fn):
-            raise ValueError, 'The input file is not a valid file'
+            raise ValueError('The input file is not a valid file')
         
         dd, ff = os.path.split(fn)
 
@@ -315,7 +315,7 @@ class FileListCtrl(BasicFileListCtrl):
 
         # column 0
         index0 = len(self.columnkeys)
-        index = self.InsertStringItem(sys.maxint, dd)
+        index = self.InsertStringItem(sys.maxsize, dd)
 
         # column 1
         self.SetStringItem(index, 1, ff)
@@ -373,9 +373,9 @@ class MyFileDropTarget(wx.FileDropTarget):
             if len(args) == len(funcs):
                 self.args = args
             else:
-                raise ValueError, 'len(args) must be the same as len(funcs)'
+                raise ValueError('len(args) must be the same as len(funcs)')
         except TypeError:
-            self.args = [args for i in xrange(len(self.funcs))]
+            self.args = [args for i in range(len(self.funcs))]
             
 
     def OnDropFiles(self, x, y, filenames):

@@ -8,35 +8,36 @@ Acceptable image file formats
 * Most microscopy formats
 
 ### Writing
-* multipage-tiff (ome.tif)
+* multipage-tiff (imageJ format or ome.tif format)
 * DeltaVision (.dv)
 
 How it works
 ------------
-Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/DocumentV057.pdf)
+Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/DocumentV06.pdf)
 
 Downloads
 ---------
-The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases)
+The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases/tag/v0.6)
 
 The source
 ----------
 The source codes are written in pure python and works on the following platforms and dependencies.
 
 Platforms successfully tested:
-* MacOSX64bit (10.9.5-10.12.5)
-* Windows64bit (XP-10)
-* Linux Ubuntu(16)
+* MacOSX64bit (10.9.5 or higher)
+* Windows64bit (XP or higher)
+* Linux Ubuntu(16), CentOS(6)
 
 Dependencies:
-* python (2.7)
-* opencv
+* python (2.7 or 3.6)
 * numpy
 * scipy
-* wxpython (3.0)
+* wxpython (v3 or v4)
 * pyopengl
-* fftw3 with FFTW3.3.4
+* PyFFTW
+* tifffile (version '2018.02.18')
 * javabridge
 * bioformats
+* lxml
 
 Authored and maintained by Atsushi Matsuda.

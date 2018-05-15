@@ -1,27 +1,11 @@
-from Priithon.all import U, N
 try:
-    from Priithon.all import Y
-    if not hasattr(Y, 'view'):
-        import multiprocessing as mp
-        NCPU=mp.cpu_count()
-        from . import ppro26 as ppro
-    else:
-        mp = None
-        NCPU = 1
-except ImportError:
-    mp = None
-    NCPU=1
+    from ..Priithon.all import U, N
+except ValueError:
+    from Priithon.all import U, N
 
-try:
-    import cv
-    import cv2
-except ImportError:
-    try:
-        import cv2
-        cv = cv2
-    except:
-        pass
-    
+from . import ppro26 as ppro
+NCPU = ppro.NCPU
+
 import scipy.ndimage.interpolation as ndii
 
 METHODS = {'0nearest': 0,
@@ -49,7 +33,7 @@ def trans3D(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, method='a', ncpu
     elif order == 6:
         func = trans3D_affine
     else:
-        raise ValueError, 'method not recognized'
+        raise ValueError('method not recognized')
 
     return func(arr, tzyx=tzyx, r=r, mag=mag, dzyx=dzyx, rzy=rzy, ncpu=ncpu)
 
@@ -90,30 +74,30 @@ def trans3D_affine(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, ncpu=NCPU
     except TypeError:
         pass
 
-    if ndim == 3 and (magz != 1 or tzyx[-3]):
+    if ndim == 3 and (magz != 1 or tzyx[-3] or rzy):
         #print magz, arr.shape
         # because, mergins introduced after 2D transformation may interfere the result of this vertical transform, vertical axis was processed first, since rzy is 0 usually.
         arrT = arr.T # zyx -> xyz
         magzz = (1,magz)
-        canvas = N.empty_like(arrT)
+        canvas = N.zeros_like(arrT)
         tzy = (0,tzyx[-3])
         dzy = (dzyx[-2], dzyx[-3])
 
-        if ncpu > 1 and mp:
-            ret = ppro.pmap(_dothat, arrT, ncpu, tzy, rzy, magzz, dzy, order)
-            for x, a in enumerate(ret):
-                canvas[x] = a
-        else:
-            for x, a in enumerate(arrT):
-                canvas[x] = _dothat(a, tzy, rzy, magzz, dzy, order)
+        #if ncpu > 1 and mp:
+        ret = ppro.pmap(_dothat, arrT, ncpu, tzy, rzy, magzz, dzy, order)
+        for x, a in enumerate(ret):
+            canvas[x] = a
+        #else:
+        #    for x, a in enumerate(arrT):
+        #        canvas[x] = _dothat(a, tzy, rzy, magzz, dzy, order)
 
         arr = canvas.T
         #del arrT
 
     if N.any(tzyx[-2:]) or r or N.any(mag):
         #print ndim, arr.shape
-        canvas = N.empty_like(arr)
-        if ndim == 3 and ncpu > 1 and mp:
+        canvas = N.zeros_like(arr)
+        if ndim == 3:# and ncpu > 1 and mp:
             # dividing XY into pieces did not work for rotation and magnification
             # here parallel processing is done section-wise since affine works only for 2D
             ret = ppro.pmap(_dothat, arr, ncpu, tzyx[-2:], r, mag, dzyx[-2:], order)
@@ -295,7 +279,7 @@ def trans3D_bilinear(a, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, mr=0, ncp
 
             canvas[x] = U.trans2d(target, None, (tzyx[-3], 0, rzy, mag, magaxis, anismag))"""
 
-        if ndim == 3 and ncpu > 1 and mp:
+        if ndim == 3:# and ncpu > 1 and mp:
             ret = ppro.pmap(_doBilinear2D, at, ncpu, (0,tzyx[-3]), rzy, mag, anismag, (0,dzyx[-3]))
             for z, a2d in enumerate(ret):
                 canvas[z] = a2d
@@ -572,7 +556,7 @@ def remap(img, mapy, mapx, interp=2):
 
     return resulting array
     """
-    des = N.empty_like(img)
+    des = N.zeros_like(img)
 
     # cv.fromarray: array can be 2D or 3D only
     if cv2.__version__.startswith('2'):
@@ -585,7 +569,7 @@ def remap(img, mapy, mapx, interp=2):
         cv.Remap(cimg, cdes, cmapx, cmapy, flags=interp+cv.CV_WARP_FILL_OUTLIERS)
     else:
         cimg = img
-        cdes = des
+        #cdes = des
         cmapx = mapx.astype(N.float32)
         cmapy = mapy.astype(N.float32)
 
@@ -593,8 +577,15 @@ def remap(img, mapy, mapx, interp=2):
 
     return N.asarray(cdes)
 
+def remap(img, mapy, mapx, order=ORDER):
+    """
+    transform image using coordinate x,y
+    return resulting array
+    """
+    return ndii.map_coordinates(img, [mapy, mapx], order=order)
+
 def logpolar_cv(img, center=None, mag=1):
-    des = N.empty_like(img)
+    des = N.zeros_like(img)
     if center is None:
         center = N.divide(img.shape, 2)
 
@@ -647,7 +638,7 @@ def logpolar(image, center=None, angles=None, radii=None):
         angles = shape[0]
     if radii is None:
         radii = shape[1]
-    theta = N.empty((angles, radii), dtype=N.float64)
+    theta = N.zeros((angles, radii), dtype=N.float64)
     theta.T[:] = -N.linspace(0, N.pi, angles, endpoint=False)
     #d = radii
     d = N.hypot(shape[0]-center[0], shape[1]-center[1])
@@ -657,6 +648,6 @@ def logpolar(image, center=None, angles=None, radii=None):
                                                    dtype=N.float64)) - 1.0
     x = radius * N.sin(theta) + center[0]
     y = radius * N.cos(theta) + center[1]
-    output = N.empty_like(x)
+    output = N.zeros_like(x)
     ndii.map_coordinates(image, [x, y], output=output)
     return output, log_base

@@ -1,4 +1,35 @@
 from wx.py.shell import *
+from wx.py import introspect
+import sys
+import six
+
+###---- introspect ---------------
+def hasattr(obj, attr):# am python3
+    try:
+        return bool(getattr(obj, attr, None))
+    except (NameError, ValueError):
+        return False
+
+#def hasattrAlwaysReturnsTrue(obj):
+#    return hasattr(obj, 'bogu5_123_aTTri8ute')
+
+class BytesIO_str(six.BytesIO):
+    def __init__(self, arg=b''):
+        if arg in six.string_types:
+            arg = arg.encode()
+        six.BytesIO.__init__(self, arg)
+
+introspect.hasattr = hasattr
+introspect.BytesIO = BytesIO_str
+
+### ---- frame.py -------------
+# Error at line 899, AttributeError, module wx has no attribute SAVE
+if wx.version().startswith('4'):
+    wx.SAVE = wx.FD_SAVE
+    wx.OVERWRITE_PROMPT = wx.FD_OVERWRITE_PROMPT
+
+### ---- shell --------------------
+
 
 class PriShellFrame(ShellFrame):
     def __init__(self, parent=None, id=-1, title='PyShell',
@@ -58,16 +89,77 @@ class PriShellFrame(ShellFrame):
 class PriShell(Shell):
     def __init__(self, *args, **kwds):
         Shell.__init__(self, *args, **kwds)
+
+    ## am
+    def GetCurrentPos2Sep(self, currpos, stoppos):
+        seps = ('@', '%', '&', '*', '(', ')', '-', '+',  '=', '[', ']', '{', '}', ';', ':', '<', '>', '/', ',')
+        for sep in seps:
+            command = self.GetTextRange(stoppos, currpos)
+            if sep in command and '"' not in command and "'" not in command:
+                shiftpos = command.rindex(sep) + 1
+                command = self.GetTextRange(stoppos+shiftpos, currpos)
+                stoppos += shiftpos
+        return stoppos
         
+    def OnChar(self, event):
+        """Keypress event handler.
+
+        Only receives an event if OnKeyDown calls event.Skip() for the
+        corresponding event."""
+
+        if self.noteMode:
+            event.Skip()
+            return
+
+        # Prevent modification of previously submitted
+        # commands/responses.
+        if not self.CanEdit():
+            return
+        key = event.GetKeyCode()
+        currpos = self.GetCurrentPos()
+        stoppos = self.promptPosEnd
+        stoppos = self.GetCurrentPos2Sep(currpos, stoppos) # am
+        # Return (Enter) needs to be ignored in this handler.
+        if key in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
+            pass
+        elif key in self.autoCompleteKeys:
+            # Usually the dot (period) key activates auto completion.
+            # Get the command between the prompt and the cursor.  Add
+            # the autocomplete character to the end of the command.
+            #if self.AutoCompActive(): # am
+            #    self.AutoCompCancel() # am
+            command = self.GetTextRange(stoppos, currpos).strip() + chr(key)
+            self.write(chr(key))
+            if self.autoComplete:
+                self.autoCompleteShow(command)
+        elif key == ord('('):
+            # The left paren activates a call tip and cancels an
+            # active auto completion.
+            #if self.AutoCompActive(): # am
+            #    self.AutoCompCancel() # am
+            # Get the command between the prompt and the cursor.  Add
+            # the '(' to the end of the command.
+            self.ReplaceSelection('')
+            command = self.GetTextRange(stoppos, currpos).strip() + '('
+            self.write('(')
+            self.autoCallTipShow(command, self.GetCurrentPos() == self.GetTextLength())
+        else:
+            # erase call tip ##-- am
+            if self.CallTipActive():
+                self.CallTipCancel()
+
+            # Allow the normal event handling to take place.
+            event.Skip()
+
     def OnKeyDown(self, event):
         """Key down event handler."""
 
         key = event.GetKeyCode()
-        #print key
         # If the auto-complete window is up let it do its thing.
         if self.AutoCompActive():
             event.Skip()
             return
+        
         # Prevent modification of previously submitted
         # commands/responses.
         controlDown = event.CmdDown() or event.RawControlDown() # 20080407: added CmdDown 20141129 added "Raw"ControlDown
@@ -193,7 +285,11 @@ class PriShell(Shell):
                 self.autoCallTipShow(command, alwaysShow=True)
             else:
                 from wx.py import introspect
-                import __main__, __builtin__
+                if sys.version_info.major == 2:
+                    import __main__
+                    from __main__ import __builtins__ as builtins
+                else:
+                    import __main__, builtins
                 #import introspect, __main__, __builtin__
                 root = introspect.getRoot(command)
                 if self.more and root=='': # pressing TAB to indent multi-line commands
@@ -238,7 +334,7 @@ class PriShell(Shell):
                         _list = [s for s in __main__.__dict__ if s.lower().startswith(rootLower)]
                         _list.sort()
 
-                        _list2 = [s for s in __builtin__.__dict__ if s.lower().startswith(rootLower)]
+                        _list2 = [s for s in builtins.__dict__ if s.lower().startswith(rootLower)]
                         _list2.sort()
 
                         # first matches from __main__ then from __builtin__
@@ -282,16 +378,20 @@ class PriShell(Shell):
         elif altDown and not controlDown \
             and key in (ord('C'), ord('c'), wx.WXK_INSERT):
             self.CopyWithPromptsPrefixed()
-        elif controlDown and key in (ord('E'), ord('e')):#20051104 seb
-            event.m_controlDown = False
-            event.m_keyCode = wx.WXK_END
-            event.Skip()
+        elif controlDown and key in (ord('E'), ord('e')):#20051104 seb 20170112 am
+            event.SetControlDown(False)
+            #event.m_keyCode = wx.WXK_END
+            #event.KeyCode = wx.WXK_END
+            pos = self.GetLastPosition()
+            self.SetCurrentPos(pos)
+            self.SetAnchor(pos)
+            #event.Skip()
             return                     
         # Home needs to be aware of the prompt.
         elif key == wx.WXK_HOME \
                  or controlDown and key in (ord('A'), ord('a')):#20051104 seb
             home = self.promptPosEnd
-            if currpos >= home: # 20051101 '>' changed to '>='
+            if 1:#currpos >= home: # 20051101 '>' changed to '>='
                 self.SetCurrentPos(home)
                 if not selecting and not shiftDown:
                     self.SetAnchor(home)

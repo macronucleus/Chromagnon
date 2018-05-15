@@ -6,7 +6,7 @@
 # main namespace to look as much as possible like the regular Python
 # shell environment.
 import __main__
-original = __main__.__dict__.keys()
+original = list(__main__.__dict__.keys())
 
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
@@ -60,7 +60,7 @@ def main():
     #seb note: wee don't need to keep any of these 
 
     # Cleanup the main namespace, leaving the App class.
-    for key in md.keys():
+    for key in list(md.keys()):
         if key not in [
             #20071212 'App',
             '__author__',

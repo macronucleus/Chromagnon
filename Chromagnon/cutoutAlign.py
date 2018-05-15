@@ -1,63 +1,19 @@
 #!/usr/bin/env priithon
+from __future__ import print_function
 __version__ = 0.1
 
-from Priithon.all import Mrc, N
-from PriCommon import mrcIO, imgGeo, imgManager
+try:
+    from Chromagnon.Priithon.all import Mrc, N
+    from Chromagnon.PriCommon import imgGeo
+except ImportError:
+    from Priithon.all import Mrc, N
+    from PriCommon import imgGeo
+
+
 import os
 
 
 EXT_CUTOUT='cut'
-
-def _cutoutForAlign2(fn, py, outFn=''):
-    """
-    if not outFn, default with 'cut' extention
-    resulting array is imgSequence=0 (t,w,z,y,x)
-    return outFn
-    """
-    h = imgManager.ImageManager(fn)
-    slc, shiftZYX, ZYX = makeSlice(h, py)
-
-    # input
-    arr = N.empty((h.nt, h.nw, h.nz, h.ny, h.nx), h.dtype)
-    for t in range(h.nt):
-        for w in range(h.nw):
-            arr[t,w] = h.get3DArr(w=w, t=t)
-
-    canvas = N.squeeze(arr[slc].astype(arr.dtype.type))
-    newNum = (canvas.shape[-1], canvas.shape[-2], N.prod(canvas.shape[:-3]))
-    if not outFn:
-        outFn = '_'.join((h.filePath, EXT_CUTOUT))#arr.Mrc.path, EXT_CUTOUT))
-    hdr = Mrc.makeHdrArray()
-    Mrc.initHdrArrayFrom(hdr, h.hdr)#arr.Mrc.hdr)
-    hdr.ImgSequence=2
-    hdr.Num[:] = newNum
-    mstart = [sl.start for sl in slc[::-1][:3] if isinstance(sl, slice)]
-    hdr.mst[:len(mstart)] += mstart
-    
-    Mrc.save(canvas, outFn, ifExists='overwrite', hdr=hdr)
-    return outFn
-
-def _cutoutForAlignPriism(fn, py, outFn=''):
-    """
-    if not outFn, default with 'cut' extention
-    resulting array is imgSequence=0 (t,w,z,y,x)
-    return outFn
-    """
-    if not outFn:
-        outFn = '_'.join((fn, EXT_CUTOUT))
-
-    h = imgManager.ImageManager(fn)
-    slc, shiftZYX, ZYX = makeSlice(h, py)
-    return pc.CopyRegion(fn, outFn, zyxslc=slc)
-
-if os.environ.has_key('IVE_BASE'):
-    from PriCommon import priismCommands as pc
-    cutoutForAlign = _cutoutForAlignPriism
-else:
-    cutoutForAlign = _cutoutForAlign2
-
-
-
 
 def getShift(shift, ZYX, erosionZYX=0):
     """
@@ -87,7 +43,6 @@ def getShift(shift, ZYX, erosionZYX=0):
         
     # rotation
     r = shift[3]
-
     # target shape
     ZYX = N.asarray(ZYX, N.float32)
     ZYXm = ZYX * magZYX
@@ -117,7 +72,7 @@ def getShift(shift, ZYX, erosionZYX=0):
     #except TypeError:
     #    erosionYX = (erosionYX, erosionYX)
 
-    yxShift = N.where(shift[1:3] < 0, N.floor(shift[1:3]), N.ceil(shift[1:3]))
+    yxShift = N.where(N.array(shift[1:3]) < 0, N.floor(shift[1:3]), N.ceil(shift[1:3]))
     
     # rotate the magnified center
     xyzm = N.ceil(ZYXm[::-1]) / 2.
@@ -174,4 +129,4 @@ if __name__ == '__main__':
 
     out = cutoutForAlign(*fns, **options.__dict__)
 
-    print 'saved %s' % out
+    print('saved %s' % out)
