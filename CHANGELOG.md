@@ -33,6 +33,10 @@ in `main.py`, `viewerCommon.py`, `glfunc.py`.
 24. Fixed wrong unit conversion for pixel size in
 `imgio.multitifIO.py` and `imgio.bioformatsIO.py`
 25. Fixed AttributeError for `mouse_last_x` in `ndvierwer.viewer2.py`
+26. (v0.61) Fixed broken command line options.
+27. (v0.61) Fixed importError when installed from the source (to
+import `imgio` from `PriCommon`)
+28. (v0.61) Fixed division error in `imgio.multitifIO.py` for python2.7.
 
 v0.5 (Jan. 2017)
 ----
