@@ -7,8 +7,12 @@ import  wx.lib.mixins.listctrl  as  listmix
 #except ImportError: # if it's not there locally, try the wxPython lib.
 #    import wx.lib.agw.hyperlink as hl
 from . import commonfuncs as C
-import imgio
-from PriCommon import guiFuncs as G
+try:
+    import imgio
+    from PriCommon import guiFuncs as G
+except ImportError:
+    from .. import imgio
+    from ..PriCommon import guiFuncs as G
 
 SIZE_COL0=180
 SIZE_COL1=280

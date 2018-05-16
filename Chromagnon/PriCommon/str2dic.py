@@ -76,7 +76,7 @@ def numberSeq(vstr, removeOverlap=True):
             slist2 += list(range(eval(start), eval(stop)+1))
         else:
             slist2 += [s]
-    slist = [int(s) for s in slist2]
+    slist = [int(s) for s in slist2 if s]
     if removeOverlap:
         slist = list(set(slist))
     slist.sort()

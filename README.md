@@ -40,4 +40,11 @@ Dependencies:
 * bioformats
 * lxml
 
+How to cite
+----------
+Please cite our paper:
+
+Matsuda, Schermelleh, Hirano, Haraguchi, Hiraoka, 2018 "Accurate and fiducial-marker-free correction for three-dimensional chromatic shift in biological fluorescence microscopy"  Sci Rep 8:7583
+
+
 Authored and maintained by Atsushi Matsuda.

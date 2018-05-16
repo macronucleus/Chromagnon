@@ -549,6 +549,8 @@ if __name__ == '__main__':
                      help='a reference image or chromagnon file (required)')
         p.add_argument('--local', '-l', default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
                      help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
+        p.add_argument('--localMinWindow', '-w', default=af.MIN_PXLS_YXS[1], choices=af.MIN_PXLS_YXS,
+                     help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
         #p.add_argument('--initguess', '-I', default=None,
         #             help='a chromagnon file name for initial guess (default=None)')
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
@@ -559,6 +561,8 @@ if __name__ == '__main__':
                      help='suffix for the chromagnon files (default=None)')
         p.add_argument('--img_suffix', '-S', default=aligner.IMG_SUFFIX,
                      help='suffix for the target files (default=%s)' % aligner.IMG_SUFFIX)
+        p.add_argument('--img_format', '-E', default=aligner.WRITABLE_FORMATS[0], choices=aligner.WRITABLE_FORMATS,
+                     help='file extension for the target files, choose from %s (default=%s)' % (aligner.WRITABLE_FORMATS, aligner.WRITABLE_FORMATS[0]))
         options = p.parse_args()
 
         ref = glob.glob(os.path.expandvars(os.path.expanduser(options.reference)))
@@ -579,7 +583,10 @@ if __name__ == '__main__':
                 options.zmag,
                 options.parm_suffix,
                 options.img_suffix,
-                nts]
+                nts,
+                options.img_format,
+                int(options.localMinWindow)]
+                     # min_pxls_yx]
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, ref, fns, parms)
         th.start()

@@ -4,7 +4,10 @@ import os
 import six
 import numpy as N
 from . import guiFuncs as G
-import imgio
+try:
+    import imgio
+except ImportError:
+    from .. import imgio
 
 # GUI
 import wx, time
