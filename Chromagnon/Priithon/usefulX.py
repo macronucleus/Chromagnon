@@ -1453,7 +1453,10 @@ def vClose(id='all'):
     for i in id:
         v = viewers[i]
         if v:
-            wx.GetTopLevelParent(v.viewer).Close()
+            try:
+                wx.GetTopLevelParent(v.viewer).Close()
+            except RuntimeError: # in some reason this happens...
+                viewers[i] = None
 
 def vReload(id=-1, autoscale=True):
     """

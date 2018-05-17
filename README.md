@@ -29,16 +29,17 @@ Platforms successfully tested:
 * Linux Ubuntu(16), CentOS(6)
 
 Dependencies:
-* `python` (2.7 or 3.6)
+* `python` (v2.7 or v3.6)
 * `numpy`
 * `scipy`
 * `wxPython` (v3 or v4)
 * `PyOpenGL`
-* `tifffile` (version '0.14.0') 
+* `tifffile` (v0.14.0)
 * `pyFFTW` (optional for fast Fourier transform)
 * `javabridge` (optional for reading more image format)
-* `bioformats` (optional for reading more image format))
-* `lxml` (optional for reading more image format))
+* `python-bioformats` (optional for reading more image format)
+* `lxml` (optional for reading more image format)
+* `Java Development Kit` (optional for reading more image format)
 
 How to cite
 ----------
