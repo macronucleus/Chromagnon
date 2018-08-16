@@ -44,7 +44,7 @@ def prepImg4AffineZ(fn, w=None, phaseContrast=True):
      
     imgyz = alignfuncs.prep2D(img.T, zs=xs)
 
-    #return an.refyz, imgyz
+    return an.refyz, imgyz
 
     a1234 = alignfuncs.chopImg(an.refyz)
     b1234 = alignfuncs.chopImg(imgyz)

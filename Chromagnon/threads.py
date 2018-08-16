@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 import os, threading, time, sys
 import wx
 
@@ -9,13 +10,13 @@ except ImportError:
     from Chromagnon.PriCommon import flatConv
     from Chromagnon.Priithon import fftmanager
 
-try:
-    from . import alignfuncs, chromformat, aligner
-except ValueError:
-    from Chromagnon import alignfuncs, chromformat, aligner
-except ImportError:
+if sys.version_info.major == 2:
     import alignfuncs, chromformat, aligner
-
+elif sys.version_info.major >= 3:
+    try:
+        from . import alignfuncs as af, chromformat, aligner
+    except (ValueError, ImportError):
+        from Chromagnon import alignfuncs as af, chromformat, aligner
 
 # cross platform
 if not getattr(__builtins__, "WindowsError", None):
@@ -109,7 +110,7 @@ class ThreadWithExc(threading.Thread):
         local = parms[2]
 
         maxShift = parms[3]
-        zmag = parms[4]
+        #zmag = parms[4]
         self.parm_suffix = parms[5]
         self.img_suffix = parms[6]
         nts = parms[7]
@@ -143,7 +144,7 @@ class ThreadWithExc(threading.Thread):
 
                     an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
-                    an.setZmagSwitch(zmag)
+                    #an.setZmagSwitch(zmag)
                     an.setMaxShift(maxShift)
 
                     pgen = self.progressValues(target=False, an=an, alignChannels=alignChannels, alignTimeFrames=alignTimeFrames, local=local)
@@ -161,7 +162,7 @@ class ThreadWithExc(threading.Thread):
                         for t in range(an.nt):
                             try:
                                 an.findAlignParamWave(t=t)
-                            except alignfuncs.AlignError: # in xcorr or else
+                            except af.AlignError: # in xcorr or else
                                 self.echo('Calculation failed, skipping')
                                 errs.append(index)
                                 continue
@@ -472,7 +473,10 @@ class GUImanager(wx.EvtHandler):
         self.OnDone()
         
     def OnError(self, evt):
-        from Priithon import guiExceptionFrame
+        try:
+            from Priithon import guiExceptionFrame
+        except ImportError:
+            from Chromagnon.Priithon import guiExceptionFrame
         self.panel.label.SetLabel('')
         self.panel.label.SetForegroundColour('black')
         self.stopWithErr = True

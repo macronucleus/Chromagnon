@@ -36,7 +36,20 @@ in `main.py`, `viewerCommon.py`, `glfunc.py`.
 26. (v0.61) Fixed broken command line options.
 27. (v0.61) Fixed importError when installed from the source (to
 import `imgio` from `PriCommon`)
-28. (v0.61) Fixed division error in `imgio.multitifIO.py` for python2.7.
+28. (v0.61) Fixed division error in `imgio.multitifIO.py` for
+python2.7.
+29. (v0.62) Z mag correction is done with zoomed image. 
+30. (v0.62) An error when executing without suffix was solved.
+31. (v0.62) Z mag selection was removed and averaging function
+    added.
+32. (v0.62) Edge pixels (including vertical) are removed for
+quadrisection phase correlation.
+33. (v0.62) ImageJ metadata is copied in `imgio.multitifIO.py`.
+34. (v0.63) entry_points for source code installation was fixed
+35. (v0.63) relative and absolute import was re-organized.
+36. (v0.63) `ome.tif` was removed from the selection list for the
+output file when `python-bioformats` is not installed.
+37. (v0.63) z translation calculation mistake introduced in v0.62 was fixed.
 
 v0.5 (Jan. 2017)
 ----

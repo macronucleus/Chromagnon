@@ -4,7 +4,7 @@
 # conda install appdirs packaging
 
 # execute like...
-# pyinstaller --clean F:\py\Chromagnon\Chromagnon.spec
+# pyinstaller --clean E:\py\Chromagnon\Chromagnon_win.spec
 # if applicable... --upx-dir=upx394w
 
 import sys
@@ -14,15 +14,28 @@ if pyversion == 3:
 elif pyversion == 2:
     glut = 'Library\\bin\\freeglut.dll'
 
+# ----chromagnon version
+with open('E:\\py\\Chromagnon\\version.py') as h:
+    line = next(h)
+    cversion = line.split()[-1][1:-1].replace('.', '')
+# ------
+
 block_cipher = None
 
 home='C:\\Users\\Atsushi'
 
 # put chromagnon.py in some other place to make the top-level different from sys.path
-a = Analysis(['F:\\gitchrom\\Chromagnon\\chromagnon.py'],
-             pathex=['F:\\py'],
+# $ cp -R ~/codes/py/Chromagnon ~/codes/gitchrom/
+# $ cp -R ~/codes/py/imgio ~/codes/gitchrom/Chromagnon/
+# $ cp -R ~/codes/py/ndviewer ~/codes/gitchrom/Chromagnon/
+# $ cp -R ~/codes/py/PriCommon ~/codes/gitchrom/Chromagnon/
+# $ cp -R ~/codes/py/Priithon ~/codes/gitchrom/Chromagnon/
+
+#a = Analysis(['F:\\gitchrom\\Chromagnon\\chromagnon.py'],
+a = Analysis(['E:\\py\\src\\Chromagnon\\Chromagnon\\Chromagnon\\chromagnon.py'],
+             pathex=['E:\\py'],
              binaries=[(home+'\\Miniconda%i\\Library\\bin\\mkl_avx.dll' % pyversion, ''), (home+'\\Miniconda%i\\Library\\bin\\mkl_avx2.dll' % pyversion, ''), (home+'\\Miniconda%i\\%s' % (pyversion, glut), '')],
-             datas=[(home+'\\Miniconda%i\\Lib\\site-packages\\javabridge\\*.pyd' % pyversion, 'javabridge'), (home+'\\Miniconda%i\\Lib\\site-packages\\javabridge\\jars\\*' % pyversion, 'javabridge\\jars'), (home+'\\Miniconda%i\\Lib\\site-packages\\bioformats\\jars\\*' % pyversion, 'bioformats\\jars'), ('F:\\py\\Priithon\\*.py', 'Priithon'), ('F:\\py\\Priithon\\plt\\*.py', 'Priithon\\plt'), ('F:\\py\\PriCommon\\*.py', 'PriCommon')],
+             datas=[(home+'\\Miniconda%i\\Lib\\site-packages\\javabridge\\*.pyd' % pyversion, 'javabridge'), (home+'\\Miniconda%i\\Lib\\site-packages\\javabridge\\jars\\*' % pyversion, 'javabridge\\jars'), (home+'\\Miniconda%i\\Lib\\site-packages\\bioformats\\jars\\*' % pyversion, 'bioformats\\jars'), ('E:\\py\\Priithon\\*.py', 'Priithon'), ('E:\\py\\Priithon\\plt\\*.py', 'Priithon\\plt'), ('E:\\py\\PriCommon\\*.py', 'PriCommon')],
              hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs'],
              hookspath=[],
              runtime_hooks=[],
@@ -47,7 +60,7 @@ coll = COLLECT(exe,
                a.datas,
                strip=False,
                upx=False, #True,
-               name='ChromagnonV06Win')
+               name='ChromagnonV%sWin' % cversion)
 
 # 20180412
 # File "stringsource", line 103, in init scipy.optimize._trlib._trlib

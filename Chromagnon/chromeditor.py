@@ -1,3 +1,4 @@
+
 import os, sys, csv, itertools
 import numpy as N
 import wx, wx.lib.mixins.listctrl as listmix
@@ -11,13 +12,15 @@ except ImportError:
     from Chromagnon.ndviewer import main as aui
     from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, microscope
     from Chromagnon.Priithon import Mrc
-    
-try:
-    from . import aligner, alignfuncs as af, chromformat
-except ValueError:
-    from Chromagnon import aligner, alignfuncs as af, chromformat
-except ImportError:
+
+if sys.version_info.major == 2:
     import aligner, alignfuncs as af, chromformat
+elif sys.version_info.major >= 3:
+    try:
+        from . import aligner, alignfuncs as af, chromformat
+    except (ValueError, ImportError):
+        from Chromagnon import aligner, alignfuncs as af, chromformat
+        
 
 SIZE_COL0=70
 SIZE_COLS=90
@@ -97,11 +100,11 @@ class ChromagnonPanel(wx.Panel):
             
             # \n
             box = G.newSpaceV(sizer)
-            G.makeTxt(self, box, "The file is a .ome.tif file, and the alignment parameters are stored in it's metadata.")
+            G.makeTxt(self, box, "The file is a tif file, and the alignment parameters are stored in it's metadata.")
         else:
             # \n
             box = G.newSpaceV(sizer)
-            G.makeTxt(self, box, 'The file is a text file: rename to ".csv" to open as a spread sheet.')
+            G.makeTxt(self, box, 'The file is a text file')
 
         # \n\n
         box = G.newSpaceV(sizer)

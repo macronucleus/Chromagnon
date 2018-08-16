@@ -20,6 +20,7 @@ class GeneralReader(object):
         self.series = 0
         self.imgseqs = IMGSEQ
         self.metadata = {}
+        self.ex_metadata = {}
         self.useROI2getArr = False
         self.flip_required = True
         
@@ -38,6 +39,14 @@ class GeneralReader(object):
     def __repr__(self):
         return self.__class__.__name__ + '(' + self.filename + ' nt=%i, nw=%i, nz=%i)' % (self.nt, self.nw, self.nz)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, errtype=None, errval=None, traceback=None):
+        self.close()
+        if errtype:
+            raise errtype(errval)
+    
     def close(self):
         """
         closes the current file
@@ -277,6 +286,12 @@ class GeneralReader(object):
             else:
                 i = (z*self.nt + t) * 2
             self.axes_w = w
+        elif len(self.axes) == 3 and self.axes[-1] in ('S', 'C', 'W'):
+            if self.imgSequence <= 2:
+                i = (t*self.nz + z) * 2
+            else:
+                i = (z*self.nt + t) * 2
+            self.axes_w = w
             
         return int(i)
 
@@ -416,8 +431,10 @@ class GeneralWriter(GeneralReader):
         read dimensions, imgSequence, dtype, pixelsize from a reader
         """
         self.setPixelSize(*rdr.pxlsiz)
+        self.metadata = rdr.metadata
+        self.ex_metadata = rdr.ex_metadata
         self.setDim(rdr.roi_size[-1], rdr.roi_size[-2], rdr.roi_size[-3], rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
-        self.prev_metadata = rdr.metadata
+
 
         #print self.wave
         

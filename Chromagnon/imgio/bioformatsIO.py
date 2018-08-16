@@ -9,9 +9,9 @@ except ImportError:
     import generalIO, mrcIO, multitifIO
 
 try:
-    from ..PriCommon import microscope, fntools
+    from ..PriCommon import microscope, fntools, commonfuncs
 except ValueError:    
-    from PriCommon import microscope, fntools
+    from PriCommon import microscope, fntools, commonfuncs
     
 import numpy as N
 
@@ -85,8 +85,9 @@ try:
         raise ValueError('pixeltype %s was not found' % pixeltype)
 
 except:
-    import traceback
-    traceback.print_exc()
+    if not commonfuncs.main_is_frozen():
+        import traceback
+        traceback.print_exc()
 
     READABLE_FORMATS = []
     WRITABLE_FORMATS = []
@@ -136,8 +137,14 @@ except:
                 raise RuntimeError('JDK not found!, please install from %s' % URL)
             else:
                 HAS_JDK = True
-        except (ImportError, RuntimeError):
+        except (ImportError, RuntimeError, ValueError): # ValueError is a parent of javabridge.jutil.JVMNotFoundError
             pass
+        except:
+            if sys.platform.startswith('linux'): # if JDK is not found on linux, it throws exception
+                pass
+            else:
+                raise
+            
     
 # constants
 OMETIFF = ('ome.tif', 'ome.tiff')

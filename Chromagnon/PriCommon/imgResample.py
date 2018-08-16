@@ -651,3 +651,58 @@ def logpolar(image, center=None, angles=None, radii=None):
     output = N.zeros_like(x)
     ndii.map_coordinates(image, [x, y], output=output)
     return output, log_base
+
+## polar transform
+
+## from
+# http://stackoverflow.com/questions/9924135/fast-cartesian-to-polar-to-cartesian-in-python
+import numpy as np
+
+def polar2cart2D(r, theta, center):
+
+    y = r  * np.sin(theta) + center[0]
+    x = r  * np.cos(theta) + center[1]
+    return y, x# x, y
+
+def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360, return_idx=False):
+    """
+    img: array
+    center: coordinate y, x
+    final_radius: ending radius
+    initial_radius: starting radius
+    phase_width: npixles / circle
+    return_idx: return transformation coordinates (y,x)
+    """
+    if img.ndim > 2 or len(center) > 2:
+        raise ValueError('this function only support 2D, you entered %i-dim array and %i-dim center coordinate' % (img.ndim, len(center)))
+    
+    if initial_radius is None:
+        initial_radius = 0
+
+    if final_radius is None:
+        rad0 = N.ceil(N.array(img.shape) - center)
+        final_radius = min((int(min(rad0)), int(min(N.ceil(center)))))
+
+    if phase_width is None:
+        phase_width = N.sum(img.shape[-2:]) * 2
+
+    theta , R = np.meshgrid(np.linspace(0, 2*np.pi, phase_width), 
+                            np.arange(initial_radius, final_radius))
+
+    Ycart, Xcart = polar2cart2D(R, theta, center)
+
+    Ycart = N.where(Ycart >= img.shape[0], img.shape[0]-1, Ycart)
+    Xcart = N.where(Xcart >= img.shape[1], img.shape[1]-1, Xcart)
+    
+    Ycart = Ycart.astype(int)
+    Xcart = Xcart.astype(int)
+
+
+    polar_img = img[Ycart,Xcart]
+    polar_img = np.reshape(polar_img,(final_radius-initial_radius,phase_width))
+
+    if return_idx:
+        return polar_img, Ycart, Xcart
+    else:
+        return polar_img
+

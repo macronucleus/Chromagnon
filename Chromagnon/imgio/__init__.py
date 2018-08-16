@@ -1,19 +1,18 @@
 
-
 import os, glob, sys
 if sys.version_info.major == 3:
     from importlib import reload
 import six
 import numpy as N
 
-try:
-    from . import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
-except ImportError:
+if sys.version_info.major == 2:
+    import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
+elif sys.version_info.major >= 3:
     try:
-        import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
+        from . import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
     except ImportError:
         from imgio import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
-
+        
 from .bioformatsIO import uninit_javabridge
 
 READABLE_FORMATS = []

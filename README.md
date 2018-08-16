@@ -34,12 +34,14 @@ Dependencies:
 * `scipy`
 * `wxPython` (v3 or v4)
 * `PyOpenGL`
-* `tifffile` (v0.14.0)
+* `tifffile` (v0.14.0-v0.15.1)
 * `pyFFTW` (optional for fast Fourier transform)
-* `javabridge` (optional for reading more image format)
-* `python-bioformats` (optional for reading more image format)
-* `lxml` (optional for reading more image format)
-* `Java Development Kit` (optional for reading more image format)
+* `javabridge` (optional for reading more image file formats)
+* `python-bioformats` (optional for reading more image file formats)
+* `lxml` (optional for reading more image file formats)
+* `Java Development Kit` (optional for reading more image file
+formats)
+* `PyPubSub` (optional for source code installation)
 
 How to cite
 ----------

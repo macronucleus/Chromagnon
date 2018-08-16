@@ -843,7 +843,7 @@ class GLViewer(GLViewerCommon):
                     self.dragSide = 1
                 else:
                     self.dragSide = 5
-            elif x > (lx + 2) and x < (ux - 2) and y > (ly + 2) and y < (uy - 2) and self.useCropbox:
+            elif 0:#x > (lx + 2) and x < (ux - 2) and y > (ly + 2) and y < (uy - 2) and self.useCropbox:
                 self.SetCursor(self.defaultCursor)
                 self.dragSide = 11
                     

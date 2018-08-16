@@ -7,7 +7,7 @@ try:
     from ..Priithon.all import N, U, F
 except ValueError:
     from Priithon.all import N, U, F
-from . import imgFilters, imgFit, imgGeo
+from . import imgFilters, imgFit, imgGeo, imgResample
 
 # cross-correlation
 PHASE=True
@@ -359,3 +359,36 @@ def apodize(img, napodize=10, doZ=True):
                 #img[slc0] = img[slc0] * fact[napo] # casting rule
                 #img[slc1] = img[scl1] * fact[napo]
     return img
+
+def iteration(a, b, niter=5, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=None, searchRad=None, npad=4):
+    """
+    iterative xcorr
+
+    if ret is None:
+        reutrn zyx
+    elif ret is 1:
+        retunr zyx, N.array((a0, b0))
+    """
+    zyx, c = Xcorr(a, b, phaseContrast, nyquist, gFit, win, searchRad=searchRad, npad=npad)
+    for i in range(niter):
+        b0 = imgResample.trans3D_affine(b, zyx)
+        slc = _makeSlice(zyx)
+        b0 = b0[slc]
+        a0 = a[slc]
+        zyx0, c = Xcorr(a0, b0, phaseContrast, nyquist, gFit, win, searchRad=searchRad, npad=npad)
+        zyx += zyx0
+
+    if ret is None:
+        return zyx
+    elif ret is 1:
+        return zyx, N.array((a0, b0))
+        
+def _makeSlice(zyx):
+    slcs = []
+    for x in zyx:
+        if x >= 0:
+            slc = slice(int(N.ceil(x)), None, None)
+        else:
+            slc = slice(0, -int(N.ceil(abs(x))))
+        slcs.append(slc)
+    return slcs

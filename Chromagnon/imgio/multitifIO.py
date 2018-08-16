@@ -7,13 +7,14 @@ except ImportError:
 import six
 import tifffile
 from tifffile import tifffile as tifff
-
+import struct, copy
     
 import numpy as N
 
 WRITABLE_FORMATS = ('tif', 'tiff')
 READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
 
+IMAGEJ_METADATA_TYPES = ['Info', 'Labels', 'Ranges', 'LUTs', 'Plot', 'ROI', 'Overlays']
 
 def _convertUnit(val, fromwhat='mm', towhat=u'\xb5'+'m'):
     factors = {'m': 0, 'mm': -3, u'\xb5'+'m': -6, 'nm': -9, 'micron': -6}
@@ -169,12 +170,19 @@ class MultiTiffReader(generalIO.GeneralReader):
             else:
                 self.setPixelSize(0.3, 0.1, 0.1)
 
-            if 'Info' in meta:
-                for m in meta['Info'].split('\n')[13:]:
-                    mm = m.split(' = ')
-                    if len(mm) == 2:
-                        key, val = mm
-                        self.ex_metadata[key] = val
+            #if 'Info' in meta:
+            #    for m in meta['Info'].split('\n')[13:]:
+            #        mm = m.split(' = ')
+            #        if len(mm) == 2:
+            #            key, val = mm
+            #            self.ex_metadata[key] = val
+            temp_meta = copy.deepcopy(meta)
+            for key, value in meta.items():
+                if key in IMAGEJ_METADATA_TYPES:
+                    self.ex_metadata[key] = value
+                    if key in temp_meta:
+                        del temp_meta[key]
+            self.metadata = temp_meta
 
         elif self.fp.is_lsm:
             self.metadata = meta = self.fp.lsm_metadata
@@ -245,8 +253,10 @@ class MultiTiffReader(generalIO.GeneralReader):
         #else:
         
         arr = self.fp.pages[int(i)].asarray()
-        if arr.ndim == 3: # h.axes == 'SYX'
+        if arr.ndim == 3 and self.axes[0] in ('S', 'C', 'W'):# == 'SYX'
             arr = arr[self.axes_w]
+        elif arr.ndim == 3 and self.axes[-1] in ('S', 'C', 'W'):# == 'SYX'
+            arr = arr[...,self.axes_w]
         return arr
 
 
@@ -272,7 +282,10 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         open a file for reading
         """
         imagej = self.style == 'imagej'
-        self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#bigtiff=not(imagej), imagej=imagej)
+        if int(tifffile.__version__.split('.')[1]) <= 14:
+            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#bigtiff=not(imagej), imagej=imagej)
+        else:
+            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)
 
         self.handle = self.fp._fh
         self.dataOffset = self.handle.tell()
@@ -284,8 +297,8 @@ class MultiTiffWriter(generalIO.GeneralWriter):
             self.metadata.update(self._makeImageJMetadata())
         elif self.style == 'ome':
             self.metadata.update(self.makeOMEMetadata())
-        else:
-            self.metadata.update(self.ex_metadata)
+        #else:
+        #    self.metadata.update(self.ex_metadata)
 
         unit = 10**6
         self.res = [(int(p), unit) for p in 1/self.pxlsiz[-2:] * unit]
@@ -295,7 +308,7 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         if not self.init:
             self.doOnSetDim()
             test = N.zeros((self.ny, self.nx), self.dtype)
-            self.dataOffset, self._secByteSize = self.fp.save(test, resolution=self.res, metadata=self.metadata, returnoffset=True)
+            self.dataOffset, self._secByteSize = self.fp.save(test, resolution=self.res, metadata=self.metadata, returnoffset=True, extratags=self.extratags)
             self.handle.seek(self.handle.tell() - self._secByteSize)
 
             self.init = True
@@ -303,9 +316,10 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         if i is not None:
             self.seekSec(i)
 
-        offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, extratags=self.extratags)
-        #if (offset - self._secByteSize * int(i)) != self.dataOffset or sec != self._secByteSize:
-        #    raise ValueError('offset %i -> %i, sec %i -> %i' % (self.dataOffset, offset, self._secByteSize, sec))
+        if int(tifffile.__version__.split('.')[1]) <= 14:
+            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True)
+        else:
+            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software)
 
     def _makeImageJMetadata(self):
         """
@@ -328,21 +342,13 @@ class MultiTiffWriter(generalIO.GeneralWriter):
                     # my field goes to "description"
                     'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
                     }
-                    #'min': 0.0,
-                    #'max': 0.0,
-                    #'Info': infostr}
-        metadata.update(self.ex_metadata)
-        if hasattr(self, 'prev_metadata'):
-            #print('writing ij')
-            #metadata['IJMetadata'] = {'info': self.prev_metadata['Info']}
-            #print(metadata.keys())
 
-            ### middle of writing
-            middle_of_writing="""
-            nmeta = 1
-            ntypes = 8 * nmeta + 4 # 4 is "IJIJ" and 8 is the byte count
-            self.extratags = [('IJMetadata', 's', 0, 'IJIJinfo1'+self.prev_metadata['Info'], True), # (code, dtype, count, value, writeonce)
-                         ('IJMetadataByteCounts', 'I', 2, (ntypes, len(self.prev_metadata['Info']) * 2), True)]"""
+        if 'Ranges' in self.ex_metadata:
+            nw_range = len(self.ex_metadata['Ranges']) // 2
+            if nw_range != self.nw:
+                del self.ex_metadata['Ranges']
+        self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
+
             
         return metadata
 
@@ -507,3 +513,58 @@ def testit(fn, outfn='testImageJ.tif'):
     ww.close()
     rr = MultiTiffReader(outfn)
     return rr.asarray()
+
+
+# https://stackoverflow.com/questions/50258287/how-to-specify-colormap-when-saving-tiff-stack?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+
+def imagej_metadata_tags(metadata, byteorder):
+    """Return IJMetadata and IJMetadataByteCounts tags from metadata dict.
+
+    The tags can be passed to the TiffWriter.save function as extratags.
+
+    """
+    header = [{'>': b'IJIJ', '<': b'JIJI'}[byteorder]]
+    bytecounts = [0]
+    body = []
+
+    def writestring(data, byteorder):
+        return data.encode('utf-16' + {'>': 'be', '<': 'le'}[byteorder])
+
+    def writedoubles(data, byteorder):
+        return struct.pack(byteorder+('d' * len(data)), *data)
+
+    def writebytes(data, byteorder):
+        return data.tobytes()
+
+    metadata_types = (
+        ('Info', b'info', 1, writestring),
+        ('Labels', b'labl', None, writestring),
+        ('Ranges', b'rang', 1, writedoubles),
+        ('LUTs', b'luts', None, writebytes),
+        ('Plot', b'plot', 1, writebytes),
+        ('ROI', b'roi ', 1, writebytes),
+        ('Overlays', b'over', None, writebytes))
+
+    for key, mtype, count, func in metadata_types:
+        if key not in metadata:
+            continue
+        if byteorder == '<':
+            mtype = mtype[::-1]
+        values = metadata[key]
+        if count is None:
+            count = len(values)
+        else:
+            values = [values]
+        header.append(mtype + struct.pack(byteorder+'I', count))
+        for value in values:
+            data = func(value, byteorder)
+            body.append(data)
+            bytecounts.append(len(data))
+
+    body = b''.join(body)
+    header = b''.join(header)
+    data = header + body
+    bytecounts[0] = len(header)
+    bytecounts = struct.pack(byteorder+('I' * len(bytecounts)), *bytecounts)
+    return ((50839, 'B', len(data), data, True),
+            (50838, 'I', len(bytecounts)//4, bytecounts, True))

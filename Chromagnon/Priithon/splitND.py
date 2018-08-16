@@ -3,7 +3,7 @@ from __future__ import print_function
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
-import six
+import six, sys
 from .splitNDcommon import *
 
 
@@ -154,7 +154,7 @@ def run(img, title=None, size=None, originLeftBottom=None, _scoopLevel=1): # jus
         # python expression: evaluate this string and use it it as title !
         if type(img)==str: # title
             try:
-                import sys
+                #import sys
                 fr = sys._getframe(_scoopLevel)
                 locs = fr.f_locals
                 globs = fr.f_globals
@@ -166,7 +166,7 @@ def run(img, title=None, size=None, originLeftBottom=None, _scoopLevel=1): # jus
 
         else:     # see if img has a name in the parent dictionary - use that as title
             try:
-                import sys
+                #import sys
                 fr = sys._getframe(_scoopLevel)
                 vars = fr.f_globals.copy()
                 vars.update( fr.f_locals )
@@ -266,6 +266,7 @@ class spv(spvCommon):
             needShow=False
             
         splitter = wx.SplitterWindow(parent, -1, style=wx.SP_LIVE_UPDATE|wx.SP_3DSASH)
+        self.splitter = splitter
     
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.upperPanel = wx.Panel(splitter, -1)
@@ -917,7 +918,8 @@ class spv(spvCommon):
         if self.hist_arr is not None:
             #glSeb  import time
             #glSeb  x = time.clock()
-            wx.Yield() # 20180406 dileptus
+            if sys.platform.startswith('linux'): # 20180712 win SIM error
+                wx.Yield() # 20180406 dileptus linux
             U.histogram(img, amin=self.hist_min, amax=self.hist_max, histArr=self.hist_arr)
             self.hist.setHist(self.hist_arr, self.hist_min, self.hist_max)
             #glSeb  print "ms: %.2f"% ((time.clock()-x)*1000.0)
@@ -941,7 +943,11 @@ class spv(spvCommon):
             self.recalcHist__Done = 1
             #time print "recalcHist ms: %.2f"% ((time.clock()-x)*1000.0)
             #20171225 py2to3
-            if wx.IsMainThread():#Thread_IsMain():
+            if wx.VERSION[0] <= 3:
+                mainthread = wx.Thread_IsMain()
+            elif wx.VERSION[0] >= 4:
+                mainthread = wx.IsMainThread()
+            if mainthread:#wx.IsMainThread():#Thread_IsMain():
                 self.hist.setHist(self.recalcHist__a_h,
                                   self.mmms[0],
                                   self.mmms[1])

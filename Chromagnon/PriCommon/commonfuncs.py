@@ -1,5 +1,5 @@
 
-import sys, os
+import sys, os, imp
 
 
 ##------ config IO ----------------
@@ -55,3 +55,9 @@ def saveConfig(**newkwds):
     for key, val in kwds.items():
         h.write('%s=%s%s' % (key, val, os.linesep))
     h.close()
+
+# a helper function for debugging the packaged software
+def main_is_frozen():
+   return (getattr(sys, "frozen", False) or # new py2exe + pyinstaller
+           hasattr(sys, "importers") # old py2exe
+           or imp.is_frozen("__main__")) # tools/freeze

@@ -1,10 +1,11 @@
 from __future__ import print_function
 import numpy as N
-import sys
+import sys, os
 
 try:
     from Priithon.all import U, F
     from PriCommon import xcorr, imgResample, imgGeo,imgFilters
+    import imgio
 
     if sys.version_info.major == 2 and hasattr(sys, 'app'):
         from PriCommon import ppro
@@ -14,21 +15,23 @@ try:
 except ImportError:
     from Chromagnon.Priithon.all import U, F
     from Chromagnon.PriCommon import xcorr, imgResample, imgGeo,imgFilters
+    from Chromagnon import imgio
     
     if sys.version_info.major == 2 and hasattr(sys, 'app'):
         from Chromagnon.PriCommon import ppro
     else:
         from Chromagnon.PriCommon import ppro26 as ppro
-        
-try:
-    from . import cutoutAlign
-except ValueError:
-    from Chromagnon import cutoutAlign
-except ImportError: # python2
+
+if sys.version_info.major == 2:
     import cutoutAlign
+elif sys.version_info.major >= 3:
+    try:
+        from . import cutoutAlign, chromformat
+    except (ValueError, ImportError):
+        from Chromagnon import cutoutAlign, chromformat
+
 from scipy import ndimage, spatial
 #import exceptions
-
 
 class AlignError(Exception): pass
 
@@ -42,7 +45,7 @@ QUADRATIC_AREA=['Right-Top', 'Left-Top', 'Left-Bottom', 'Right-Bottom']
 IF_FAILED=['auto', 'force_logpolar', 'force_simplex', 'terminate']
 
 
-def prep2D(a3d, zs=None):
+def prep2D(a3d, zs=None, removeEdge=True):
     """
     simply makes maximum projection of best z sections
 
@@ -52,7 +55,11 @@ def prep2D(a3d, zs=None):
         zs = findBestRefZs(a3d)
 
     aa = a3d[zs]
-    return N.max(aa, axis=0)
+    aa = N.max(aa, axis=0)
+    if removeEdge:
+        return aa[1:-1,1:-1] # remove the edge pixels (for deconvolved images)
+    else:
+        return aa
 
 def measureSaturation(a3d, force_calc_neighbor=False, ret_fraction=False):
     """
@@ -297,7 +304,7 @@ def getOffset(asiny1, asiny2, asinx, theta, center2):
     dx = (a1 * a2 * tan2 - a1 * a2 * tan1) / (a1 * tan1 + a2 * tan2)
     return dx
 
-def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=5, cqthre=CTHRE/10.*1/0.3, if_failed=IF_FAILED[0]):#'simplex'):
+def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=5, cqthre=CTHRE/10.*1/0.3, if_failed=IF_FAILED[0], center=None):
     """
     iteratively do quadratic cross correlation
 
@@ -311,7 +318,8 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
     return [ty,tx,r,my,mx] if_failed is 'terminate' and failed, return None
     """
     shape = N.array(a2d.shape)
-    center = shape // 2
+    if center is None:
+        center = shape // 2
 
     ret = N.zeros((5,), N.float32)
     ret[3:] = 1
@@ -641,7 +649,6 @@ def findBestRefZs(ref, sigma=0.5):
     ref: 3D array
     return z idx at the focus
     """
-    from Priithon.all import F
     nz = ref.shape[0]
     if ref.ndim == 2:
         return [0]
@@ -691,6 +698,51 @@ def applyShift(arr, zyxrm, dyx=(0,0)):
         arr = imgResample.trans3D_affine(arr, zyxrm[:3], zyxrm[3], zyxrm[zmagidx:], dyx)
 
     return arr
+
+# ------ averaging --------
+
+def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
+    """
+    return output filename
+    """
+    if len(reffns) == 1:
+        return reffns
+    
+    contain_chrom = [chromformat.is_chromagnon(fn) for fn in reffns]
+    if all(contain_chrom):
+        #raise ValueError('Some reference files are chromagnon files. Please use only image files for averaging.')
+        return chromformat.averageChromagnon(reffns)
+    elif any(contain_chrom):
+        raise ValueError('Different reference files are mixed. Please use only image files or only chromagnon files for averaging.')
+    
+    rdrs = [imgio.Reader(fn) for fn in reffns]
+    for rdr in rdrs[1:]:
+        if rdr.nt != rdrs[0].nt or rdr.nw != rdrs[0].nw or rdr.nz != rdrs[0].nz:
+            raise ValueError('dimensions of input image files are not equal')
+            
+    if not out:
+        base = os.path.commonprefix(reffns)
+        if not os.path.basename(base):
+            base = os.path.splitext(reffns[0])[0] + '_etc'
+        out = base + suffix + ext
+
+    wtr = imgio.Writer(out, rdrs[0])
+
+    rdr = rdrs[0]
+    arrs = N.empty((len(rdrs), rdr.ny, rdr.nx), rdr.dtype)
+
+    for t in range(rdr.nt):
+        for w in range(rdr.nw):
+            for z in range(rdr.nz):
+                for i, rdr in enumerate(rdrs):
+                    arrs[i] = rdr.getArr(t=t, w=w, z=z)
+                    wtr.writeArr(N.mean(arrs, axis=0).astype(rdr.dtype), t=t, w=w, z=z)
+
+    wtr.close()
+    [rdr.close() for rdr in rdrs]
+    return out
+                
+
 
 # ------ non linear  ------
 
@@ -747,6 +799,63 @@ def remapWithAffine(img, mapzyx, affine, interp=2):
         else:
             arr2[z] = a
     return arr2
+
+def makeNonliearImg(holder, out, gridStep=10):
+    """
+    save the result of non-linear transformation into the filename "out"
+    gridStep: spacing of grid (number of pixels)
+
+    return out
+    """
+    ext = ('.ome.tif', '.ome.tiff')
+    if not out.endswith(ext):
+        out = out + ext[0]
+
+    if holder.mapyx.ndim == 6:
+        arr = N.zeros(holder.mapyx.shape[:3]+holder.mapyx.shape[-2:], N.float32)
+    else:
+        arr = N.zeros(holder.mapyx.shape[:2]+holder.mapyx.shape[-2:], N.float32)
+        
+    for t in range(holder.nt):
+        if hasattr(holder, 'img'):
+            a = holder.img.get3DArr(w=holder.refwave, t=t)
+            if holder.mapyx.ndim == 5:
+                a = N.max(a, 0)
+            arr[t,holder.refwave] = a
+            me = a.max()
+        else:
+            me = 1.
+        if holder.mapyx.ndim == 6:
+            arr[t,:,:,::gridStep,:] = me
+            arr[t,:,:,:,::gridStep] = me
+        else:
+            arr[t,:,::gridStep,:] = me
+            arr[t,:,:,::gridStep] = me
+        
+    affine = N.zeros((7,), N.float64)
+    affine[-3:] = 1
+
+    writer = imgio.Writer(out)#bioformatsIO.BioformatsWriter(out)
+
+    if hasattr(holder, 'img'):
+        writer.setFromReader(holder.img)
+    elif hasattr(holder, 'creader'):
+        writer.setFromReader(holder.creader)
+    if holder.mapyx.ndim == 5:
+        writer.nz = 1
+    writer.dtype = N.float32
+
+    for t in range(holder.nt):
+        for w in range(holder.nw):
+            a = arr[t,w]
+            if a.ndim == 2:
+                a = a.reshape((1,a.shape[0], a.shape[1]))
+            a = remapWithAffine(a, holder.mapyx[t,w], affine)
+
+            writer.write3DArr(a, t=t, w=w)
+    del arr
+
+    return out
 
 
 # ------ non linear functions ------
@@ -1172,10 +1281,9 @@ def paddYX(yx, npxl, shape, maxcutY=0, maxcutX=0):
     """
     npxl //= 2
     
-    #from Priithon.all import F
     pshape = (2,) + tuple([int(s) for s in N.array(yx.shape[-2:]) + 3*2])
     #yxp = F.getPadded(yx, pshape)
-    #from Priithon.all import Y
+
     #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl))#, order=1, prefilter=False)
     #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl), order=1, prefilter=False) # bilinear is better
     #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl), order=0, prefilter=False)

@@ -10,13 +10,6 @@ except ImportError:
     from PriCommon import imgGeo
     import imgio
 
-    
-try:
-    from . import alignfuncs as af
-except ValueError:
-    from Chromagnon import alignfuncs as af
-except ImportError:
-    import alignfuncs as af
 
 IDTYPE = '101'
 PARM_EXT=('chromagnon.csv', 'chromagnon.tif', 'chromagnon.tiff','chromagnon.ome.tif', 'chromagnon.ome.tiff', 'chromagnon')
@@ -139,7 +132,7 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
                      'num_entry': str(self.num_entry),
                      'idtype': IDTYPE}
             
-                self.writer.ex_metadata.update(d)
+                self.writer.metadata.update(d)#ex_metadata.update(d)
 
     def writeAlignParmSingle(self, t=0, w=0):
         parm = self.holder.alignParms[t,w]
@@ -151,7 +144,7 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
                 if self.writer.file.endswith('ome.tif'):
                     self.writer.ome.add_structured_annotation('t%03d_w%i_' %(t,w) + key, str(parm[i]))
                 else:
-                    self.writer.ex_metadata['t%03d_w%i_' %(t,w) + key] = str(parm[i])
+                    self.writer.metadata['t%03d_w%i_' %(t,w) + key] = str(parm[i])#ex_metadata['t%03d_w%i_' %(t,w) + key] = str(parm[i])
 
     def writeAlignParamAll(self):
         for t in range(self.rdr.nt):
@@ -240,6 +233,7 @@ class ChromagnonReader(object):
             self.imgSequence = self.reader.imgSequence
             self.pxlsiz = self.reader.pxlsiz
             self.metadata = self.reader.metadata
+            self.ex_metadata = self.reader.ex_metadata
             #refwave = self.eval(str(self.reader.ome.get_structured_annotation('refwave')))
             refwave = self.reader.metadata['refwave']
             #self.num_entry = self.eval(str(self.reader.ome.get_structured_annotation('num_entry')))
@@ -483,6 +477,7 @@ def summarizeAlignmentData(fns, outfn='', refwave=0, calc_rotmag=True, npxls=(64
                     #    wtr.writerow([r.file, t, wave] + [0,0,0,0,0,0,0])
     return outfn
 
+moved2alignfunc20180806='''
 def makeNonliearImg(holder, out, gridStep=10):
     """
     save the result of non-linear transformation into the filename "out"
@@ -613,6 +608,7 @@ def makeNonliearImg_tmp(holder, out, gridStep=10):
     del arr
 
     return out
+'''
 
 class dummyHolder(object):
     def __init__(self):
@@ -633,7 +629,7 @@ def averageChromagnon(fns, out=None):
     binars = [is_binary(fn) for fn in fns]
     for bn in binars[1:]:
         if bn != binars[0]:
-            raise ValueError('Formats (csv, ome.tif) of the chromagnon files are mixed')
+            raise ValueError('Formats (csv, tif) of the chromagnon files are mixed')
     binar = binars[0]
     if not out:
         out = makeChromagnonFileName(os.path.commonprefix(fns) + '_ave', binar)
@@ -652,7 +648,7 @@ def averageChromagnon(fns, out=None):
     if binar:
         for r in rrs[1:]:
             if r.nw != rrs[0].nw or r.nt != rrs[0].nt or r.nz != rrs[0].nz or r.ny != rrs[0].ny or r.nx != rrs[0].nx:
-                raise ValueError('Different dimensions found')
+                raise ValueError('Different dimensions found for chromagon.tif files')
         if r.nz > 1:
             arr = N.empty((n, r.nt, r.nw, r.nz, 2, r.ny, r.nx), N.float32)
         else:

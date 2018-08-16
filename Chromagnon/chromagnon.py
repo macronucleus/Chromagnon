@@ -6,43 +6,10 @@
 # Load image file, make calibration file and then apply calibration to image file
 ##################################################################################
 
-
 import sys, os
 import six
 
-#### javabridge for py2exe
-# following workaround should be put before importing anything involved.
-INIT = False
-import imp
-def main_is_frozen():
-   return (getattr(sys, "frozen", False) or # new py2exe + pyinstaller
-           hasattr(sys, "importers") # old py2exe
-           or imp.is_frozen("__main__")) # tools/freeze
-
-def init_java_home():
-    global INIT
-    if not INIT:
-        if main_is_frozen():
-            if sys.platform.startswith('win'):
-                # py2exe emit warnings as error messages if it is not supressed.
-                import warnings
-                warnings.simplefilter('ignore')
-
-            if 0: # JDK was excluede from V0.6 # py2exe/py2app
-                cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
-                if sys.platform.startswith('win'):
-                    jdk = os.path.join(cwd, 'jdk')
-                elif sys.platform.startswith('darwin'):
-                    jdk = os.path.join(os.path.dirname(cwd), 'Resources', 'jdk')
-
-                os.environ['JDK_HOME'] = jdk
-                os.environ['JAVA_HOME'] = os.path.join(jdk, 'jre')
-                
-        INIT = True
-
-
-init_java_home()
-
+# ------------- import modules
 import wx
 try:
     from PriCommon import guiFuncs as G, commonfuncs as C, listbox
@@ -55,15 +22,15 @@ except (ValueError, ImportError):
     from Chromagnon.Priithon.all import U, N, Mrc
     from Chromagnon import imgio
 
-## for py2exe, here the relative import was impossible to run this script as __main__
+## for packaging, here the relative import was impossible to run this script as __main__
 try:
-    from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
-except (ValueError, ImportError):
+    if sys.version_info.major == 2:
+        import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+    elif sys.version_info.major >= 3:
+        from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+except ImportError: # run as __main__
     from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
-except ImportError:
-    import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
 
-            
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
 
@@ -128,7 +95,7 @@ class BatchPanel(wx.Panel):
         # fill in the contents
         self.makePanel()
 
-    def makePanel(self, tif=False):
+    def makePanel(self):
         # config
         confdic = C.readConfig()
         self.lastpath = confdic.get('lastpath', '')
@@ -214,7 +181,8 @@ class BatchPanel(wx.Panel):
         self.listRef.setOnDrop(self.goButton.Enable, 1)
         self.listTgt.setOnDrop(self.goButton.Enable, 1)
         
-        self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
+        #self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
+        self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are averaged to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
         
         self.localChoice = LOCAL_CHOICE
         label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
@@ -239,7 +207,7 @@ class BatchPanel(wx.Panel):
         self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
         self.flatButton.SetToolTip(wx.ToolTip('Open a graphical interphase to flat field images'))
 
-        flatsize = self.goButton.GetSize()[0] + self.zmaglabel.GetSize()[0] + self.zmagch.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
+        flatsize = self.goButton.GetSize()[0] + self.averageCb.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5 #self.zmaglabel.GetSize()[0] + self.zmagch.GetSize()[0] 
 
         G.newSpaceH(box, FRAMESIZE_X-flatsize)
 
@@ -442,12 +410,12 @@ class BatchPanel(wx.Panel):
         The actual sequence of processes is written in threads.ThreadWithExc.run()
         """
         if self.goButton.GetValue():
+            
             if not self.listRef.columnkeys:
                 return
 
             fns = [os.path.join(*self.listRef.getFile(index)[:2]) for index in self.listRef.columnkeys]
             targets = [os.path.join(*self.listTgt.getFile(index)[:2]) for index in self.listTgt.columnkeys]
-
 
             # other parameters
             initguess = ''
@@ -456,13 +424,35 @@ class BatchPanel(wx.Panel):
             if not form:
                 G.openMsg(parent=self, msg='Please select the output file format next to the Suffix text box', title="The format type is missing")
                 self.goButton.SetValue(0)
+                self.label.SetLabel('')
                 return
+
+            # averaging
+            #ref_all_image = all([not chromformat.is_chromagnon(fn) for fn in fns])
+            if self.averageCb.GetValue() and len(fns) > 1:# and ref_all_image:
+                try:
+                    self.label.SetLabel('averaging...')
+                    self.label.SetForegroundColour('red')
+                    wx.Yield()
+                    ave_fn = af.averageImage(fns, ext=form)
+                except Exception as e:
+                    G.openMsg(parent=self, msg=e.args[0], title="Reference files are not appropriate for averaging")
+                    self.goButton.SetValue(0)
+                    self.label.SetLabel('')
+                    return         
+                self.listRef.clearAll()
+                self.listRef.addFile(ave_fn)
+                fns = [ave_fn]
+            elif self.averageCb.GetValue() and len(fns) == 1:
+                self.averageCb.SetValue(0)
+            
                 
             parms = [self.cutoutCb.GetValue(),
                      initguess,
                      self.localListChoice.GetStringSelection(),
                      self.maxShift.GetValue(),
-                     self.zmagch.GetStringSelection(),
+                     None, # empty after removing zmag slection
+                     #self.zmagch.GetStringSelection(),
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
                      [nt for nt in self.listRef.nts], # copy
@@ -479,7 +469,7 @@ class BatchPanel(wx.Panel):
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
-                parms[6] = alginer.IMG_SUFFIX
+                parms[6] = aligner.IMG_SUFFIX
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
@@ -526,11 +516,7 @@ class BatchPanel(wx.Panel):
     
 
 ## command line behavior
-if __name__ == '__main__':
-    ## windows support for py2exe
-    import multiprocessing
-    multiprocessing.freeze_support()
-
+def command_line():
     if len(sys.argv) == 1:
         main()
 
@@ -539,56 +525,74 @@ if __name__ == '__main__':
 
         description = r"""
            Chromagnon is an adaptive channel alignment program for fluorescnece microscope images.
-           Feed one reference file each time.
-           If no image file is supplied, a GUI will open to feed multiple files"""
+           If no image file is supplied, a GUI will open to feed multiple files.
+
+           If you supply image file, the program starts as a console program.
+           When you have mutiple reference files, do like the 'usage':
+           """
+        usage = '%(prog)s target1 target2 -R reference1 reference2 [options]'
         
-        p = argparse.ArgumentParser(description=description)
+        p = argparse.ArgumentParser(description=description, usage=usage)
         p.add_argument('targets', nargs='*',
-                     help='target images files (required)')
-        p.add_argument('--reference', '-R', required=True,
-                     help='a reference image or chromagnon file (required)')
+                     help='target images files')
+        p.add_argument('--reference', '-R', required=True, nargs='*',
+                     help='reference image or chromagnon files (required)')
         p.add_argument('--local', '-l', default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
                      help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
         p.add_argument('--localMinWindow', '-w', default=af.MIN_PXLS_YXS[1], choices=af.MIN_PXLS_YXS,
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
-        #p.add_argument('--initguess', '-I', default=None,
-        #             help='a chromagnon file name for initial guess (default=None)')
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
                      help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
-        p.add_argument('--zmag', '-z', default=aligner.ZMAG_CHOICE[0], choices=aligner.ZMAG_CHOICE,
-                     help='choose from %s (default=%s)' % (aligner.ZMAG_CHOICE, aligner.ZMAG_CHOICE[0]))
+        p.add_argument('--not_crop_mergins', '-c', action='store_false',
+                     help='crop mergins after alignment (default=False; do crop mergins)')
+        p.add_argument('--average_references', '-a', action='store_true',
+                     help='average reference image (default=False)')
         p.add_argument('--parm_suffix', '-P', default='',
                      help='suffix for the chromagnon files (default=None)')
         p.add_argument('--img_suffix', '-S', default=aligner.IMG_SUFFIX,
                      help='suffix for the target files (default=%s)' % aligner.IMG_SUFFIX)
         p.add_argument('--img_format', '-E', default=aligner.WRITABLE_FORMATS[0], choices=aligner.WRITABLE_FORMATS,
                      help='file extension for the target files, choose from %s (default=%s)' % (aligner.WRITABLE_FORMATS, aligner.WRITABLE_FORMATS[0]))
-        options = p.parse_args()
+        options = p.parse_args(sys.argv[1:])
 
-        ref = glob.glob(os.path.expandvars(os.path.expanduser(options.reference)))
+        refs = []
+        for ref in options.reference:
+            refs += glob.glob(os.path.expandvars(os.path.expanduser(ref)))
         
         fns = []
         for fn in options.targets:
             fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
         nts = []
         for fn in fns:
-            h = imgio.Reader(fn) #bioformatsIO.load(fn)
+            h = imgio.Reader(fn)
             nts.append(h.nt)
             h.close()
 
-        parms = [True, # crop mergins
+        if options.average_references:
+            refs = af.averageImage(refs, ext=options.img_format)
+            print('averaged image was saved as %s' % refs)
+
+        parms = [not options.not_crop_mergins,
                 None,#options.initguess,
                 options.local,
                 options.maxShift,
-                options.zmag,
+                None,#options.zmag,
                 options.parm_suffix,
                 options.img_suffix,
                 nts,
                 options.img_format,
                 int(options.localMinWindow)]
-                     # min_pxls_yx]
 
-        th = threads.ThreadWithExc(None, LOCAL_CHOICE, ref, fns, parms)
+        th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()
-        #bioformatsIO.uninit_javabridge()
-        imgio.uninit_javabridge()
+        th.join()
+        print('done')
+
+        
+if __name__ == '__main__':
+    ## windows support for py2exe
+    import multiprocessing
+    multiprocessing.freeze_support()
+
+    command_line()
+    imgio.uninit_javabridge()

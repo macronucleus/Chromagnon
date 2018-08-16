@@ -62,6 +62,25 @@ def laserM2(m2=1.05, wave=488, diam_mm=1, distance_mm=1000):
 
     return N.degrees(theta), div
 
+def airyND(shape, orig=None, wrap=False):
+    from Priithon.all import F
+    from PriCommon import imgFit
+    return F.radialArr(shape, imgFit.airy1D, orig, wrap)
+
+
+def rescan_resolution(fwhm_emi=250, fwhm_exc=250, mag=2):
+    a = fwhm_emi / mag
+    b = (mag - 1) * fwhm_exc / mag
+    return (a**2 + b**2) ** 0.5
+
+def rescan_optimum_mag(fwhm_emi=250, fwhm_exc=250):
+    return 1 + (fwhm_emi**2) / (fwhm_exc**2)
+
+def rescan_optimum_spot_width(fwhm_emi=250, fwhm_exc=250):
+    a = fwhm_emi * fwhm_exc
+    b = (fwhm_emi**2) + (fwhm_exc**2)
+    return a / (b**0.5)
+
 #------------ color LUT -----------------#
 
 COLOR_TABLE=[(1,0,1),   (0,0,1), (0,1,1), (0,1,0), (1,1,0),  (1,0,0), (1,0,1), (1,1,1)]

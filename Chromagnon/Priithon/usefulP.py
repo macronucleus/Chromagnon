@@ -3,11 +3,15 @@
 __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
+import wx
+wx.PyDeadObjectError = RuntimeError # wx 3->4
+
 import numpy as N
 try: # 20051117
     plot_defaultStyle
 except:
     plot_defaultStyle = '-+'
+    
 
 def plotSetColorsDefault(colString="rgbkcm"):
     """
@@ -279,13 +283,12 @@ def plotFigure(which_one = None):
     """if which_one = None       : start a new plot window
        if which_one is 'integer' : select that figure as active
     """
-    import wx
     from . import plt
     try:
         return plt.figure(which_one)
         #if which_one is None:
         #    plothold(on=0)
-    except wx.PyDeadObjectError:
+    except wx.PyDeadObjectError: 
         print("** figure '%s' invalid - made new one **"%which_one)
 
 def plotFigureGetNo(createNewIfNeeded=False):
@@ -537,7 +540,7 @@ def plotMouseEventHandlerSet(handler=None, figureNo=None):
             print plotMouse__window2graph(p)
     """
     fig = _getFig(figureNo)
-    import wx
+    #import wx
 
     pc = fig.client                   # canvas
 

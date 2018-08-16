@@ -69,9 +69,9 @@ RTYPES = (N.float32, N.float64)
 CTYPE = N.complex64
 CTYPES = (N.complex64, N.complex128)
 
-print('FFTW: ', FFTW)
-print('SCIK: ', SCIK)
-print('REIK: ', REIK)
+#print('FFTW: ', FFTW)
+#print('SCIK: ', SCIK)
+#print('REIK: ', REIK)
 
 # disable GPU functions
 SCIK = False

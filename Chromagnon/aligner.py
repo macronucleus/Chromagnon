@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os
+import os, sys
 import numpy as N
 from scipy import ndimage as nd
 
@@ -11,13 +11,14 @@ except ImportError:
     from Chromagnon.PriCommon import imgGeo, imgFilters, xcorr, fntools
     from Chromagnon.Priithon.all import Mrc, U
     from Chromagnon import imgio
-    
-try:
-    from . import alignfuncs as af, cutoutAlign, chromformat
-except ValueError:
-    from Chromagnon import alignfuncs as af, cutoutAlign, chromformat
-except ImportError:
+
+if sys.version_info.major == 2:
     import alignfuncs as af, cutoutAlign, chromformat
+elif sys.version_info.major >= 3:
+    try:
+        from . import alignfuncs as af, cutoutAlign, chromformat
+    except (ValueError, ImportError):
+        from Chromagnon import alignfuncs as af, cutoutAlign, chromformat
 
 if __name__ == '__main__':
     NCPU = os.cpu_count()
@@ -35,7 +36,7 @@ ZMAG_CHOICE = ['Auto', 'Always', 'Never']
 
 # file extention
 IMG_SUFFIX='_ALN'
-WRITABLE_FORMATS = ['tif', 'dv', 'ome.tif']
+WRITABLE_FORMATS = [fm for fm in ('tif', 'dv', 'ome.tif') if fm in imgio.WRITABLE_FORMATS]
 
 # chromagnon file format
 IDTYPE = 101
@@ -176,7 +177,7 @@ class Chromagnon(object):
         if self.max_shift_pxl > min((self.img.nx, self.img.ny)):
             self.max_shift_pxl = min((self.img.nx, self.img.ny))
 
-    def setZmagSwitch(self, value='Auto'):
+    def setZmagSwitch(self, value='Always'):#'Auto'):
         self.zmagSwitch = value
 
     def setEchofunc(self, func=None):
@@ -362,7 +363,7 @@ class Chromagnon(object):
         self.progress()
 
     
-    def setRefImg(self, refyz=None, refyx=None):
+    def setRefImg(self, refyz=None, refyx=None, removeEdge=True):
         """
         set self.refyz and self.refyx
         """
@@ -379,13 +380,13 @@ class Chromagnon(object):
                             self.echofunc('using slices %s' % self.refzs, skip_notify=True)
 
                     self.zs = N.array(self.refzs)
-                    refyx = af.prep2D(ref, zs=self.refzs)
+                    refyx = af.prep2D(ref, zs=self.refzs, removeEdge=removeEdge)
 
                 if refyz is None:
                     if self.refxs is None:
                         self.refxs = af.findBestRefZs(ref.T, sigma=-0.5)
                     self.xs = N.array(self.refxs)
-                    refyz = af.prep2D(ref.T, zs=self.refxs)
+                    refyz = af.prep2D(ref.T, zs=self.refxs, removeEdge=removeEdge)
                 del ref
             elif refyx is None:
                 refyx = self.img.getArr(w=self.refwave, t=self.reftime, z=0)
@@ -448,22 +449,33 @@ class Chromagnon(object):
 
                 # try quadratic cross correlation
                 zdif = max(self.refzs) - min(self.refzs)
+                zzoom = 1.
 
-                if self.zmagSwitch != ZMAG_CHOICE[2] and not ((zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[0]):
+                if self.zmagSwitch != ZMAG_CHOICE[2] and not ((zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[0]): # not "never" and go for zmag
                     initguess = N.zeros((5,), N.float32)
                     initguess[:2] = ret[w,:2][::-1]
                     initguess[3:] = ret[w,4:6][::-1]
 
-                    if zdif > 3 and self.img.nz > 10 and self.zmagSwitch == ZMAG_CHOICE[1]:
+                    if zdif > 3 and self.img.nz > 10 and self.zmagSwitch == ZMAG_CHOICE[1]: # always
                         if_failed = 'simplex'
                     else:
                         if_failed = af.IF_FAILED[-1] # 'terminate' -> xcorr
-                    
-                    val, check = af.iteration(imgyz, self.refyz, maxErr=(self.maxErrYX, self.maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, cqthre=af.CTHRE/20., if_failed=if_failed)
+
+                    if (zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[1]: # always but number of z sections is not enough
+                        zzoom = imgyz.shape[0] / imgyz.shape[1]
+                        print('Z axis zoom factor=%.2f' % zzoom)
+                        imgyz = nd.zoom(imgyz, (1, zzoom))
+                        refyz = nd.zoom(self.refyz, (1, zzoom))
+                        maxErrZ = self.maxErrZ * zzoom
+                    else:
+                        refyz = self.refyz
+                        maxErrZ = self.maxErrZ
+                        
+                    val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, cqthre=af.CTHRE/20., if_failed=if_failed)
 
                     #if check:# is not None:
                     ty2,tz,_,_,mz = val#check
-                    ret[w,0] = tz
+                    ret[w,0] = tz / zzoom
                     ret[w,4] = mz
                     if not check: # chage to normal cross correlation
                         initguess = ret[w,:2][::-1]
@@ -545,8 +557,8 @@ class Chromagnon(object):
 
         set self.mapyx and self.regions
         """
-        if self.refyz is None or self.refyx is None:
-            self.setRefImg()
+        #if self.refyz is None or self.refyx is None:
+        self.setRefImg(removeEdge=False)
 
         # preparing the initial mapyx
         # mapyx is not inherited to avoid too much distortion
@@ -575,7 +587,7 @@ class Chromagnon(object):
                     zsinds = N.nonzero(zsbool)[0]
                     zs = zs[zsinds]
 
-                imgyx = af.prep2D(img, zs=zs)
+                imgyx = af.prep2D(img, zs=zs, removeEdge=False)
                 del img
             else:
                 imgyx = N.squeeze(self.img.get3DArr(w=w, t=t))
@@ -585,7 +597,7 @@ class Chromagnon(object):
 
             imgyx = imgyx.astype(N.float32)
             self.refyx = self.refyx.astype(N.float32)
-            
+
             yxs, regions, arr2 = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, cthre=self.cthre, echofunc=self.echofunc)
 
             self.mapyx[t,w] = yxs
@@ -969,11 +981,11 @@ class Chromagnon(object):
             out = os.path.extsep.join((self.img.filename, 'local', 'ome', 'tif'))
 
         try:
-            return chromformat.makeNonliearImg(self, out, gridStep)
+            return af.makeNonliearImg(self, out, gridStep)#chromformat.makeNonliearImg(self, out, gridStep)
         except OSError:
             out = fntools.nextFN(out)
             print(out)
-            return chromformat.makeNonliearImg(self, out, gridStep)
+            return af.makeNonliearImg(self, out, gridStep)#chromformat.makeNonliearImg(self, out, gridStep)
     
         
 def hasSameWave(img):
