@@ -807,7 +807,7 @@ def makeNonliearImg(holder, out, gridStep=10):
 
     return out
     """
-    ext = ('.ome.tif', '.ome.tiff')
+    ext = ('.tif', '.tiff')
     if not out.endswith(ext):
         out = out + ext[0]
 
@@ -835,15 +835,17 @@ def makeNonliearImg(holder, out, gridStep=10):
     affine = N.zeros((7,), N.float64)
     affine[-3:] = 1
 
-    writer = imgio.Writer(out)#bioformatsIO.BioformatsWriter(out)
+    writer = imgio.Writer(out)
 
     if hasattr(holder, 'img'):
         writer.setFromReader(holder.img)
     elif hasattr(holder, 'creader'):
         writer.setFromReader(holder.creader)
     if holder.mapyx.ndim == 5:
-        writer.nz = 1
-    writer.dtype = N.float32
+        #writer.nz = 1
+        writer.setDim(nz=1)
+    writer.setDim(dtype=N.float32)
+    #writer.dtype = N.float32
 
     for t in range(holder.nt):
         for w in range(holder.nw):

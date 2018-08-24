@@ -342,7 +342,7 @@ class ThreadWithExc(threading.Thread):
             elif an.nt > 1:
                 prange += [0.5+0.5*round(an.nz/50)]
 
-                prange += [(1+round(an.nz/10))]*(an.nt-1)
+                prange += [(1+round(an.nz/10))]*(an.nt-1)*2
 
                 #prange += [round(an.nz/25)] * an.nw * an.nt * ntargets
 
@@ -570,6 +570,8 @@ class ThreadFlat(ThreadWithExc):
 
                 base, ext = os.path.splitext(target)
                 out = ''.join((base, parms[1], parms[2]))
+                if out == target:
+                    raise ValueError('Please use a suffix to avoid overwriting the original file.')
                 out = flatConv.flatConv(target, flatFile, out=out)#None, suffix=parms[1])
 
                 wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))

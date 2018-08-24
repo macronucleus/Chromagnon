@@ -12,26 +12,28 @@ except ImportError:
 # GUI
 import wx, time
 
+__version__ = 0.2
+
 # Constants
-EXT='flat.ome.tif'
+#EXT='flat.ome.tif'
+SUF = '_FLAT'
+EXT = 'flat.tif'
 IDTYPE = '101'
-
-#if EXT not in bioformatsIO.OMETIFF:
-#    bioformatsIO.OMETIFF = tuple(list(bioformatsIO.OMETIFF) + [EXT])
-
 
 # functions
 def is_flat(fn, check_img_to_open=True):
     check = False
     if fn.endswith(EXT):
         check = True
-    else:
-        if check_img_to_open:
-            rdr = imgio.Reader(fn)#bioformatsIO.BioformatsReader(fn)
-            if hasattr(rdr, 'ome') and \
-                rdr.ome.get_structured_annotation('idtype') == IDTYPE:
-                    check = True
-            rdr.close()
+    elif check_img_to_open:
+        rdr = imgio.Reader(fn)
+        if hasattr(rdr, 'ome') and \
+            rdr.ome.get_structured_annotation('idtype') == IDTYPE:
+                check = True
+        elif hasattr(rdr, 'metadata') and \
+            rdr.metadata.get('idtype') == int(IDTYPE):
+                check = True
+        rdr.close()
 
     return check
 
@@ -46,15 +48,16 @@ def makeFlatConv(fn, out=None, suffix=''):
     elif not out.endswith(EXT):
         out = os.path.extsep.join(os.path.splitext(out)[0], EXT)
 
-    h = imgio.Reader(fn) #bioformatsIO.load(fn)
+    h = imgio.Reader(fn)
     ntz = h.nz * h.nt
     
-    o = imgio.Writer(fn) #bioformatsIO.getWriter(out)
+    o = imgio.Writer(out)
     o.setFromReader(h)
-    o.nt = 1
-    o.nz = 1
-    o.dtype = N.float32
-    o.ome.add_structured_annotation('idtype', IDTYPE)
+    o.setDim(nt=1, nz=1, dtype=N.float32)
+    if out.endswith('.ome.tif'):
+        o.ome.add_structured_annotation('idtype', IDTYPE)
+    elif out.endswith('.tif'):
+        o.metadata['idtype'] = IDTYPE
     
     for w in range(h.nw):
         canvas = N.zeros((h.nt, h.nz, h.ny, h.nx), N.float32)
@@ -69,7 +72,7 @@ def makeFlatConv(fn, out=None, suffix=''):
 
     return out
 
-def flatConv(fn, flatFile, out=None, suffix='_'+EXT.upper()):
+def flatConv(fn, flatFile, out=None, suffix=SUF):
     """
     save a normalized image
 
@@ -79,10 +82,10 @@ def flatConv(fn, flatFile, out=None, suffix='_'+EXT.upper()):
         base, ext = os.path.splitext(fn)
         out = base + suffix + ext
 
-    h = imgio.Reader(fn) #bioformatsIO.load(fn)
+    h = imgio.Reader(fn)
 
-    f = imgio.Reader(flatFile) #bioformatsIO.load(flatFile)
-    o = imgio.Writer(out) #bioformatsIO.getWriter(out)
+    f = imgio.Reader(flatFile)
+    o = imgio.Writer(out)
     o.setFromReader(h)
     if out.endswith('ome.tif'):
         o.imgSequence = 0

@@ -159,7 +159,7 @@ class BatchPanel(wx.Panel):
         
         self.tgtClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'tareget'), title='Clear selected', tip='', enable=False)
 
-        label, self.flatimg_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('flatimg_suffix_txt', '_'+flatConv.EXT.upper()), tip='A suffix for the output file name', sizeX=100)
+        label, self.flatimg_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('flatimg_suffix_txt', flatConv.SUF), tip='A suffix for the output file name', sizeX=100)
 
         choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
         label, self.outextch = G.makeListChoice(self, box, '', choices, defValue=confdic.get('flat_format', choices[0]), tip='Choose image file formats; for reading with ImageJ, dv is recommended.')
@@ -232,8 +232,11 @@ class BatchPanel(wx.Panel):
         else:
             self.tgtClearButton.Enable(0)
             
-        if evt:
-            self.currentItem = (rt, evt.m_itemIndex) # for doubleclick
+        if evt: # for doubleclick
+            if wx.version().startswith('3'):
+                self.currentItem = (rt, evt.m_itemIndex) 
+            else:
+                self.currentItem = (rt, evt.Index)
 
     def OnDoubleClick(self, evt=None):
         if self.currentItem[0] == 'reference':
@@ -355,6 +358,11 @@ class BatchPanel(wx.Panel):
             parms = [self.flat_suffix_txt.GetValue(),
                      self.flatimg_suffix_txt.GetValue(),
                      self.outextch.GetStringSelection()]
+
+            if not parms[1]:
+                G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
+                parms[1] = flatConv.SUF
+                self.flatimg_suffix_txt.SetValue(parms[1])
 
             gui = threads.GUImanager(self, __name__)
             

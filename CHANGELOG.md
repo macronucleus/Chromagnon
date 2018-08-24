@@ -49,7 +49,12 @@ quadrisection phase correlation.
 35. (v0.63) relative and absolute import was re-organized.
 36. (v0.63) `ome.tif` was removed from the selection list for the
 output file when `python-bioformats` is not installed.
-37. (v0.63) z translation calculation mistake introduced in v0.62 was fixed.
+37. (v0.63) z translation calculation mistake introduced in v0.62 was
+fixed.
+38. (v0.64) `imgio.multitifIO.py` was fixed for reading single
+wavelength and ome.tif.
+39. (v0.64) Errors in `PriCommon.flatconv.py` was fixed and put the
+    version number in `flatfielder.py` (v0.2).
 
 v0.5 (Jan. 2017)
 ----

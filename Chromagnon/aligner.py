@@ -939,6 +939,10 @@ class Chromagnon(object):
                 fn = base + self.img_suffix + self.img_ext
             else:
                 fn = self.img.filename + self.img_suffix + self.img_ext
+
+        if fn == self.img.filename:
+            raise ValueError('Please use a suffix to avoid overwriting the original file.')
+        
         min0 = self.min_is_zero()
                 
         des = self.prepSaveFile(fn)
@@ -978,7 +982,7 @@ class Chromagnon(object):
             return
         
         if not out:
-            out = os.path.extsep.join((self.img.filename, 'local', 'ome', 'tif'))
+            out = os.path.extsep.join((self.img.filename, 'local', 'tif'))
 
         try:
             return af.makeNonliearImg(self, out, gridStep)#chromformat.makeNonliearImg(self, out, gridStep)

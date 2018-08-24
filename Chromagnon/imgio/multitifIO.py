@@ -152,8 +152,12 @@ class MultiTiffReader(generalIO.GeneralReader):
 
             if meta.get('StructuredAnnotations'):
                 sas = meta['StructuredAnnotations']['XMLAnnotation']
-                for sa in sas: # list
-                    kv = sa['Value']['OriginalMetadata']
+                if type(sas) == list:
+                    for sa in sas: # list
+                        kv = sa['Value']['OriginalMetadata']
+                        self.metadata[kv['Key']] = kv['Value']
+                elif type(sas) == dict:
+                    kv = sas['Value']['OriginalMetadata']
                     self.metadata[kv['Key']] = kv['Value']
                 
         elif self.fp.is_imagej:
@@ -205,7 +209,11 @@ class MultiTiffReader(generalIO.GeneralReader):
         elif self.fp.is_ome:
             px = self.metadata['Image']['Pixels']
             for w in range(nw):
-                channel = px['Channel'][w]
+                channels = px['Channel']
+                if type(channels) == list:
+                    channel = [w]
+                else:
+                    channel = channels
                 unit = channel.get('EmissionWavelengthUnit', 'nm')
                 wave = channel.get('EmissionWavelength')
                 if wave is not None:
@@ -229,7 +237,10 @@ class MultiTiffReader(generalIO.GeneralReader):
                 waves.append(int(N.sum(color_code * color / N.sum(color))))
         
         elif 'waves' in self.metadata:
-            waves = [eval(w) for w in self.metadata['waves'].split(',')]
+            if type(self.metadata['waves']) == int:
+                waves = [self.metadata['waves']]
+            else:
+                waves = [eval(w) for w in self.metadata['waves'].split(',')]
         return waves
 
                                 
