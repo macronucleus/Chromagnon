@@ -54,7 +54,8 @@ fixed.
 38. (v0.64) `imgio.multitifIO.py` was fixed for reading single
 wavelength and ome.tif.
 39. (v0.64) Errors in `PriCommon.flatconv.py` was fixed and put the
-    version number in `flatfielder.py` (v0.2).
+version number in `flatfielder.py` (v0.2).
+40. (v0.64) Version number added to the command line option.
 
 v0.5 (Jan. 2017)
 ----

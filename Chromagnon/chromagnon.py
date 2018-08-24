@@ -533,6 +533,8 @@ def command_line():
         usage = '%(prog)s target1 target2 -R reference1 reference2 [options]'
         
         p = argparse.ArgumentParser(description=description, usage=usage)
+        p.add_argument('--version', '-v', action='version', version='%s' % version.version)
+
         p.add_argument('targets', nargs='*',
                      help='target images files')
         p.add_argument('--reference', '-R', required=True, nargs='*',
