@@ -31,9 +31,9 @@ class MrcReader(generalIO.GeneralReader):
         
         nx = self.fp.hdr.Num[0]
         ny = self.fp.hdr.Num[1]
-        nt = self.fp.hdr.NumTimes
-        nw = self.fp.hdr.NumWaves
-        nz = self.fp.hdr.Num[2] // (nt * nw)
+        nt = int(self.fp.hdr.NumTimes) # change data type
+        nw = int(self.fp.hdr.NumWaves)
+        nz = int(self.fp.hdr.Num[2]) // (nt * nw)
         dtype = self.fp._dtype
         wave = self.fp.hdr.wave[:nw]
         imgseq = self.fp.hdr.ImgSequence
@@ -67,17 +67,12 @@ class MrcReader(generalIO.GeneralReader):
             self.hdr = hdr
 
 
-    #def getArr(self, t=0, z=0, w=0):
-    #    i = self.findFileIdx(t, z, w)
-
-    #        return self.fp.readSec(i)
-
     def readSec(self, i):
         return self.fp.readSec(i)
 
 
-class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
-    def __init__(self, outfn, hdr=None, extInts=None, extFloats=None):#, byteorder='='):
+class MrcWriter(generalIO.GeneralWriter):
+    def __init__(self, outfn, hdr=None, extInts=None, extFloats=None):
         """
         prepare your hdr and output filename
         """
@@ -85,30 +80,21 @@ class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
         self.flip_required = False
         
         self.hdr = hdr
-        self.extInts = extInts
-        self.extFloats = extFloats
+        self.setExtHdr(extInts=extInts, extFloats=extFloats)
         if outfn.endswith('.dv'):
             self.byteorder = '<' # deltavision format
         else:
             self.byteorder = '='
 
         if self.hdr:
-            self.setDimFromMrcHdr(self.hdr, extInts, extFloats)#, byteorder)
+            self.setDimFromMrcHdr(self.hdr)
 
-        self.init()
-        
     def openFile(self):
         if hasattr(self, 'fp'):
             self.mode = 'r+'
         self.fp = Mrc3(self.fn, self.mode)
 
         self.handle = self.fp._f
-
-    def init(self):
-        pass
-        #self.fp._secByteSize = self._secByteSize
-        #self.fp._dtype = self.dtype
-        
 
     def doOnSetDim(self):
         pixelType = Mrc.dtype2MrcMode(self.dtype)
@@ -124,19 +110,16 @@ class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
         self.hdr.wave[:self.nw] = self.wave[:self.nw]
         self.hdr.d[:] = self.pxlsiz[::-1]
 
-        #self.makeHdr()
-        #self.setDimFromMrcHdr(hdr)
-        self.writeHeader(self.hdr, extInts=self.extInts, extFloats=self.extFloats)
+        self.writeHeader(self.hdr)
 
     def setFromReader(self, rdr, calcmm=True):
         """
         read dimensions, imgSequence, dtype, pixelsize from a reader
         """
-        if type(rdr) == MrcReader:
-            if hasattr(rdr, 'extInts'):
-                self.setDimFromMrcHdr(rdr.hdr, rdr.extInts, rdr.extFloats)
-            else:
-                self.setDimFromMrcHdr(rdr.hdr)
+        if isinstance(rdr, MrcReader):
+            if hasattr(rdr.fp, 'extInts'):
+                self.setExtHdr(extInts=rdr.fp.extInts, extFloats=rdr.fp.extFloats)
+            self.setDimFromMrcHdr(rdr.hdr)
         else:
             self.setPixelSize(*rdr.pxlsiz)
             self.setDim(rdr.roi_size[-1], rdr.roi_size[-2], rdr.roi_size[-3], rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
@@ -162,22 +145,24 @@ class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
                 else:
                     self.hdr.__setattr__('mm%i' % (w+1), [mi, ma])
         
-    def setDimFromMrcHdr(self, hdr, extInts=None, extFloats=None):
+    def setDimFromMrcHdr(self, hdr):
         """
         set dimensions using a Mrc header
         """
-        #self.writeHeader(hdr, extInts, extFloats, byteorder)
         self.hdr = makeHdr_like(hdr)
         self.setPixelSize(*hdr.d[::-1])
-        nz = hdr.Num[2] // (hdr.NumWaves * hdr.NumTimes)
+        nz = int(hdr.Num[2]) // (int(hdr.NumWaves) * int(hdr.NumTimes))
+        if nz < 1:
+            raise ValueError('number of Z is less than 1 (nt: %i, nw: %i)' % (int(hdr.NumWaves), int(hdr.NumTimes)))
         dtype = Mrc.MrcMode2dtype(hdr.PixelType)
 
-        self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes, hdr.NumWaves, dtype, hdr.wave, hdr.ImgSequence)#, 1, False)
-        #self.hdr = hdr
+        self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes, hdr.NumWaves, dtype, hdr.wave, hdr.ImgSequence)
+
+    def setExtHdr(self, extInts=None, extFloats=None):
+        self.extFloats = extFloats
+        self.extInts = extInts
         
-        
-    def writeHeader(self, hdr, extInts=None, extFloats=None):
-        
+    def writeHeader(self, hdr):
         Mrc.initHdrArrayFrom(self.fp.hdr, hdr)
         self.fp.hdr.Num = hdr.Num
         self.fp.hdr.PixelType = hdr.PixelType
@@ -187,22 +172,18 @@ class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
         if self.byteorder == '<':
             self.hdr.dvid = -16224 # little_indian number
 
-        if (extInts is not None or extFloats is not None) or self.byteorder == '<':
+        if (self.extInts is not None or self.extFloats is not None) or self.byteorder == '<':
             # old ImageJ assumes that the dv format (byteorder == <) has extended header
-            if extInts is None:
-                extInts = N.zeros((1,8))
-                nInts = extInts.shape[-1]
-            else:
-                nInts = hdr.NumIntegers
+            if self.extInts is None:
+                self.extInts = N.zeros((1,8))
+            nInts = self.extInts.shape[-1]
                 
-            if extFloats is None:
-                extFloats = N.zeros((1,32))
-                nFloats = extFloats.shape[-1]
-            else:
-                nFloats = hdr.NumFloats
+            if self.extFloats is None:
+                self.extFloats = N.zeros((1,32))
+            nFloats = self.extFloats.shape[-1]
                 
             self.fp = addExtHdrFromExt(self.fp, nInts,
-                                        nFloats, extInts, extFloats)
+                                        nFloats, self.extInts, self.extFloats)
             self.fp.hdr.NumIntegers = self.fp.extInts.shape[-1]
             self.fp.hdr.NumFloats = self.fp.extFloats.shape[-1]
 
@@ -214,11 +195,8 @@ class MrcWriter(generalIO.GeneralWriter):#, MrcReader):
 
 
         self.hdr = self.fp.hdr
-        self.extInts = extInts
-        self.extFloats = extFloats
 
     def writeArr(self, arr2D, w=0, t=0, z=0):
-        #print 'w, t, z', w, t, z
         i = self.findFileIdx(t, z, w)
 
         self.fp.writeSec(arr2D, i)
@@ -300,8 +278,12 @@ def makeHdrFromRdr(rdr):
 
 
 def addExtHdrFromExt(hdl, numInts=0, numFloats=0, extInts=None, extFloats=None):
-    nSecs = hdl.hdr.Num[2]
-    #numInts, numFloats = extInts.shape[-1], extFloats.shape[-1]
+    if extInts is not None:
+        nSecs = extInts.shape[0]
+    elif extFloats is not None:
+        nSecs = extFloats.shape[0]
+    else:
+        nSecs = hdl.hdr.Num[2]
     hdl.makeExtendedHdr(numInts, numFloats, nSecs=nSecs) # this creates many instances
 
     hdl.extInts = _reshapeExtHdr(hdl.extInts)
@@ -322,7 +304,7 @@ def _reshapeExtHdr(extHdr):
 
 #### imgManager ####
 def shapeFromNum(Num, NumWaves=1, NumTimes=1, imgSequence=1):
-    nz = Num[2] // (int(NumWaves) * int(NumTimes)) # int() to avoid byte swap
+    nz = int(Num[2]) // (int(NumWaves) * int(NumTimes)) # int() to avoid byte swap
     if imgSequence == 0:
         shape = [NumWaves, NumTimes, nz, Num[1], Num[0]]
     elif imgSequence == 1:
@@ -513,4 +495,12 @@ class Mrc3(Mrc.Mrc2):
         return a.tofile(self._f)
 
 
-
+def nt_uint_switch(on=True):
+    if on:
+        Mrc.mrcHdrFormats[-8] = '1u2'
+        ret = 1
+    else:
+        Mrc.mrcHdrFormats[-8] = '1i2'
+        ret = 0
+    Mrc.mrcHdr_dtype = list(zip(Mrc.mrcHdrNames, Mrc.mrcHdrFormats))
+    return ret

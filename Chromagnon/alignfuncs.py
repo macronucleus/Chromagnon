@@ -23,7 +23,7 @@ except ImportError:
         from Chromagnon.PriCommon import ppro26 as ppro
 
 if sys.version_info.major == 2:
-    import cutoutAlign
+    import cutoutAlign, chromformat
 elif sys.version_info.major >= 3:
     try:
         from . import cutoutAlign, chromformat
@@ -887,7 +887,7 @@ def chopShapeND(shape, npxls=(32,32), shiftOrigin=(0,0)):#False):
         if not shiftOrigin[d]:
             start -= half
         for n in range(int(ndiv)):
-            if (start + npxls[d]) >= s:
+            if (start + npxls[d]) > s:
                 break
             mms += [[start, start + npxls[d]]]
             start += npxls[d]
@@ -1120,6 +1120,8 @@ def xcorNonLinear(arr, ref, npxls=60, threshold=None, cthre=CTHRE, pxlshift_allo
                     # crop to throw away the tip object
                     av = imgFilters.cutOutCenter(a, 0.5, interpolate=False)
                     bv = imgFilters.cutOutCenter(b, 0.5, interpolate=False)
+                    #if not y and not x:
+                    #    print('av and bv shapes', av.shape, bv.shape)
 
                     var = getVar(av, bv)
                     region[1,2*y+yi,2*x+xi] = var
@@ -1618,32 +1620,13 @@ def makeWin(shape, minwin, maxwin=300):
         win = int(win)
         if win % 2:
             win += 1
+        #win = win//4 * 4 # always multiples of 4
         wins.append(win)
     return wins
-
-no_meaning="""
-def makeWin(shape, minwin):
-    shape = N.array(shape)
-    minwin0 = minwin
-    found = False
-    for i in xrange(10):
-        if N.any(shape % minwin0) == 0:
-            minwin0 += 2
-        else:
-            found = True
-            break
-    if found:
-        minwin = minwin0
-        
-    wins = [minwin * (2**i) for i in xrange(int(N.log2(min(shape)/minwin)))]
-    wins = [w + w % 2 for w in wins]
-    return wins[::-1]"""
-    
-    
     
 def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=None, threshold=None, phaseContrast=True, niter=5, maxErr=0.01, cthre=CTHRE, echofunc=None):
     """
-    return (yx_arr, px_analyzed_arr, result_arr)
+    return (yx_arr, px_analyzed_arr, result_arr, last_win_size)
     """
     shape = N.array(arr.shape)
 
@@ -1653,31 +1636,13 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
         maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
         maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
         shape = N.subtract(shape, (maxcutY*2, maxcutX*2))
-    old="""
-    win0 = float(min(shape//4))
 
-    series = int(N.sqrt(win0 / minwin))# + 1
-    print win0, series
-    wins0 = win0 // (2 ** N.arange(series))
-    wins = []
-    for win in wins0:
-        win = int(win)
-        if win % 2:
-            win -= 1
-        wins.append(win)
-    print wins"""
     wins = makeWin(shape, minwin)
     #print(wins)
     if not wins:
         return N.zeros((2,)+arr.shape, N.float32), None, None
         
     currentGuess = initGuess
-    ## After v0.5.7, window size became difficult to predict at this point
-    ## yx waas simply assembled into the image size instead of minimum size possible.
-    old="""
-    tmp_shape = [int(n) for n in (2,) + tuple(shape//wins[-1])] # VisibleDeprecationWarning
-    yx_acc = N.zeros(tmp_shape, N.float32)"""
-    #yxs = N.zeros((2,)+arr.shape, N.float32)
     
     for i, win in enumerate(wins):
         if echofunc:
@@ -1687,26 +1652,14 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
             if yxc is None:
                 if echofunc:
                     echofunc('window size %i did not work!, change to %i (trial %i)' % (win, win+2, ii))
-                #print 'ii=%i, window size %i did not work!, change to %i' % (i, win, win+2)
                 win += 2
                 yxc = 0
             else:
                 break
 
-        #return yxc, win
-        #yxc, regions = iterNonLinear(arr, ref, npxl=win, affine=affine, initGuess=currentGuess, threshold=threshold, phaseContrast=phaseContrast, niter=niter, maxErr=maxErr, cthre=cthre, echofunc=echofunc)
-
-        #print 'shape', yxc.shape, yx_acc.shape, arr.shape
-
-        #yxz = paddYX2(yxc, 2**(series-1-i), yx_acc.shape[-2:])
-        #yx_acc += yxz
-        #yxs += yxc
-
         if currentGuess is None:
-            #currentGuess = paddYX(yxc, win, arr.shape, maxcutY, maxcutX)
             currentGuess = yxc
         else:
-            #currentGuess += paddYX(yxc, win, arr.shape, maxcutY, maxcutX)
             currentGuess += yxc
 
         rmax = regions.max()
@@ -1715,24 +1668,10 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
                 echofunc('  no region was found to be good enough')
             break
         else:
-            #print('rmax: %.2f, -- continue' % rmax)
             if echofunc:
                 echofunc('rmax: %.2f, -- continue' % rmax, skip_notify=True)
 
-    old="""
-    # throw away regions with low contrast
-    if rmax:
-        #thre = N.where(regions == rmax, 1, 0)
-        #yx_acc[:] *= thre#N.where(regions == rmax, 1, 0)
-        yxs = paddYX(yx_acc, wins[-1], arr.shape, maxcutY, maxcutX)
-    else:
-        yxs = N.zeros((2,)+arr.shape, N.float32)"""
-
-    #yxs = currentGuess
-    #if initGuess is not None:
-    #    yxs += initGuess
-
-    return currentGuess, regions, arr2
+    return currentGuess, regions, arr2, win
 
 
 # this does not work and possibly even slower

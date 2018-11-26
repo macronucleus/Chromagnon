@@ -1145,7 +1145,7 @@ mrcHdrFields = [
     ('1i2', 'v1', 'Depends on the image type. '),
     ('1i2', 'v2', 'Depends on the image type. '),
     ('2f4', 'mm5', 'Minimum intensity of the 2nd wavelength image. '),
-    ('1i2', 'NumTimes', 'Number of time points.'),
+    ('1i2', 'NumTimes', 'Number of time points.'),#u2', 'NumTimes', 'Number of time points.'),
     ('1i2', 'ImgSequence', 'Image sequence. 0=ZTW, 1=WZT, 2=ZWT. '),
     ('3f4', 'tilt', 'X axis tilt angle (degrees). '),
     ('1i2', 'NumWaves', 'Number of wavelengths.'),

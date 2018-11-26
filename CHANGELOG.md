@@ -56,6 +56,15 @@ wavelength and ome.tif.
 39. (v0.64) Errors in `PriCommon.flatconv.py` was fixed and put the
 version number in `flatfielder.py` (v0.2).
 40. (v0.64) Version number added to the command line option.
+41. (v0.65) Choice for number of iterations to do 3D cross
+correlation.
+42. (v0.65) A problem to select regions with SoftWorx was fixed by
+fixing extended header for dv files (`imgio.mrcIO.py`).
+43. (v0.65) `alignfuncs.chopShapeND` was fixed to chop an image shape
+with the exact number of pixels to chop.
+44. (v0.65) `imgio.multitifIO.py` was fixed for reading channel data
+of `ome.tif` and `lsm` file formats.
+45. (v0.65) default wild card was changed from `*.*dv` to `*`.
 
 v0.5 (Jan. 2017)
 ----

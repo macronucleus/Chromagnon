@@ -46,7 +46,7 @@ def readArray(filename, comment='#', sep=None):
     data = []
     for line in TextFile(filename):
         if not line[0] in comment:
-            data.append(list(map(eval, string.split(line, sep))))
+            data.append(list(map(eval, line.split(sep))))#string.split(line, sep))))
     a = numpy.array(data)
     if a.shape[0] == 1 or a.shape[1] == 1:
         a = numpy.ravel(a)

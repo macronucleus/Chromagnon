@@ -242,8 +242,12 @@ def row(a):
 def col(a):
     return reshape(asarray(a),[-1,1])
 
-SizeMismatch = 'SizeMismatch'
-SizeError = 'SizeError'
+class SizeMismatch(Exception):
+    pass
+class SizeError(Exception):
+    pass
+#SizeMismatch = 'SizeMismatch'
+#SizeError = 'SizeError'
 NotImplemented = 'NotImplemented'
 
 #------------ Numerical constants ----------------

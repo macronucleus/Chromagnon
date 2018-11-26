@@ -12,7 +12,8 @@ def str2dic(ss, sep=SEP, wsep=WSP):
         if wsep in ss:
             dic = []
             for s in ss.split(sep):
-                dic.append([eval(wd) for wd in s.split(wsep)])
+                if s:
+                    dic.append([eval(wd) for wd in s.split(wsep)])
             dic = dict(dic)
         else:
             try:

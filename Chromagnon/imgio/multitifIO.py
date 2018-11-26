@@ -90,6 +90,7 @@ class MultiTiffReader(generalIO.GeneralReader):
                 waxis = axes.index('W')
                 nw = shape[waxis]
         waves = generalIO.makeWaves(nw)
+            
 
         
         p = self.fp.pages[0]
@@ -211,13 +212,13 @@ class MultiTiffReader(generalIO.GeneralReader):
             for w in range(nw):
                 channels = px['Channel']
                 if type(channels) == list:
-                    channel = [w]
+                    channel = channels[w]
                 else:
                     channel = channels
                 unit = channel.get('EmissionWavelengthUnit', 'nm')
                 wave = channel.get('EmissionWavelength')
                 if wave is not None:
-                    waves.append(_convertUnit(wave, unit, 'nm'))
+                    waves[w] = _convertUnit(wave, unit, 'nm')
         elif self.fp.is_imagej and 'Info' in self.metadata:
             for m in self.metadata['Info'].split('\n')[13:]:
                     mm = m.split(' = ')
@@ -231,10 +232,13 @@ class MultiTiffReader(generalIO.GeneralReader):
         elif self.fp.is_lsm:
             channel = self.metadata['ChannelColors']['Colors']
             color_code = N.array((650, 515, 450, 0), N.float32)
-            waves = []
+            #waves = []
             for w in range(nw):
                 color = N.array(channel[w])
-                waves.append(int(N.sum(color_code * color / N.sum(color))))
+                if N.sum(color):
+                    waves[w] = int(N.sum(color_code * color / N.sum(color)))
+                else:
+                    waves[w] = generalIO.WAVE_START - 50
         
         elif 'waves' in self.metadata:
             if type(self.metadata['waves']) == int:

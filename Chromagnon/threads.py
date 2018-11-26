@@ -110,7 +110,7 @@ class ThreadWithExc(threading.Thread):
         local = parms[2]
 
         maxShift = parms[3]
-        #zmag = parms[4]
+        accur = parms[4]
         self.parm_suffix = parms[5]
         self.img_suffix = parms[6]
         nts = parms[7]
@@ -144,8 +144,9 @@ class ThreadWithExc(threading.Thread):
 
                     an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
-                    #an.setZmagSwitch(zmag)
                     an.setMaxShift(maxShift)
+                    if accur:
+                        an.setMaxIter3D(accur)
 
                     pgen = self.progressValues(target=False, an=an, alignChannels=alignChannels, alignTimeFrames=alignTimeFrames, local=local)
                     an.setProgressfunc(pgen)
@@ -333,8 +334,8 @@ class ThreadWithExc(threading.Thread):
         if not target:
             if (alignChannels and an.nw > 1) or (alignChannels and not alignTimeFrames):
                 prange += [0.5+0.5*round(an.nz/50)]
-                prange += [1] * (an.nw-1) * an.nt
-                prange += [round(an.nz/10) or 0.5] * (an.nw-1) * an.nt
+                prange += [1] * (an.nw-1) * an.nt # 2D
+                prange += [round(an.nz/10) or 0.5] * (an.nw-1) * an.nt * an.niter_3D # 3D
                 if local in self.localChoice[1:]:
                     prange += [1] * (an.nw-1) * an.nt
 

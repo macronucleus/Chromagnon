@@ -1258,7 +1258,12 @@ def fitAny(f, parmTuple0, data, fixed_mask=None, **leastsq_kwargs):
             return f(p, x)-y
 
         x0 = parmTuple0
-        return leastsq(func, x0, **leastsq_kwargs)
+        try:
+            return leastsq(func, x0, **leastsq_kwargs)
+        except TypeError: # warning keyword was deleted from python2.6
+            if 'warning' in leastsq_kwargs:
+                del leastsq_kwargs['warning']
+            return leastsq(func, x0, **leastsq_kwargs)
     elif all(fixed_mask):
         # all parameters are fixed -- we don't need to fit anything here.
         return parmTuple0, 999

@@ -41,7 +41,7 @@ class TextFile:
     """
 
     def __init__(self, filename, mode = 'r'):
-        if string.find(filename, ':/') > 1: # URL
+        if filename.find(':/') > 1: #string.find(filename, ':/') > 1: # URL
             if mode != 'r':
                 raise IOError("can't write to a URL")
             import urllib.request, urllib.parse, urllib.error

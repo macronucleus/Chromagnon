@@ -30,7 +30,7 @@ def rotate(a, r, center=None):
     r:      degrees (counter-clockwise)
     center: center of rotation, if None, use (0,0)
     """
-    if not r:
+    if N.all(r == 0):#not r:
         return a
     a = N.asarray(a)
     if center is None:
@@ -39,11 +39,15 @@ def rotate(a, r, center=None):
         center = N.asarray(center)
         a = a[:] - center
 
-    rd = N.math.radians(r)
+    rd = N.radians(r)
     sin = N.sin(rd)
     cos = N.cos(rd)
-    m = N.mat(((cos, sin), (-sin, cos)))
-    ar = N.inner(a, m) + center
+    try:
+        m = N.mat(((cos, sin), (-sin, cos)))
+        ar = N.inner(a, m) + center
+    except ValueError: # more than 2D
+        y, x = a
+        ar = N.array(((x * sin + y * cos), (x*cos-y*sin))) + center
     if ar.ndim > a.ndim: # windows numpy keeps matrix with larger ndim 
         ar = N.asarray(ar).reshape(a.shape)
     return ar
@@ -248,7 +252,7 @@ def evenShape(shape, minus=True):
 
 def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
     '''
-    r: length of square, can be (z,y,x) or scaller
+    r: length of square, can be (z,y,x) or scaller (diameter)
     closest: use closest index using subpixel pos info, None is the same as N.floar(pos)
     adjustEdge: change slice so that slice does not include outside, if this is None and pos is too close to the edge, return None
 
@@ -282,8 +286,10 @@ def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
     sls = []
     for i, zyx in enumerate(pos[::-1]): # fill from lowest axis
         j = -(i+1)
-        start = int(zyx - r[j] / 2. + 0.5000001)
-        end = int(zyx + r[j] / 2. + 0.5000001)
+        zyx = zyx + 0.5000001
+        start = int(zyx - r[j] / 2.)# + 0.5000001)
+        end = int(zyx + r[j] / 2.)# + 0.5000001)
+        #print(start, end, r)
         if start < 0:
             if adjustEdge:
                 start = 0

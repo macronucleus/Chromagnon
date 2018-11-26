@@ -47,7 +47,8 @@ elif sys.platform.startswith('darwin'):
 else:
     LIST_Y=150
 
-FILTER = '*.dv*'
+FILTER = '*'
+
 
 LOCAL_CHOICE = ['None', 'Projection']#, 'Section-wise']
 
@@ -183,6 +184,9 @@ class BatchPanel(wx.Panel):
         
         #self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
         self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are averaged to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
+
+        self.accurChoice = aligner.ACCUR_CHOICE
+        label, self.accurListChoice = G.makeListChoice(self, box, 'Z-accuracy', self.accurChoice, defValue=confdic.get('accur', self.accurChoice[0]))
         
         self.localChoice = LOCAL_CHOICE
         label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
@@ -451,8 +455,7 @@ class BatchPanel(wx.Panel):
                      initguess,
                      self.localListChoice.GetStringSelection(),
                      self.maxShift.GetValue(),
-                     None, # empty after removing zmag slection
-                     #self.zmagch.GetStringSelection(),
+                     self.accurListChoice.GetStringSelection(),
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
                      [nt for nt in self.listRef.nts], # copy
@@ -473,7 +476,7 @@ class BatchPanel(wx.Panel):
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
-            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], Zmag=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
+            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
 
             # run program
             gui = threads.GUImanager(self, __name__)

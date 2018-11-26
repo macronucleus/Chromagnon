@@ -368,6 +368,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
             slc += [slice(int(start), int(stop), None)]
 
         # cutout, shift and cutout
+        #print(slc)
         try:
             canvas = arr[slc]
             if SHIFT:
@@ -776,7 +777,9 @@ def centerOfMass(img, yx, window=5):
 # removing points
 
 def mask_value(arr, zyx, r=2.5, value=0):
-    ''' Edit the pixels around zyx to be zero '''
+    ''' Edit the pixels around zyx to be zero 
+    r: radius (will be 2*r + 1)
+    '''
     from . import imgGeo
     sls = imgGeo.nearbyRegion(arr.shape, zyx, 2*N.asarray(r)+1)
     arr[sls] = value

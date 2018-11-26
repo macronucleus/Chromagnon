@@ -130,3 +130,30 @@ def copy(fn, out='test.dv'):
     o.close()
 
     return Reader(out)
+
+
+def merge(fns, out=None, along='t'):
+    if not out:
+        out = os.path.commonprefix(fns) + '_merge.dv'
+    nsecs = 0
+    for fn in fns:
+        h = Reader(fn)
+        if along == 't':
+            nsecs += h.nt
+        #h.close()
+
+    o = Writer(out, h)
+    o.setDim(nt=nsecs)
+
+    t2 = 0
+    for fn in fns:
+        h = Reader(fn)
+        for t in range(h.nt):
+            for w in range(h.nw):
+                a = h.get3DArr(t=t, w=w)
+                o.write3DArr(a, t=t2+t, w=w)
+        t2 += h.nt
+        h.close()
+    o.close()
+
+    return out
