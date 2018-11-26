@@ -21,7 +21,7 @@ The ready to use packages are available [here](https://github.com/macronucleus/C
 
 The source
 ----------
-The source codes are written in pure python and works on the following platforms and dependencies.
+The source code is written in pure python and works on the following platforms and dependencies.
 
 Platforms successfully tested:
 * MacOSX64bit (10.9.5 or higher)
