@@ -743,6 +743,25 @@ def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
     return out
                 
 
+# ------ check wavelengths --------
+
+def checkWaves(waves1, waves2):
+    """
+    return the index of the wrong combination if any
+    if all wavelengths matches, then return None
+    """
+    for i, ws2 in enumerate(waves2[:len(waves1)]):
+        ws1 = waves1[i]
+        somewaves = [w for w, wave in enumerate(ws2) if wave in ws1]
+        if len(somewaves) < 2:
+            return i, i
+
+    ws1 = waves1[-1]
+    for j, ws2 in enumerate(waves2[len(waves1):]):
+        somewaves = [w for w, wave in enumerate(ws2) if wave in ws1]
+        if len(somewaves) < 2:
+            return len(waves1)-1, (i+1) + j
+                
 
 # ------ non linear  ------
 

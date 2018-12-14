@@ -65,6 +65,17 @@ with the exact number of pixels to chop.
 44. (v0.65) `imgio.multitifIO.py` was fixed for reading channel data
 of `ome.tif` and `lsm` file formats.
 45. (v0.65) default wild card was changed from `*.*dv` to `*`.
+46. (v0.66) Error message when the reference wavelength was not found
+in the target image was fixed. (`chromformat.py`)
+47. (v0.66) Multitiff reader dtype was also read not only 
+from series but also form page. (`imgio.multitifIO.py`)
+48. (v0.66) Warning message was ignored when chromagnon was run as
+__main__. (`chromagnon.py`)
+49. (v0.66) When not or only one wavelength is in common, then the
+    program shows a warning message and quits. When at least two
+    wavelengths are in common, the the program proceeds to align the
+    comon two channels and leaves the uncommon channels
+    unaligned. (`chromagnon.py` and `aignfuncs.py`)
 
 v0.5 (Jan. 2017)
 ----

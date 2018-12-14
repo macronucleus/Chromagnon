@@ -426,31 +426,44 @@ class BatchPanel(wx.Panel):
 
             form = self.outextch.GetStringSelection()
             if not form:
-                G.openMsg(parent=self, msg='Please select the output file format next to the Suffix text box', title="The format type is missing")
-                self.goButton.SetValue(0)
-                self.label.SetLabel('')
+                self.quit('Please select the output file format next to the Suffix text box', title="The format type is missing")
                 return
 
+            # check wavelengths
+            waves1 = [list(map(int, self.listRef.getFile(index)[2].split(','))) for index in self.listRef.columnkeys]
+            waves2 = [list(map(int, self.listTgt.getFile(index)[2].split(','))) for index in self.listTgt.columnkeys]
+            ids = af.checkWaves(waves1, waves2)
+            if ids is not None:
+                for i, listbox in zip(ids, (self.listRef, self.listTgt)):
+                    listbox.SetItemTextColour(i, 'purple')
+                    #listbox.SetBackGroundColour(i, 'gray')
+                msg = 'Less than two Common wavelengths were found at least in %s and %s\n\nThe program will not run.' % (self.listRef.getFile(ids[0])[1], self.listTgt.getFile(ids[1])[1])
+                self.quit(msg, title='Error in input files')
+                return
+            
             # averaging
-            #ref_all_image = all([not chromformat.is_chromagnon(fn) for fn in fns])
-            if self.averageCb.GetValue() and len(fns) > 1:# and ref_all_image:
+            if self.averageCb.GetValue() and len(fns) > 1:
+                if any([waves1[0] != ws1 for ws1 in waves1[1:]]):
+                    self.quit('There are inconsistency in channel composition in the reference files', title="Reference files are not appropriate for averaging")
+                    return
+                
                 try:
                     self.label.SetLabel('averaging...')
                     self.label.SetForegroundColour('red')
                     wx.Yield()
                     ave_fn = af.averageImage(fns, ext=form)
                 except Exception as e:
-                    G.openMsg(parent=self, msg=e.args[0], title="Reference files are not appropriate for averaging")
-                    self.goButton.SetValue(0)
-                    self.label.SetLabel('')
+                    self.quit(e.args[0], title="Reference files are not appropriate for averaging")
                     return         
                 self.listRef.clearAll()
                 self.listRef.addFile(ave_fn)
                 fns = [ave_fn]
             elif self.averageCb.GetValue() and len(fns) == 1:
                 self.averageCb.SetValue(0)
+
+
             
-                
+            # parameters
             parms = [self.cutoutCb.GetValue(),
                      initguess,
                      self.localListChoice.GetStringSelection(),
@@ -488,6 +501,11 @@ class BatchPanel(wx.Panel):
             tid = self.th._get_my_tid()
             threads.async_raise(tid, threads.MyError)
 
+    def quit(self, message='', title='ERROR'):
+        if message:
+            G.openMsg(parent=self, msg=message, title=title)
+        self.goButton.SetValue(0)
+        self.label.SetLabel('')
 
     def view(self, target):
         """
@@ -598,6 +616,9 @@ if __name__ == '__main__':
     ## windows support for py2exe
     import multiprocessing
     multiprocessing.freeze_support()
+
+    import warnings
+    warnings.filterwarnings('ignore')
 
     command_line()
     imgio.uninit_javabridge()

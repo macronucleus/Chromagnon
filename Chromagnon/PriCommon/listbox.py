@@ -53,6 +53,7 @@ class BasicFileListCtrl(wx.ListCtrl,
         """
         self.columnkeys = [] # (raw_index)
 
+        #self.waves = []
         self.nws = []
         self.nts = []
         self.seqs = []
@@ -65,6 +66,7 @@ class BasicFileListCtrl(wx.ListCtrl,
         idx = self.columnkeys.index(index)
         self.columnkeys = self.columnkeys[:idx] + [i - 1 for i in self.columnkeys[idx+1:]]#.pop(index)
 
+        #self.waves.pop(index)
         self.nws.pop(index)
         self.nts.pop(index)
         self.seqs.pop(index)
@@ -310,6 +312,7 @@ class FileListCtrl(BasicFileListCtrl):
         self.SetStringItem(index, 2, wstr)
 
         self.nws.append(len(nw))
+        #self.waves.append(h.wave[:h.nw])
 
         # column 3
         nt = h.nt

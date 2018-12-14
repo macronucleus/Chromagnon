@@ -413,12 +413,13 @@ class GUImanager(wx.EvtHandler):
         index = evt.data[1]
         color = evt.data[2]
 
-        item = listbox.GetItem(index)
-        item.SetTextColour(color)
-        listbox.SetItem(item)
+        #item = listbox.GetItem(index)
+        listbox.SetItemTextColour(index, 'red')
+        #item.SetTextColour(color)
+        #listbox.SetItem(item)
             
         self.currlist = self.panel.listRef
-        self.item     = item
+        self.item     = listbox.GetItem(index)#item
 
 
     def OnView(self, evt):

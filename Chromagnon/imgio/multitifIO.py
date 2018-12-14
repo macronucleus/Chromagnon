@@ -103,14 +103,16 @@ class MultiTiffReader(generalIO.GeneralReader):
             page0_byte_count = self.fp.pages[0].offsets_bytecounts[1][0]
             
             self._secExtraByteSize = page1_offset - page0_offset - page0_byte_count
-
         else:
             self._secExtraByteSize = 0
 
-
+        dtype = s.dtype or p.dtype
+        if not dtype:
+            raise ValueError('data type not found')
+            
         waves = self.readChannelInfo(nw, waves)
 
-        self.setDim(p.imagewidth, p.imagelength, nz, nt, nw, s.dtype, waves, imgSeq)
+        self.setDim(p.imagewidth, p.imagelength, nz, nt, nw, dtype, waves, imgSeq)
         #self.setPixelSize(p.samplesperpixel)
         
         self.axes = p.axes # axis of one section
