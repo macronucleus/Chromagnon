@@ -21,7 +21,6 @@ def _convertUnit(val, fromwhat='mm', towhat=u'\xb5'+'m'):
     factor = factors[fromwhat] - factors[towhat] or 0
     return float(val) * 10 ** factor
 
-
 class MultiTiffReader(generalIO.GeneralReader):
     def __init__(self, fn):
         """
@@ -108,7 +107,7 @@ class MultiTiffReader(generalIO.GeneralReader):
 
         dtype = s.dtype or p.dtype
         if not dtype:
-            raise ValueError('data type not found')
+            raise generalIO.ImageIOError('data type not found')
             
         waves = self.readChannelInfo(nw, waves)
 

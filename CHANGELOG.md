@@ -76,6 +76,9 @@ __main__. (`chromagnon.py`)
     wavelengths are in common, the the program proceeds to align the
     comon two channels and leaves the uncommon channels
     unaligned. (`chromagnon.py` and `aignfuncs.py`)
+50. (v0.66) `ImageIOError` was created in `imgio.generalIO.py`.
+51. (v0.66) If dtype was not found in `tifffile`, then the file is read
+    by `bioformats`.
 
 v0.5 (Jan. 2017)
 ----

@@ -94,7 +94,16 @@ def _switch(fn, read=True, *args, **kwds):
     
     # specific formats
     elif ext in formats['tif']:
-        return klasses['tif'](fn, *args, **kwds)
+        try:
+            return klasses['tif'](fn, *args, **kwds)
+        except generalIO.ImageIOError:
+            print('Reading tif file failed, forwarding to bioformats')
+            if 'nd2' in bioformatsIO.bioformats.READABLE_FORMATS and 'nd2' not in formats['bio'] and ext not in formats['seq']:
+                raise ValueError(JDK_MSG % 'tif')
+            try:
+                return klasses['bio'](fn, *args, **kwds)
+            except:
+                raise ValueError('The input file %s was not readable' % fn)
     elif ext in formats['mrc']:
         return klasses['mrc'](fn, *args, **kwds)
     elif ext in formats['bio']:

@@ -8,6 +8,12 @@ WAVE_END = 700
 
 READABLE_FORMATS = WRITABLE_FORMATS = []
 
+class ImageIOError(Exception):
+    """
+    general image file IO error
+    """
+    pass
+
 class GeneralReader(object):
     def __init__(self, fn, mode='r'):
         """
