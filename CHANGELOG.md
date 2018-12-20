@@ -78,7 +78,9 @@ __main__. (`chromagnon.py`)
     unaligned. (`chromagnon.py` and `aignfuncs.py`)
 50. (v0.66) `ImageIOError` was created in `imgio.generalIO.py`.
 51. (v0.67) If dtype was not found in `tifffile`, then the file is read
-    by `bioformats`.
+by `bioformats`.
+52. (v0.68) `imgio.multitifIO.py` and `imgio.generalIO.py` was fixed
+to support `numpy.dtype` evaluated to `False` using older `numpy` (1.12).
 
 v0.5 (Jan. 2017)
 ----

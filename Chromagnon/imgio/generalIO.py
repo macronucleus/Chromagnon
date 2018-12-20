@@ -135,7 +135,7 @@ class GeneralReader(object):
         if nt:
             self.nt = int(nt)
 
-        if dtype:
+        if type(dtype) == N.dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
             self.dtype = dtype
 
         if len(wave):

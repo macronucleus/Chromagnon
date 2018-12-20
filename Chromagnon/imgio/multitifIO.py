@@ -106,7 +106,10 @@ class MultiTiffReader(generalIO.GeneralReader):
             self._secExtraByteSize = 0
 
         dtype = s.dtype or p.dtype
-        if not dtype:
+        if type(dtype) != N.dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
+            #p.asarray(validate=None)
+            #dtype = p.keyframe.dtype
+            #if type(dtype) != N.dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
             raise generalIO.ImageIOError('data type not found')
             
         waves = self.readChannelInfo(nw, waves)
