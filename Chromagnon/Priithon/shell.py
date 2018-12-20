@@ -19,8 +19,106 @@ class BytesIO_str(six.BytesIO):
             arg = arg.encode()
         six.BytesIO.__init__(self, arg)
 
+def getRoot(command, terminator=None):
+    """Return the rightmost root portion of an arbitrary Python command.
+
+    Return only the root portion that can be eval()'d without side
+    effects.  The command would normally terminate with a '(' or
+    '.'. The terminator and anything after the terminator will be
+    dropped."""
+    import tokenize
+    command = command.split('\n')[-1]
+    if command.startswith(sys.ps2):
+        command = command[len(sys.ps2):]
+    command = command.lstrip()
+    command = introspect.rtrimTerminus(command, terminator)
+    if terminator == '.':
+        tokens = introspect.getTokens(command)
+        if not tokens:
+            return ''
+        if tokens[-1][0] is tokenize.ENDMARKER:
+            # Remove the end marker.
+            del tokens[-1]
+        if tokens[-1][0] is tokenize.NEWLINE:
+           # print('removing')
+            # Remove the new line introduced after python3.6.7
+            del tokens[-1]
+        if not tokens:
+            return ''
+        if terminator == '.' and \
+               (tokens[-1][1] != '.' or tokens[-1][0] is not tokenize.OP):
+            # Trap decimals in numbers, versus the dot operator.
+            return ''
+
+    #print(command)
+    # Strip off the terminator.
+    if terminator and command.endswith(terminator):
+        size = 0 - len(terminator)
+        command = command[:size]
+
+    command = command.rstrip()
+    tokens = introspect.getTokens(command)
+    tokens.reverse()
+    line = ''
+    start = None
+    prefix = ''
+    laststring = '.'
+    lastline = ''
+    emptyTypes = ('[]', '()', '{}')
+    for token in tokens:
+        tokentype = token[0]
+        tokenstring = token[1]
+        line = token[4]
+        #if tokentype is tokenize.ENDMARKER:
+        # Remove the new line introduced after python3.6.7
+        if tokentype in (tokenize.ENDMARKER, tokenize.NEWLINE):
+            continue
+        if PY3 and tokentype is tokenize.ENCODING:
+            line = lastline
+            break
+        if tokentype in (tokenize.NAME, tokenize.STRING, tokenize.NUMBER) \
+        and laststring != '.':
+            # We've reached something that's not part of the root.
+            if prefix and line[token[3][1]] != ' ':
+                # If it doesn't have a space after it, remove the prefix.
+                prefix = ''
+            break
+        if tokentype in (tokenize.NAME, tokenize.STRING, tokenize.NUMBER) \
+        or (tokentype is tokenize.OP and tokenstring == '.'):
+            if prefix:
+                # The prefix isn't valid because it comes after a dot.
+                prefix = ''
+                break
+            else:
+                # start represents the last known good point in the line.
+                start = token[2][1]
+        elif len(tokenstring) == 1 and tokenstring in ('[({])}'):
+            # Remember, we're working backwords.
+            # So prefix += tokenstring would be wrong.
+            if prefix in emptyTypes and tokenstring in ('[({'):
+                # We've already got an empty type identified so now we
+                # are in a nested situation and we can break out with
+                # what we've got.
+                break
+            else:
+                prefix = tokenstring + prefix
+        else:
+            # We've reached something that's not part of the root.
+            break
+        laststring = tokenstring
+        lastline = line
+    if start is None:
+        start = len(line)
+    root = line[start:]
+    if prefix in emptyTypes:
+        # Empty types are safe to be eval()'d and introspected.
+        root = prefix + root
+    return root
+
+
 introspect.hasattr = hasattr
 introspect.BytesIO = BytesIO_str
+introspect.getRoot = getRoot
 
 ### ---- frame.py -------------
 # Error at line 899, AttributeError, module wx has no attribute SAVE
