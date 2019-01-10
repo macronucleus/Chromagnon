@@ -17,7 +17,7 @@ Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download
 
 Downloads
 ---------
-The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases/tag/v0.69)
+The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases)
 
 The source
 ----------
