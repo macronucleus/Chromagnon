@@ -13,11 +13,11 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/v0.65/ChromagnonDocumentV065.pdf)
+Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/v0.69/ChromagnonDocumentV065.pdf)
 
 Downloads
 ---------
-The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases/tag/v0.6)
+The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases/tag/v0.69)
 
 The source
 ----------
