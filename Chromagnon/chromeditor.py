@@ -471,7 +471,10 @@ class ChromagnonList(wx.ListCtrl,
             # column 0
             ii = next(self.counter)
             #print('inserting item', ii, wave)
-            index = self.InsertItem(ii, str(wave))#sys.maxsize, str(wave))
+            if wx.VERSION[0] < 4:
+                index = self.InsertStringItem(ii, str(wave))
+            else:
+                index = self.InsertItem(ii, str(wave))#sys.maxsize, str(wave))
             # subsequent columns
             for i, p in enumerate(self.alignParms[self.t,w]):
                 self.SetItem(index, i+1, str(p))
@@ -517,8 +520,8 @@ class ChromagnonList(wx.ListCtrl,
 
         self.applyGraphics(index)
 
-        if wx.version().startswith('3'):
-            wx.ListCtrl.StringItem(self, index, col, data)
+        if wx.VERSION[0] < 4:
+            wx.ListCtrl.SetStringItem(self, index, col, data)
         else:
             wx.ListCtrl.SetItem(self, index, col, data)#StringItem(self, index, col, data)
 

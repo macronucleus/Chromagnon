@@ -14,6 +14,7 @@ of image files (`alignfuncs.py`).
    `alignfuncs.py`, `thread.py`).
 7. Averaging was changed to max intensity projection
 (`alignfuncs.py`).
+8. bugs in wxpython 3.0 was fixed (`chromeditor.py` and binary for centos).
 
 
 

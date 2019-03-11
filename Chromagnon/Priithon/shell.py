@@ -3,6 +3,12 @@ from wx.py import introspect
 import sys
 import six
 
+### ---- py2 ------
+try:
+    PY3
+except NameError:
+    PY3 = False
+
 ###---- introspect ---------------
 def hasattr(obj, attr):# am python3
     try:
