@@ -13,7 +13,7 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/v0.69/ChromagnonDocumentV065.pdf)
+Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/v0.70/ChromagnonDocumentV070.pdf)
 
 Downloads
 ---------
