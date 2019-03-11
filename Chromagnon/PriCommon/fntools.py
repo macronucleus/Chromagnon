@@ -129,3 +129,10 @@ def classifyFn(fns, sep='_', idx=0):
     return pprint.pformat(done)
 #return done
             
+def linuxOrMac(fn):
+    import sys
+    if sys.platform == 'darwin' and not fn.startswith('/Volumes'):
+        fn = '/Volumes' + fn
+    elif sys.platform.startswith('linux') and fn.startswith('/Volumes'):
+        fn = fn.replace('/Volumes', '')
+    return fn

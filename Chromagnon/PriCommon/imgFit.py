@@ -133,12 +133,19 @@ def _fitGaussianND(img, inds, zyx, sigma=0.5, mean_max=None):
 
     from scipy import optimize
     inds = [inds[i].flatten().astype(N.float64) for i in range(ndim)]
-    try:
-        ret, check = optimize.leastsq(func, param0,
-                                      args=(inds,sidx), warning=None)
-    except TypeError: # python2.6
-        ret, check = optimize.leastsq(func, param0,
-                                      args=(inds,sidx))
+    if hasattr(optimize, 'least_squares'):
+        ret = optimize.least_squares(func, param0, args=(inds, sidx))
+        check = ret.status
+        if check == -1:
+            check = 5
+        ret = ret.x
+    else:
+        try:
+            ret, check = optimize.leastsq(func, param0,
+                                          args=(inds,sidx), warning=None)
+        except TypeError: # python2.6
+            ret, check = optimize.leastsq(func, param0,
+                                          args=(inds,sidx))
     #ret[2:5] -= 0.5
   #  ret[2:5] += 0.5 # use pixel center
     ret[sidx:] = N.abs(ret[sidx:])

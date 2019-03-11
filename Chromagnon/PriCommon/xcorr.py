@@ -262,17 +262,23 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
 
     # cross correlation
     bfa = bfa.conjugate()
-    c = cc = F.irfft(afa * bfa)
+    #c = cc = F.irfft(afa * bfa)
+    c = F.irfft(afa * bfa)
 
+    # 20180214 the padded region was cutout before finding the peak.
+    c = cc = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
+    #cc = c
     center = N.divide(c.shape, 2)
     if searchRad:
         slc = imgGeo.nearbyRegion(c.shape, center, searchRad)
         cc = N.zeros_like(c)
         cc[slc] = c[slc]
     v, zyx, s = _findMaxXcor(cc, win, gFit=gFit)
+    #return cc
+    #print(zyx, center)
     zyx -= center
 
-    c = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
+    #c = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
     #c = imgFilters.cutOutCenter(c, shape, interpolate=False)
 
     if ret == 3:

@@ -51,12 +51,15 @@ class MultiTiffReader(generalIO.GeneralReader):
             imgSeq = self.findImgSequence(axes[:-2])
         elif self.fp.is_imagej and not self.fp.is_micromanager and 'channels' in self.metadata:
             imgSeq = 1
-            nw = self.metadata['channels']
-            nz = self.metadata['slices']
-            nt = self.metadata['images'] // (nw * nz)
-                
-            #waves = self.wave
-            axes = 'TZCYXS'#'TZW'
+            nw = nt = nz = 1
+
+            if 'channels' in self.metadata:
+                nw = self.metadata['channels']
+            if 'slices' in self.metadata:
+                nz = self.metadata['slices']
+            if 'frames' in self.metadata:
+                nt = self.metadata['frames']
+            #axes = 'TZCYXS'
         else:
             axes = s.axes.replace('S', 'W')    # sample (rgb)
             axes = axes.replace('C', 'W')      # color, emission wavelength

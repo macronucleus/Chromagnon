@@ -1,3 +1,22 @@
+v0.7(Feb. 2019)
+----
+1. `PriCommon.xcorr.py` padded region was removed before finding peak.
+2. averaging proceeeds with different number of z sections in the set
+of image files (`alignfuncs.py`).
+3. A warning message for single wavelength time series was removed.
+4. An error reading single z and multiple t was fixed `multitifIO.py`.
+5. Replaced max_shift (`chromagnon.py`, `aligner.py`, `alignfuncs.py`)
+   to extra parameters and the default became 10 um
+   (probably, the "fix no. 1" improved alignment of images with very bright
+   thing only in one channel)
+6. Extra parameter dialog (`extrapanel.py`) was added to choose the output directory,
+   refwave, z-accuracy (`chromagnon.py`, `aligner.py`,
+   `alignfuncs.py`, `thread.py`).
+7. Averaging was changed to max intensity projection
+(`alignfuncs.py`).
+
+
+
 v0.6 (Feb. 2018)
 ----
 1. Updated to Python3.6, wxpython, OpenGL, bioformats

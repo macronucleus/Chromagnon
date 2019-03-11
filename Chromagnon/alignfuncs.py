@@ -36,7 +36,7 @@ from scipy import ndimage, spatial
 class AlignError(Exception): pass
 
 CTHRE=0.065 * 0.3 # xcorr Gaussian profile was normalized to 0.3 to 1, then threshold also changed...
-MAX_SHIFT = 5 #2 #0.4 # um
+MAX_SHIFT = 10 #5 #None #5 #2 #0.4 # um
 MIN_PXLS_YX = 60
 MIN_PXLS_YXS = [str(30 * (2**i)) for i in range(4)]
 MAX_SHIFT_LOCAL = 4#2 # pixel
@@ -142,7 +142,7 @@ def chopImg(a2d, center=None):
     return r1, r2, r3, r4
 
 
-def estimate2D(a2d, ref, center=None, phaseContrast=True, cqthre=CTHRE/10., max_shift_pxl=5):
+def estimate2D(a2d, ref, center=None, phaseContrast=True, cqthre=CTHRE/10., max_shift_pxl=MAX_SHIFT):#None):#5):
     """
     return [ty,tx,r,my,mx], offset, check
     """
@@ -304,7 +304,7 @@ def getOffset(asiny1, asiny2, asinx, theta, center2):
     dx = (a1 * a2 * tan2 - a1 * a2 * tan1) / (a1 * tan1 + a2 * tan2)
     return dx
 
-def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=5, cqthre=CTHRE/10.*1/0.3, if_failed=IF_FAILED[0], center=None):
+def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=None, echofunc=None, max_shift_pxl=MAX_SHIFT, cqthre=CTHRE/10.*1/0.3, if_failed=IF_FAILED[0], center=None):
     """
     iteratively do quadratic cross correlation
 
@@ -317,6 +317,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
     return [ty,tx,r,my,mx] if_failed is 'terminate' and failed, return None
     """
+    print('max_shift_pxl', max_shift_pxl)
     shape = N.array(a2d.shape)
     if center is None:
         center = shape // 2
@@ -342,6 +343,8 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
     rough = True
                     
     offset = N.zeros((2,), N.float32)
+    prevs = N.zeros((niter,2), N.float32)
+    switch = False
     for i in range(niter):
         b = applyShift(a2d, [0]+list(ret), offset)
 
@@ -361,6 +364,14 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         if goodImg > 0:
             ll, curroff, checks = estimate2D(b, c, center-startYX+offset, phaseContrast=phaseContrast, max_shift_pxl=max_shift_pxl, cqthre=cqthre)
 
+            prevs[i] = ll[:2]
+            # it's possible to temrminate iteration by comparing previous error value,
+            # but the criteria to terminate should be determined...
+            #if i > 1 and N.any(N.abs(prevs[i-2]*5) < N.abs(ll[:2])):
+            #    switch = True
+            #    print(prevs)
+
+
             if len(checks) <= 1:
                 ret[:3] += ll[:3]
                 ret[3:] *= ll[3:]
@@ -372,8 +383,9 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
                 msg = '%s quadratic regions had too-low correlation, using alternative algorithm' % regions
                 if echofunc:
                     echofunc(msg)
+                switch = True
                 #print msg
-                    
+            if switch:
                 if if_failed == 'terminate':
                     return ret, False
                 elif if_failed == 'simplex':
@@ -384,6 +396,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
                     if initguess is not None:
                         ret[:] = initguess[:]
                 #offset += curroff
+                
 
         elif goodImg < 0:
             ll = logpolar(b, c, center-startYX+offset, phaseContrast)
@@ -716,8 +729,15 @@ def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
         raise ValueError('Different reference files are mixed. Please use only image files or only chromagnon files for averaging.')
     
     rdrs = [imgio.Reader(fn) for fn in reffns]
-    for rdr in rdrs[1:]:
-        if rdr.nt != rdrs[0].nt or rdr.nw != rdrs[0].nw or rdr.nz != rdrs[0].nz:
+    nzmin = min([rdr.nz for rdr in rdrs])
+    for rdr in rdrs:#[1:]:
+        if rdr.nz != nzmin:#rdrs[0].nz:
+            rdr.roi_start[0] = (rdr.nz - nzmin) // 2
+            rdr.roi_size[0] = nzmin
+            rdr.zs = list(range(rdr.roi_start[0], rdr.roi_start[0]+rdr.roi_size[0]))
+        else:
+            ref_rdr = rdr
+        if rdr.nt != rdrs[0].nt or rdr.nw != rdrs[0].nw:# or rdr.nz != rdrs[0].nz:
             raise ValueError('dimensions of input image files are not equal')
             
     if not out:
@@ -726,17 +746,23 @@ def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
             base = os.path.splitext(reffns[0])[0] + '_etc'
         out = base + suffix + ext
 
-    wtr = imgio.Writer(out, rdrs[0])
+    #rdr = ref_rdr
+    wtr = imgio.Writer(out, ref_rdr)#s[0])
 
-    rdr = rdrs[0]
-    arrs = N.empty((len(rdrs), rdr.ny, rdr.nx), rdr.dtype)
+    #rdr = rdrs[0]
+    arrs = N.empty((len(rdrs), ref_rdr.ny, ref_rdr.nx), ref_rdr.dtype)
 
-    for t in range(rdr.nt):
-        for w in range(rdr.nw):
-            for z in range(rdr.nz):
+    for t in range(ref_rdr.nt):
+        for w in range(ref_rdr.nw):
+            for zo in range(nzmin):#rdr.nz):
                 for i, rdr in enumerate(rdrs):
-                    arrs[i] = rdr.getArr(t=t, w=w, z=z)
-                    wtr.writeArr(N.mean(arrs, axis=0).astype(rdr.dtype), t=t, w=w, z=z)
+                    if rdr.nz != nzmin:
+                        zi = rdr.zs[zo]
+                    else:
+                        zi = zo
+                    arrs[i] = rdr.getArr(t=t, w=w, z=zi)
+                    #wtr.writeArr(N.mean(arrs, axis=0).astype(rdr.dtype), t=t, w=w, z=zo)
+                    wtr.writeArr(N.max(arrs, axis=0).astype(rdr.dtype), t=t, w=w, z=zo)
 
     wtr.close()
     [rdr.close() for rdr in rdrs]

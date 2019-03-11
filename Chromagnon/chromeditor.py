@@ -470,7 +470,7 @@ class ChromagnonList(wx.ListCtrl,
         for w, wave in enumerate(self.waves):
             # column 0
             ii = next(self.counter)
-            print('inserting item', ii, wave)
+            #print('inserting item', ii, wave)
             index = self.InsertItem(ii, str(wave))#sys.maxsize, str(wave))
             # subsequent columns
             for i, p in enumerate(self.alignParms[self.t,w]):
@@ -491,7 +491,7 @@ class ChromagnonList(wx.ListCtrl,
         for w, wave in enumerate(self.waves):
             index = self.getWaveListIndex(wave)
             for i, p in enumerate(self.alignParms[t, w]):
-                print('setting item', index, wave)
+                #print('setting item', index, wave)
                 self.SetItem(index, i+1, str(p))#SetStringItem(index, i+1, str(p))
 
             self.applyGraphics(w)

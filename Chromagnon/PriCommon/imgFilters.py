@@ -329,7 +329,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
         else:
             windowSize = N.where(shape >= windowSize, windowSize, shape)
             if sectWise:
-                windowSize = arr.shape[:-2] + windowSize[-2:]
+                windowSize = arr.shape[:-2] + tuple(windowSize[-2:])
     windowSize = N.asarray(windowSize)
 
     # cutout individual position
@@ -368,10 +368,16 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
             slc += [slice(int(start), int(stop), None)]
 
         # cutout, shift and cutout
-        #print(slc)
+        #print(slc, slc_edge)
         try:
             canvas = arr[slc]
             if SHIFT:
+                # 20180214 subpixel shift +0.5 was fixed
+                #raise RuntimeError('check')
+                if sectWise:
+                    subpxl[-2:] = N.where(windowSize[-2:] > 1, subpxl[-2:]-0.5, subpxl[-2:])
+                else:
+                    subpxl[-n:] = N.where(windowSize[-n:] > 1, subpxl[-n:]-0.5, subpxl[-n:])
                 canvas = U.nd.shift(canvas, subpxl)
                 canvas = canvas[slc_edge]
             check = 1
@@ -383,6 +389,100 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
             arrList += [N.ascontiguousarray(canvas)]
 
     return arrList
+
+
+def pointsCutOut3D(arr, posList, windowSize=100, d2=None, interpolate=True, removeWrongShape=True):
+    """
+    array:       nd array
+    posList:     ([(z,)y,x]...)
+    windowSize:  scalar (in pixel or as percent < 1.) or ((z,)y,x)
+                 if arr.ndim > 2, and len(windowSize) == 2, then
+                 cut out section-wise (higher dimensions stay the same)
+    d2:          conern only XY of windowSize (higher dimensions stay the same)
+    interpolate: shift array by subpixel interpolation to adjust center
+
+    return:      list of array centered at each pos in posList
+    """
+
+    shape = N.array(arr.shape)
+    center = shape / 2.
+
+    if arr.ndim <= 2:
+        ndim_arr = arr.ndim
+    else:
+        ndim_arr = 3
+
+    # prepare N-dimensional window size
+    try:
+        len(windowSize) # seq
+        if d2:
+            windowSize = windowSize[-2:]
+        if len(windowSize) != arr.ndim:
+            dim = len(windowSize)
+            windowSize = tuple(shape[:-dim]) + tuple(windowSize)
+    except TypeError: # scaler
+        if windowSize < 1 and windowSize > 0: # percentage
+            w = shape * windowSize
+            if d2:
+                w[:-2] = shape[:-2]
+            elif ndim_arr > 3:
+                w[:-3] = shape[:-3]
+            windowSize = w.astype(N.uint)
+        else:
+            windowSize = N.where(shape >= windowSize, windowSize, shape)
+            if d2:
+                windowSize[:-2] = shape[:-2]
+    windowSize = N.asarray(windowSize)
+    halfWin = windowSize / 2
+    #ndim_win = len(windowSize)
+
+    margin = int(interpolate)
+    # cutout individual position
+    arrList = []
+    for pos in posList:
+        ndim_pos = len(pos)
+
+        # calculate idx
+        dif = pos +0.5 - halfWin[-ndim_pos:]
+
+        dif = N.round_(dif)
+        dif = dif.astype(N.int)
+        starts = dif - margin
+        starts = N.where(starts < 0, 0, starts)
+        stops = dif + windowSize[-ndim_pos:] + margin
+        stops = N.where(stops > shape[-ndim_pos:], shape[-ndim_pos:], stops)
+
+        #if removeWrongShape and (N.any((starts) < 0) or N.any((stops) > shape[-ndim_pos:])):
+        #    continue
+        
+        slc = [Ellipsis]
+        for dim, s0 in enumerate(starts):
+            s1 = stops[dim]
+            slc.append(slice(s0, s1))
+        cpa = arr[slc]
+        
+        if interpolate:
+            dif = pos + 0.5 - halfWin[-ndim_pos:]
+            sub = (arr.ndim - len(dif)) * [0] + list(dif)
+            sub = N.array(sub)
+            sar = U.nd.shift(cpa, sub % 1)
+
+            slc = [Ellipsis]
+            for d in range(ndim_arr):
+                slc.append(slice(margin, -margin))
+            cpa = sar[slc]
+
+        arrList.append(cpa)
+
+
+    if removeWrongShape:
+        if d2 and arr.ndim == 2:
+            arrList = N.array([a for a in arrList if N.all(a.shape[-2:] == windowSize[-2:])])
+        else:
+            arrList = N.array([a for a in arrList if N.all(a.shape[-3:] == windowSize[-3:])])
+    return arrList
+        
+
 
 def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
     """
@@ -734,9 +834,13 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, win=11, mask_npxls=3):
         else:
             v = ret[1]
             zyx = ret[2:2+ndim]
-            sigma = ret[2+ndim:2+ndim*2]
-            mask_gaussianND(img, zyx, v, sigma)
-            poses.append([v,zyx,sigma])
+            if N.any(N.abs(zyx - vzyx[1:]) > win/2.):#zyx < 0 or zyx > img.shape or ):
+                mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
+                poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [sigma_peak])
+            else:
+                sigma = ret[2+ndim:2+ndim*2]
+                mask_gaussianND(img, zyx, v, sigma)
+                poses.append([v,zyx,sigma])
 
         vzyx = U.findMax(img)
         if N.all(vzyx == prev):

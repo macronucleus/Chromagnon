@@ -34,7 +34,9 @@ NUM_ENTRY=len(ZYXRM_ENTRY)
 
 ZMAG_CHOICE = ['Auto', 'Always', 'Never']
 ACCUR_CHOICE_DIC = {'fast': 1, 'good': 2, 'best': 10}
-ACCUR_CHOICE = [x[0] for x in sorted(list(ACCUR_CHOICE_DIC.items()), key=lambda x: x[1])]
+#ACCUR_CHOICE = [x[0] for x in sorted(list(ACCUR_CHOICE_DIC.items()), key=lambda x: x[1])]
+ACCUR_CHOICE = sorted(list(ACCUR_CHOICE_DIC.values()))
+#print('accu', ACCUR_CHOICE)
 MAXITER_3D = ACCUR_CHOICE_DIC['good']
 
 # file extention
@@ -92,6 +94,7 @@ class Chromagnon(object):
         self.setFileFormats()
         self.setParmSuffix()
         self.setIf_failed()
+        self.setDefaultOutPutDir()
         
         self.alignParms = N.zeros((self.img.nt, self.img.nw, NUM_ENTRY), N.float32)
         self.alignParms[:,:,4:] = 1
@@ -187,9 +190,12 @@ class Chromagnon(object):
         self.cthre = val
 
     def setMaxShift(self, um=af.MAX_SHIFT):
-        self.max_shift_pxl = um / N.mean(self.img.pxlsiz[1:])#:2])
-        if self.max_shift_pxl > min((self.img.nx, self.img.ny)):
-            self.max_shift_pxl = min((self.img.nx, self.img.ny))
+        if um:
+            self.max_shift_pxl = um / N.mean(self.img.pxlsiz[1:])#:2])
+            if self.max_shift_pxl > min((self.img.nx, self.img.ny)):
+                self.max_shift_pxl = min((self.img.nx, self.img.ny))
+        else:
+            self.max_shift_pxl = None
 
     def setZmagSwitch(self, value='Always'):#'Auto'):
         self.zmagSwitch = value
@@ -301,6 +307,11 @@ class Chromagnon(object):
     def setphaseContrast(self, phaseContrast=True):
         self.phaseContrast = phaseContrast
 
+    def setDefaultOutPutDir(self, outdir=None):
+        if outdir and not os.path.isdir(outdir):
+            os.path.makedirs(outdir)
+        self.outdir = outdir
+        
     def getSaturation(self, w=0, t=0, only_neighbor=True):
         """
         return number of saturated pixels
@@ -324,53 +335,56 @@ class Chromagnon(object):
         
         set self.refwave (in index)
         """
-        # if time laplse
-        if self.img.nt > 1:
-            # how large the object is...
-            arrs = [self.img.get3DArr(w=w, t=t).ravel() for w in range(self.img.nw)]
-            modes = [imgFilters.mode(a[::50]) for a in arrs]
-            fpxls = [N.where(a > modes[i])[0].size/float(a.size) for i, a in enumerate(arrs)]
-            # bleach half time
-            halfs = []
-            for w in range(self.nw):
-                mes = [self.img.get3DArr(w=w, t=t).mean() for t in range(self.nt)]
-                parm, check = U.fitDecay(mes)
-                halfs.append(parm[-1] / float(self.nt))
+        if self.refwave is not None:
+            self.refwave = self.img.getWaveIdx(self.refwave)
+        else:
+            # if time laplse
+            if self.img.nt > 1:
+                # how large the object is...
+                arrs = [self.img.get3DArr(w=w, t=t).ravel() for w in range(self.img.nw)]
+                modes = [imgFilters.mode(a[::50]) for a in arrs]
+                fpxls = [N.where(a > modes[i])[0].size/float(a.size) for i, a in enumerate(arrs)]
+                # bleach half time
+                halfs = []
+                for w in range(self.nw):
+                    mes = [self.img.get3DArr(w=w, t=t).mean() for t in range(self.nt)]
+                    parm, check = U.fitDecay(mes)
+                    halfs.append(parm[-1] / float(self.nt))
 
-            channels = N.add(fpxls, halfs)
-            refwave = N.argmax(channels)
-            print('The channel to align is %i' % refwave)
-        
-        # if wavelengths are only 2, then use the channel 0
-        elif self.img.nw <= 2:
-            refwave = 0
+                channels = N.add(fpxls, halfs)
+                refwave = N.argmax(channels)
+                print('The channel to align is %i' % refwave)
 
-        # take into account for the PSF distortion due to chromatic aberration
-        elif self.img.nw > 2:
-            pwrs = N.array([self.img.get3DArr(w=w, t=t).mean() for w in range(self.img.nw)])
-            # the middle channel should have the intermediate PSF shape
-            waves = [self.img.getWaveFromIdx(w) for w in range(self.img.nw)]
-            waves.sort()
-            candidates = [self.img.getWaveIdx(wave) for wave in waves[1:-1]]
+            # if wavelengths are only 2, then use the channel 0
+            elif self.img.nw <= 2:
+                refwave = 0
 
-            # remove channels with lots of saturation
-            candidates = [w for w in candidates if not self.getSaturation(w=w,t=t)]
-            
-            # find out channels with enough signal
-            thr = N.mean(pwrs) / 1.25
-            bol = N.where(pwrs[candidates] > thr, 1, 0)
-            if N.any(bol):
-                ids = N.nonzero(bol)[0]
-                if len(ids) == 1:
-                    idx = ids[0]
+            # take into account for the PSF distortion due to chromatic aberration
+            elif self.img.nw > 2:
+                pwrs = N.array([self.img.get3DArr(w=w, t=t).mean() for w in range(self.img.nw)])
+                # the middle channel should have the intermediate PSF shape
+                waves = [self.img.getWaveFromIdx(w) for w in range(self.img.nw)]
+                waves.sort()
+                candidates = [self.img.getWaveIdx(wave) for wave in waves[1:-1]]
+
+                # remove channels with lots of saturation
+                candidates = [w for w in candidates if not self.getSaturation(w=w,t=t)]
+
+                # find out channels with enough signal
+                thr = N.mean(pwrs) / 1.25
+                bol = N.where(pwrs[candidates] > thr, 1, 0)
+                if N.any(bol):
+                    ids = N.nonzero(bol)[0]
+                    if len(ids) == 1:
+                        idx = ids[0]
+                    else:
+                        candidates = N.array(candidates)[ids]
+                        idx = N.argmax(pwrs[candidates])
+
+                    refwave = candidates[idx]
                 else:
-                    candidates = N.array(candidates)[ids]
-                    idx = N.argmax(pwrs[candidates])
-
-                refwave = candidates[idx]
-            else:
-                refwave = N.argmax(pwrs)
-        self.refwave = refwave
+                    refwave = N.argmax(pwrs)
+            self.refwave = refwave
 
         self.fixAlignParmWithCurrRefWave()
 
@@ -447,9 +461,12 @@ class Chromagnon(object):
                     ref = self.img.get3DArr(w=self.refwave, t=t)
                     prefyx = N.max(ref, 0)
                     pimgyx = N.max(img, 0)
-                    searchRad = self.max_shift_pxl * 2
-                    if searchRad > min((self.img.nx, self.img.ny)):
-                        searchRad = min((self.img.nx, self.img.ny))
+                    if self.max_shift_pxl:
+                        searchRad = self.max_shift_pxl * 2
+                        if searchRad > min((self.img.nx, self.img.ny)):
+                            searchRad = min((self.img.nx, self.img.ny))
+                    else:
+                        searchRad = None
                     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=self.phaseContrast, searchRad=searchRad)
                     ret[w,1:3] = yx
                     del ref, c
@@ -487,6 +504,7 @@ class Chromagnon(object):
                         refyz = self.refyz
                         maxErrZ = self.maxErrZ
                         
+                    #return imgyz, refyz
                     val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, cqthre=af.CTHRE/20., if_failed=if_failed)
 
                     #if check:# is not None:
@@ -540,9 +558,12 @@ class Chromagnon(object):
 
 
         # final 3D cross correlation
-        searchRad = self.max_shift_pxl * 2
-        if searchRad > min((self.img.nx, self.img.ny)):
-            searchRad = min((self.img.nx, self.img.ny))
+        if self.max_shift_pxl:
+            searchRad = self.max_shift_pxl * 2
+            if searchRad > min((self.img.nx, self.img.ny)):
+                searchRad = min((self.img.nx, self.img.ny))
+        else:
+            searchRad = None
 
         self.setRegionCutOut()
         ref = self.get3DArrayAligned(w=self.refwave, t=t)
@@ -797,6 +818,8 @@ class Chromagnon(object):
         """
         if not fn:
             fn = chromformat.makeChromagnonFileName(self.img.filename + self.parm_suffix, self.mapyx is not None)
+            if self.outdir:
+                fn = os.path.join(self.outdir, os.path.basename(fn))
         self.cwriter = chromformat.ChromagnonWriter(fn, self.img, self)
         self.cwriter.writeAlignParamAll()
         self.cwriter.close()
@@ -969,6 +992,8 @@ class Chromagnon(object):
                 fn = base + self.img_suffix + self.img_ext
             else:
                 fn = self.img.filename + self.img_suffix + self.img_ext
+            if self.outdir:
+                fn = os.path.join(self.outdir, os.path.basename(fn))
 
         if fn == self.img.filename:
             raise ValueError('Please use a suffix to avoid overwriting the original file.')
@@ -1013,6 +1038,8 @@ class Chromagnon(object):
         
         if not out:
             out = os.path.extsep.join((self.img.filename, 'local', 'tif'))
+            if self.outdir:
+                out = os.path.join(self.outdir, os.path.basename(out))
 
         try:
             return af.makeNonliearImg(self, out, gridStep)#chromformat.makeNonliearImg(self, out, gridStep)

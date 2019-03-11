@@ -25,11 +25,11 @@ except (ValueError, ImportError):
 ## for packaging, here the relative import was impossible to run this script as __main__
 try:
     if sys.version_info.major == 2:
-        import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+        import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
     elif sys.version_info.major >= 3:
-        from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+        from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
 except ImportError: # run as __main__
-    from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version
+    from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
 
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
@@ -100,6 +100,7 @@ class BatchPanel(wx.Panel):
         # config
         confdic = C.readConfig()
         self.lastpath = confdic.get('lastpath', '')
+        self.extra_parms = {}
 
         # draw / arrange
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -112,14 +113,13 @@ class BatchPanel(wx.Panel):
 
         self.refClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Clear selected', tip='', enable=False)
 
-        maxShiftLabel, self.maxShift = G.makeTxtBox(self, box, 'max shift allowed (um)', defValue=confdic.get('maxShift', af.MAX_SHIFT), tip='maximum possible shift of each channel', sizeX=50)
-
         parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
 
-        #self.refwave = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Ref channel', tip='', enable=True)
+        extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Extra parameters')
+        
         # ---- target ------
 
-        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + maxShiftLabel.GetSize()[0] + self.maxShift.GetSize()[0]
+        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + extraButton.GetSize()[0]
         G.newSpaceH(box, LISTSIZE_X+LISTSPACE-refsize)
 
         self.tgtAddButton = G.makeButton(self, box, lambda ev:self.OnChooseImgFiles(ev,'target'), title='Target files', tip='', enable=True)
@@ -182,12 +182,8 @@ class BatchPanel(wx.Panel):
         self.listRef.setOnDrop(self.goButton.Enable, 1)
         self.listTgt.setOnDrop(self.goButton.Enable, 1)
         
-        #self.zmaglabel, self.zmagch = G.makeListChoice(self, box, '  Z mag', aligner.ZMAG_CHOICE, defValue=confdic.get('Zmag', aligner.ZMAG_CHOICE[0]), tip='if "Auto" is chosen, then z mag calculation is done if the z stack contains more than 30 Z sections with a sufficient contrast')
-        self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are averaged to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
+        self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are maximum intensity projected to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
 
-        self.accurChoice = aligner.ACCUR_CHOICE
-        label, self.accurListChoice = G.makeListChoice(self, box, 'Z-accuracy', self.accurChoice, defValue=confdic.get('accur', self.accurChoice[0]))
-        
         self.localChoice = LOCAL_CHOICE
         label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
 
@@ -211,7 +207,7 @@ class BatchPanel(wx.Panel):
         self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
         self.flatButton.SetToolTip(wx.ToolTip('Open a graphical interphase to flat field images'))
 
-        flatsize = self.goButton.GetSize()[0] + self.averageCb.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5 #self.zmaglabel.GetSize()[0] + self.zmagch.GetSize()[0] 
+        flatsize = self.goButton.GetSize()[0] + self.averageCb.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
 
         G.newSpaceH(box, FRAMESIZE_X-flatsize)
 
@@ -308,7 +304,7 @@ class BatchPanel(wx.Panel):
                 return
             if os.name == 'posix':
                 wildcard = dlg.fnPat
-            if isinstance(fns, six.string_types):#str):
+            if isinstance(fns, six.string_types):
                 fns = [fns]
 
             ll.addFiles(fns)
@@ -355,7 +351,37 @@ class BatchPanel(wx.Panel):
         """
         self.initGuess.clearAll()
         self.clearInitguessButton.Enable(0)
-            
+
+    def OnExtraParamButton(self, evt=None):
+        confdic = C.readConfig()
+
+        dlg = extrapanel.ExtraDialog(self, self.listRef, confdic, outdir=self.extra_parms.get('outdir'), refwave=str(self.extra_parms.get('refwave')))
+        val = dlg.ShowModal()
+
+        self.outdir = self.refwave = self.zacuur = None
+        if val == wx.ID_OK:
+            if not (dlg.outdir_cb.GetValue()):
+                self.extra_parms['outdir'] = dlg.outdir
+                C.saveConfig(outdir=dlg.outdir)
+            if hasattr(dlg, 'refwave_cb') and not (dlg.refwave_cb.GetValue()):
+                refwave = dlg.refwave_choice.GetStringSelection()
+                try:
+                    refwave = eval(refwave)
+                except (TypeError, ValueError):
+                    pass
+                self.extra_parms['refwave'] = refwave
+
+            if hasattr(dlg, 'tseriesListChoice'):
+                self.extra_parms['tseries4wave'] = dlg.tseriesListChoice.GetStringSelection()
+                
+            self.extra_parms['zacuur'] = eval(dlg.accurListChoice.GetStringSelection())
+            C.saveConfig(accur=self.extra_parms['zacuur'])
+
+            self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
+            C.saveConfig(max_shift=self.extra_parms['max_shift'])
+
+        dlg.Destroy()
+        
     def checkGo(self, evt=None):
         """
         enable "Go" button according to the entry of the file list
@@ -422,7 +448,8 @@ class BatchPanel(wx.Panel):
             targets = [os.path.join(*self.listTgt.getFile(index)[:2]) for index in self.listTgt.columnkeys]
 
             # other parameters
-            initguess = ''
+            #initguess = ''
+            confdic = C.readConfig()
 
             form = self.outextch.GetStringSelection()
             if not form:
@@ -432,8 +459,9 @@ class BatchPanel(wx.Panel):
             # check wavelengths
             waves1 = [list(map(int, self.listRef.getFile(index)[2].split(','))) for index in self.listRef.columnkeys]
             waves2 = [list(map(int, self.listTgt.getFile(index)[2].split(','))) for index in self.listTgt.columnkeys]
+            nts = all([t == 1 for t in self.listRef.nts])
             ids = af.checkWaves(waves1, waves2)
-            if ids is not None:
+            if ids is not None and nts:
                 for i, listbox in zip(ids, (self.listRef, self.listTgt)):
                     listbox.SetItemTextColour(i, 'purple')
                     #listbox.SetBackGroundColour(i, 'gray')
@@ -462,26 +490,32 @@ class BatchPanel(wx.Panel):
                 self.averageCb.SetValue(0)
 
 
+            accur = self.extra_parms.get('zacuur', confdic.get('accur', aligner.ACCUR_CHOICE[0]))
+            if accur in aligner.ACCUR_CHOICE_DIC:
+                accur = aligner.ACCUR_CHOICE_DIC[accur]
             
             # parameters
             parms = [self.cutoutCb.GetValue(),
-                     initguess,
+                     self.extra_parms.get('outdir'),#initguess,
                      self.localListChoice.GetStringSelection(),
-                     self.maxShift.GetValue(),
-                     self.accurListChoice.GetStringSelection(),
+                     self.extra_parms.get('refwave'), #None, #self.maxShift.GetValue(),
+                     int(accur),#self.extra_parms.get('zacuur', confdic.get('accur', aligner.ACCUR_CHOICE[0]))), #self.accurListChoice.GetStringSelection(),
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
-                     [nt for nt in self.listRef.nts], # copy
+                     self.extra_parms.get('tseries4wave', 'time'),#[nt for nt in self.listRef.nts], # copy
                      form,
-                     int(self.min_pxls_choice.GetStringSelection())] 
+                     int(self.min_pxls_choice.GetStringSelection()),
+                         self.extra_parms.get('max_shift', af.MAX_SHIFT)] 
 
+            #print(parms[4], confdic.get('accur', aligner.ACCUR_CHOICE[0]), type(parms[4]))
             # check the user-inputs
+            old="""
             try:
                 parms[3] = float(parms[3])
             except ValueError:
                 G.openMsg(parent=self, msg='The default value (%.2f um) will be used' % af.MAX_SHIFT, title="The value for max shift allowed is missing")
                 parms[3] = af.MAX_SHIFT
-                self.maxShift.SetValue(str(parms[3]))
+                self.maxShift.SetValue(str(parms[3]))"""
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
@@ -489,7 +523,8 @@ class BatchPanel(wx.Panel):
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
-            C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
+            C.saveConfig(cutout=parms[0], local=parms[2], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
+            #C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
 
             # run program
             gui = threads.GUImanager(self, __name__)
@@ -564,8 +599,8 @@ def command_line():
                      help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
         p.add_argument('--localMinWindow', '-w', default=af.MIN_PXLS_YXS[1], choices=af.MIN_PXLS_YXS,
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
-        p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
-                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+        #p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
+        #             help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
         p.add_argument('--not_crop_mergins', '-c', action='store_false',
                      help='crop mergins after alignment (default=False; do crop mergins)')
         p.add_argument('--average_references', '-a', action='store_true',
@@ -596,10 +631,10 @@ def command_line():
             print('averaged image was saved as %s' % refs)
 
         parms = [not options.not_crop_mergins,
-                None,#options.initguess,
+                None,#options.outdir
                 options.local,
-                options.maxShift,
-                None,#options.zmag,
+                None, #options.refwave
+                None,#options.zaccur,
                 options.parm_suffix,
                 options.img_suffix,
                 nts,

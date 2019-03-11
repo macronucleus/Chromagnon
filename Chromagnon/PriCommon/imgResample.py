@@ -664,6 +664,11 @@ def polar2cart2D(r, theta, center):
     x = r  * np.cos(theta) + center[1]
     return y, x# x, y
 
+def cart2polar2D(y, x):
+    r = N.sqrt(y**2 + x**2)
+    theta = N.arctan2(y, x)
+    return r, theta
+
 def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360, return_idx=False):
     """
     img: array

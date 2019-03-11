@@ -862,7 +862,7 @@ class plot_frame(wx.Frame):
                    "PCX files (*.pcx)|*.pcx|" \
                    "TIFF files (*.tif)|*.tif|" \
                    "All Files |*"
-        dlg = wx.FileDialog(self, "Save As", ".", "", wildcard, wx.SAVE)
+        dlg = wx.FileDialog(self, "Save As", ".", "", wildcard, wx.FD_SAVE)#SAVE)
         if dlg.ShowModal() == wx.ID_OK:
             f = dlg.GetPath()
             dummy, ftype = os.path.splitext(f)

@@ -31,7 +31,7 @@ EVT_VIEW_ID = wx.NewId()
 EVT_ABORT_ID = wx.NewId()
 EVT_ERROR_ID = wx.NewId()
 EVT_ECHO_ID = wx.NewId()
-EVT_INITGUESS_ID = wx.NewId()
+#EVT_INITGUESS_ID = wx.NewId()
 EVT_SETFLAT_ID = wx.NewId()
 EVT_CLOSE_PAGE_ID = wx.NewId()
 EVT_PROGRESS_ID = wx.NewId()
@@ -64,7 +64,7 @@ class ThreadWithExc(threading.Thread):
         self.targets = targets
         self.parms = parms
         self.img_suffix = aligner.IMG_SUFFIX
-        self.logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
+        #self.logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
         
     def _get_my_tid(self):
         """determines this (self's) thread id
@@ -104,18 +104,27 @@ class ThreadWithExc(threading.Thread):
 
         # parameters
         cutout = parms[0]
-        initGuess = parms[1]
-        if initGuess and not os.path.isfile(initGuess):
-            raise ValueError('The initial guess is not a valid Chromagnon file')
+        #initGuess = parms[1]
+        #if initGuess and not os.path.isfile(initGuess):
+        #    raise ValueError('The initial guess is not a valid Chromagnon file')
+        outdir = parms[1]
+        if outdir and not os.path.isdir(outdir):
+            raise ValueError('Output directory does not exist')
+        elif outdir:
+            self.logh = open(os.path.join(outdir, 'Chromagnon.log'), 'a')
+        else:
+            self.logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
         local = parms[2]
 
-        maxShift = parms[3]
+        #maxShift = parms[3]
+        refwave = parms[3]
         accur = parms[4]
         self.parm_suffix = parms[5]
         self.img_suffix = parms[6]
         nts = parms[7]
         self.img_ext = parms[8]
         min_pxls_yx = parms[9]
+        max_shift = parms[10]
         
         saveAlignParam = True
         alignChannels = True
@@ -144,19 +153,21 @@ class ThreadWithExc(threading.Thread):
 
                     an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
-                    an.setMaxShift(maxShift)
+                    an.setMaxShift(max_shift)
                     if accur:
                         an.setMaxIter3D(accur)
+                    an.setDefaultOutPutDir(outdir)
+                    an.setReferenceWave(refwave)
 
                     pgen = self.progressValues(target=False, an=an, alignChannels=alignChannels, alignTimeFrames=alignTimeFrames, local=local)
                     an.setProgressfunc(pgen)
                     
-                    if initGuess:
-                        an.loadParm(initGuess)
+                    #if initGuess:
+                    #    an.loadParm(initGuess)
                         # mapyx should not be inherited...
-                        an.mapyx = None
+                    #    an.mapyx = None
                     
-                    if (an.nw > 1 and an.nt == 1):
+                    if (an.nw > 1 and (an.nt == 1 or nts=='channel')):
                         an.findBestChannel()
                         self.echo('Calculating channel alignment...')
                         
@@ -205,6 +216,7 @@ class ThreadWithExc(threading.Thread):
                     self.log('\n**Applying to %s using %s at %s' % (os.path.basename(target), os.path.basename(fn), tstf))
 
                     an = self.getAligner(target, index, what='target')
+                    an.setDefaultOutPutDir(outdir)
                     
                     pgen = self.progressValues(target=True, an=an)
                     an.setProgressfunc(pgen)
@@ -243,6 +255,7 @@ class ThreadWithExc(threading.Thread):
                     self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
                 
                 an = self.getAligner(target, index, what='target')
+                an.setDefaultOutPutDir(outdir)
                 pgen = self.progressValues(target=True, an=an)
                 an.setProgressfunc(pgen)
                 self.progress(0)
@@ -387,7 +400,7 @@ class GUImanager(wx.EvtHandler):
 
         BindEvent(self, self.OnEcho, EVT_ECHO_ID)
 
-        BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
+        #BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
 
         BindEvent(self, self.OnSetFlat, EVT_SETFLAT_ID)
 
@@ -494,8 +507,8 @@ class GUImanager(wx.EvtHandler):
         self.panel.label.SetForegroundColour(color)
         #print(msg)
 
-    def OnInitGuess(self, evt):
-        self.panel._setInitGuess(evt.data[0])
+    #def OnInitGuess(self, evt):
+    #    self.panel._setInitGuess(evt.data[0])
 
     
     def OnSetFlat(self, evt):

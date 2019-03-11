@@ -7,12 +7,13 @@
 
 # execute like...
 # $ cd ~/chrom/Chromagnon
-# $ pyinstaller --clean ~/codes/py/src/Chromagnon/Chromagnon.spec
+# $ source activate chrom
+# $ pyinstaller --clean ~/codes/py/Chromagnon/Chromagnon.spec
 # on mac, make disk image
 # on linux
 # tar -jcvf ChromagnonV065Ubuntu.tar.bz2 ChromagnonV065Ubuntu
 # on windows
-# pyinstaller --clean E:\py\Chromagnon\Chromagnon.spec
+# pyinstaller --clean Z:\py\Chromagnon\Chromagnon.spec
 # if applicable... --upx-dir=upx394w
 
 import sys, os
@@ -32,8 +33,8 @@ if sys.platform.startswith('win'):
     conda = 'Miniconda%i' % pyversion
     site=os.path.join(home, conda, 'Lib', 'site-packages')
 
-    code=os.path.abspath(os.path.join('E:', 'py'))
-    src = os.path.abspath(os.path.join('E:', 'src', 'Chromagnon', 'Chromagnon'))
+    code=os.path.abspath(os.path.join('Z:', 'py'))
+    src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
     
     libbin = os.path.join(home, conda, 'Library', 'bin')
     if pyversion == 3:
