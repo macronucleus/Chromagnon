@@ -599,8 +599,8 @@ def command_line():
                      help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
         p.add_argument('--localMinWindow', '-w', default=af.MIN_PXLS_YXS[1], choices=af.MIN_PXLS_YXS,
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
-        #p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
-        #             help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+        p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
+                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
         p.add_argument('--not_crop_mergins', '-c', action='store_false',
                      help='crop mergins after alignment (default=False; do crop mergins)')
         p.add_argument('--average_references', '-a', action='store_true',
@@ -639,7 +639,8 @@ def command_line():
                 options.img_suffix,
                 nts,
                 options.img_format,
-                int(options.localMinWindow)]
+                int(options.localMinWindow),
+                options.maxShift]
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()
