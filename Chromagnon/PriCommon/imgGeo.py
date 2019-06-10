@@ -303,7 +303,7 @@ def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
 
         sls.append(slice(start, end))
     sls.append(Ellipsis)
-    return sls[::-1]
+    return tuple(sls[::-1])
 
 def edgeFromSlice(slicelist, start=True):
     if start:

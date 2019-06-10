@@ -76,7 +76,7 @@ class MultiTiffReader(generalIO.GeneralReader):
                 axes = axes.replace('Q', 'W')
             elif 'T' not in axes:
                 axes = axes.replace('Q', 'T')
-            imgSeq = self.findImgSequence(axes[:-2])
+            imgSeq = self.findImgSequence(axes.replace('YX', ''))#[:-2])
 
 
             nz = nt = nw = 1
@@ -212,7 +212,7 @@ class MultiTiffReader(generalIO.GeneralReader):
         if self.fp.is_micromanager:
             # my code uses wavelength a lot, and therefore, string name is not accepted...
             #waves = self.metadata['ChNames']
-            self.wave = N.arange(400, 700, 300//nw)[:nw]
+            self.wave = self.makeWaves()#N.arange(400, 700, 300//nw)[:nw]
         
         elif self.fp.is_ome:
             px = self.metadata['Image']['Pixels']
@@ -361,6 +361,7 @@ class MultiTiffWriter(generalIO.GeneralWriter):
                     'unit': 'micron',
                     'spacing': self.pxlsiz[0],
                     'loop': False,
+                    'frames': self.nt,
                     # my field goes to "description"
                     'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
                     }

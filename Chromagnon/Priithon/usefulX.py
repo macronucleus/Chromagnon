@@ -909,7 +909,7 @@ def saveSession(fn=None, autosave=False):
         import time
         # global _saveSessionDefaultPrefix
         fn = PriConfig.saveSessionDefaultPrefix + time.strftime("%Y%m%d-%H%M.py")
-        fn = wx.FileSelector("Please select file", "",fn, flags=wx.SAVE)
+        fn = wx.FileSelector("Please select file", "",fn, flags=wx.FD_SAVE)
 
     if not fn: # cancel
         return
@@ -930,7 +930,7 @@ def FN_seb(save=0, verbose=1):
 
     ## frame title, start-dir, default-filename, ??, default-pattern
     if save:
-        flags=wx.SAVE
+        flags=wx.FD_SAVE
     else:
         flags=0
     fn = wx.FileSelector("Please select file", flags=flags)

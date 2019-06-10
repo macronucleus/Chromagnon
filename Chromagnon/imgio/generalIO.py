@@ -3,8 +3,9 @@ import numpy as N
 
 IMGSEQ = ['WTZ', 'TZW', 'TWZ', 'WZT']
 
-WAVE_START = 400
-WAVE_END = 700
+WAVE_START = 0#100
+#WAVE_END   = 700
+WAVE_STEP  =  1#20 # step has to be a constant for Chromagnon
 
 READABLE_FORMATS = WRITABLE_FORMATS = []
 
@@ -140,13 +141,13 @@ class GeneralReader(object):
 
         if len(wave):
             if len(wave) > 1 and len(set(wave)) == 1:#wave[0] == wave[-1]:
-                self.wave = N.arange(400, 700, 300//self.nw)[:self.nw]
+                self.wave = self.makeWaves()#N.arange(400, 700, 300//self.nw)[:self.nw]
             else:
                 self.wave = wave
         elif (hasattr(self, 'wave') and not len(self.wave)) and not len(wave) and self.nw:
-            self.wave = N.arange(400, 700, 300//self.nw)[:self.nw]
+            self.wave = self.makeWaves()#N.arange(400, 700, 300//self.nw)[:self.nw]
         elif not (hasattr(self, 'wave')):
-            self.wave = N.arange(400, 700, 300//self.nw)[:self.nw]
+            self.wave = self.makeWaves()#N.arange(400, 700, 300//self.nw)[:self.nw]
 
             
         if imgSequence is not None:
@@ -288,15 +289,15 @@ class GeneralReader(object):
                 i = z*self.nw*self.nt + w*self.nt + t
         elif len(self.axes) == 3 and self.axes[0] in ('S', 'C', 'W'):
             if self.imgSequence <= 2:
-                i = (t*self.nz + z) * 2
+                i = (t*self.nz + z) #* 2 # what is "*2"?? 20190514
             else:
-                i = (z*self.nt + t) * 2
+                i = (z*self.nt + t) #* 2
             self.axes_w = w
         elif len(self.axes) == 3 and self.axes[-1] in ('S', 'C', 'W'):
             if self.imgSequence <= 2:
-                i = (t*self.nz + z) * 2
+                i = (t*self.nz + z) #* 2
             else:
-                i = (z*self.nt + t) * 2
+                i = (z*self.nt + t) #* 2
             self.axes_w = w
             
         return int(i)
@@ -489,4 +490,6 @@ class GeneralWriter(GeneralReader):
 
 
 def makeWaves(nw):
-    return list(range(WAVE_START, WAVE_END, (WAVE_END - WAVE_START)//nw))[:nw]
+    #return list(range(WAVE_START, WAVE_END, (WAVE_END - WAVE_START)//nw))[:nw]
+    #return N.array(list(range(WAVE_START, WAVE_END, WAVE_STEP//nw))[:nw])
+    return N.arange(WAVE_START, WAVE_START+WAVE_STEP*nw, WAVE_STEP)#WAVE_END, WAVE_STEP//nw)[:nw]

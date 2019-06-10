@@ -508,7 +508,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
         if len(ind_shape) > 2:
             irs = N.reshape(irs, ind_shape)
 
-        irs = irs[slc]
+        irs = irs[tuple(slc)]
         if mode == 1 and N.sometrue(dm):
             inds = N.empty_like(irs)
            # print 'translate', dm

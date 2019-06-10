@@ -380,6 +380,12 @@ def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None
         arr1 = arr1.astype( N.float64 )
     if arr2.dtype.type == N.uint32:
         arr2 = arr2.astype( N.float64 )
+    # 20190410
+    if N.iscomplexobj(arr1):
+        arr1 = N.abs(arr1)
+    if N.iscomplexobj(arr2):
+        arr2 = N.abs(arr2)
+        
     
     x=arr1
     arr=arr2
@@ -452,6 +458,8 @@ def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTra
 
         if logY:
             arrY = N.log10(abs(arrY)+logZeroOffset)
+        if N.iscomplexobj(arrY):
+            arrY = N.abs(arrY)
         plt.plot(arrY, _col(c))
         if figureNo is not None:
             plt.interface._active = _oldActive

@@ -86,8 +86,11 @@ try:
 
 except:
     if not commonfuncs.main_is_frozen():
-        import traceback
-        traceback.print_exc()
+        import traceback, warnings
+        #traceback.print_exc()
+        errs = traceback.format_exc()
+        warnings.warn(errs, UserWarning)
+        
 
     READABLE_FORMATS = []
     WRITABLE_FORMATS = []

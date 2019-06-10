@@ -259,6 +259,7 @@ def makeHdrFromRdr(rdr):
     if hasattr(rdr, 'hdr'):
         hdr = makeHdr_like(rdr.hdr)
     else:
+        old="""
         hdr = Mrc.makeHdrArray()
         Mrc.init_simple(hdr, Mrc.dtype2MrcMode(rdr.dtype), rdr.shape)
         hdr.ImgSequence = rdr.imgSequence
@@ -269,11 +270,25 @@ def makeHdrFromRdr(rdr):
             if [1 for wave in rdr.wave[:rdr.nw] if isinstance(wave, six.string_types)]:
                 hdr.wave[:rdr.nw] = 0
             else:
-                hdr.wave[:rdr.nw] = rdr.wave[:rdr.nw]
+                hdr.wave[:rdr.nw] = rdr.wave[:rdr.nw]"""
+        hdr = makeHdrFromDim(nx=rdr.nx, ny=rdr.ny, nz=rdr.nz, nt=rdr.nt, nw=rdr.nw, dtype=rdr.dtype, wave=rdr.wave, imgSequence=rdr.imgSequence)
         hdr.d = rdr.pxlsiz[::-1]
         if 'Instrument' in rdr.metadata:
             hdr.LensNum = eval(rdr.metadata['Instrument']['Objective']['ID'].split(':')[1])
 
+    return hdr
+
+def makeHdrFromDim(nx, ny, nz, nt, nw, dtype, wave=[], imgSequence=0):
+    hdr = Mrc.makeHdrArray()
+    Mrc.init_simple(hdr, Mrc.dtype2MrcMode(dtype), nx, ny, nz*nt*nw)
+    hdr.ImgSequence = imgSequence
+    hdr.NumTimes = nt
+    hdr.NumWaves = nw
+    if len(wave):
+        if [1 for wav in wave[:nw] if isinstance(wav, six.string_types)]:
+            hdr.wave[:nw] = 0
+        else:
+            hdr.wave[:nw] = wave[:nw]
     return hdr
 
 

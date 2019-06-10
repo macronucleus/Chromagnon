@@ -108,7 +108,6 @@ class Chromagnon(object):
         self.mapyx = None
         self.regions = None
         self.byteorder = '<'
-        self.setCCthreshold()
         self.setMaxShift()
         self.setZmagSwitch()
 
@@ -181,14 +180,6 @@ class Chromagnon(object):
             val = ACCUR_CHOICE_DIC[val]
         self.niter_3D = val
 
-    def setCCthreshold(self, val=af.CTHRE):
-        """
-        set the threshold to check the quality of cross-correlation
-        
-        set self.cthre
-        """
-        self.cthre = val
-
     def setMaxShift(self, um=af.MAX_SHIFT):
         if um:
             self.max_shift_pxl = um / N.mean(self.img.pxlsiz[1:])#:2])
@@ -232,7 +223,7 @@ class Chromagnon(object):
             self.reftlist = tlist"""
         self.reftime = t
 
-    def setReferenceWave(self, wave=0):
+    def setReferenceWave(self, wave=None):
         """
         set self.refwave (index)
         """
@@ -505,7 +496,7 @@ class Chromagnon(object):
                         maxErrZ = self.maxErrZ
                         
                     #return imgyz, refyz
-                    val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, cqthre=af.CTHRE/20., if_failed=if_failed)
+                    val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=if_failed)
 
                     #if check:# is not None:
                     ty2,tz,_,_,mz = val#check
@@ -641,7 +632,7 @@ class Chromagnon(object):
             imgyx = imgyx.astype(N.float32)
             self.refyx = self.refyx.astype(N.float32)
 
-            yxs, regions, arr2, win = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, cthre=self.cthre, echofunc=self.echofunc)
+            yxs, regions, arr2, win = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)
 
             self.mapyx[t,w] = yxs
             if self.regions is None or self.regions.shape[-2:] != regions.shape:
@@ -651,6 +642,23 @@ class Chromagnon(object):
             self.last_win_sizes[t,w] = win
             
             self.progress()
+
+            if 0: # 3D cross correlation after the local alignment does not seem to help improving final correction accuracy.
+                if self.max_shift_pxl:
+                    searchRad = self.max_shift_pxl * 2
+                    if searchRad > min((self.img.nx, self.img.ny)):
+                        searchRad = min((self.img.nx, self.img.ny))
+                else:
+                    searchRad = None
+                ref = self.get3DArrayRemapped(w=self.refwave, t=t)
+                ref = af.fixSaturation(ref, self.getSaturation(w=self.refwave, t=t))
+                img = self.get3DArrayRemapped(w=w, t=t)
+                img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
+                zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+                if len(zyx) == 2:
+                    zyx = N.array([0] + list(zyx))
+                self.alignParms[t,w,:3] += zyx
+                print('the result of the last correlation', zyx)
 
         self.echo('Projection local alignment done')
 
@@ -696,7 +704,7 @@ class Chromagnon(object):
                         else:
                             initGuess = None
                     print('Section-wise local alignment -- W: %i, Z: %i' % (w, z))
-                    yxs, regions,arr2 = af.iterWindowNonLinear(arr, ref, initGuess=initGuess, affine=self.alignParms[t,w], threshold=threshold, phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, cthre=self.cthre, echofunc=self.echofunc)
+                    yxs, regions,arr2 = af.iterWindowNonLinear(arr, ref, initGuess=initGuess, affine=self.alignParms[t,w], threshold=threshold, phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)
                     self.mapyx[t,w,z] = yxs
                     if self.regions is None or self.regions.shape[-2:] != regions.shape or self.regions.ndim == 4:
                         self.regions = N.zeros((self.img.nt, self.img.nw, self.img.nz)+regions.shape, N.uint16)
@@ -893,7 +901,7 @@ class Chromagnon(object):
                        slice(0, ZYX[1]),
                        slice(0, ZYX[2])]
 
-        self.cropSlice = slc
+        self.cropSlice = tuple(slc) # future warning 20190604
 
     def get3DArrayAligned(self, w=0, t=0):
         """
@@ -929,6 +937,73 @@ class Chromagnon(object):
         
         return arr
 
+    def get2DArray(self, w=0, t=0, yz=False, alignParms=None):#, doXcorr=True):
+        """
+        alginParms: overwrite self.alignParms, this should not have t dimension
+
+        """
+        if self.refyz is None or self.refyx is None:
+            self.setRefImg()
+
+        if w == self.refwave:
+            if yz:
+                return self._zoomimg(self.refyz)
+            
+            else:
+                return self.refyx
+        
+        if alignParms is None:
+            alignParms = self.alignParms[t]
+            
+        if self.img.nz > 1:
+            img = self.img.get3DArr(w=w, t=t)
+            img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
+
+            if yz:
+                if not alignParms[w,2]:
+                    self.echo('making an initial guess for channel %i' % w)
+                    ref = self.img.get3DArr(w=self.refwave, t=t)
+                    prefyx = N.max(ref, 0)
+                    pimgyx = N.max(img, 0)
+                    if self.max_shift_pxl:
+                        searchRad = self.max_shift_pxl * 2
+                        if searchRad > min((self.img.nx, self.img.ny)):
+                            searchRad = min((self.img.nx, self.img.ny))
+                    else:
+                        searchRad = None
+                    yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=self.phaseContrast, searchRad=searchRad)
+                    #ret[w,1:3] = yx
+                    del ref, c
+                    print(yx)
+                    zs = N.round_(self.refxs-yx[-1]).astype(N.int)#ret[w,2]).astype(N.int)
+                else:
+                    zs = N.round_(self.refxs-alignParms[w,2]).astype(N.int)
+                nz = self.img.nx
+                removeEdge=True
+                img = img.T
+            else:
+                zs = N.round_(self.refzs-alignParms[w,0]).astype(N.int)
+                nz = self.img.nz
+                removeEdge=False
+                
+            if zs.max() >= nz:
+                zsbool = (zs < nz)
+                zsinds = N.nonzero(zsbool)[0]
+                zs = zs[zsinds]
+
+            imgyx = af.prep2D(img, zs=zs, removeEdge=removeEdge)
+            del img
+
+            imgyx = self._zoomimg(imgyx)
+            
+        else:
+            imgyx = N.squeeze(self.img.get3DArr(w=w, t=t))
+        return imgyx
+
+    def _zoomimg(self, imgyz):
+        zzoom = self.refyz.shape[0] / self.refyz.shape[1]
+        self.echo('Z axis zoom factor=%.2f' % zzoom)
+        return nd.zoom(imgyz, (1, zzoom))
 
     ### saving image into a file ###
 
@@ -1054,3 +1129,5 @@ def hasSameWave(img):
     if len(waves) > len(set(waves)):
         return True
     
+def dummyEcho(msg, skip_notify=None):
+    print(msg)

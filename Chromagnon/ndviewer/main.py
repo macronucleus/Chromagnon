@@ -457,9 +457,16 @@ class ImagePanel(wx.Panel):
 
     def onSaveScr(self, evt=None):
         from Priithon.all import Y
+        from PIL import Image
+
         fn = Y.FN(save=1)#, verbose=0)
+        Image.init()
         if not fn:
             return
+        elif os.path.splitext(fn)[-1] not in Image.EXTENSION:
+            G.openMsg(parent=self.parent, msg='Please supply file extension.\nThe file was not saved', title="File format unknown")
+            return
+            
         # choose viewers
         if self.orthogonal_toggle.GetValue():
             vstr = self.viewerch.GetStringSelection()
@@ -471,6 +478,7 @@ class ImagePanel(wx.Panel):
         self.hist[0].setBraces(self.hist[0].leftBrace, self.hist[0].rightBrace)
         # save
         Y.vSaveRGBviewport(v, fn)
+
         
     def initHists(self):
         ''' Initialize the histogram/aligner panel, and a bunch of empty lists;

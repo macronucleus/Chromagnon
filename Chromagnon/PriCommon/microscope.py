@@ -93,10 +93,15 @@ def LUT(wave):
     return colorTuple (R,G,B)
     """
     col = None
-    for i, WAVE in enumerate(WAVE_CUTOFF):
-        if wave < WAVE:
-            col = COLOR_TABLE[i]
-            break
+    if wave > 350:
+        for i, WAVE in enumerate(WAVE_CUTOFF):
+            if wave < WAVE:
+                col = COLOR_TABLE[i]
+                break
+    else: # imgio.generalIO makes channel names 0,1,2,3...
+        i = int(wave) % (len(COLOR_TABLE) - 1)
+        colors = COLOR_TABLE[::2][:-1] + COLOR_TABLE[1::2]
+        col = colors[i]
     if not col:
         col = COLOR_TABLE[i+1]
     return col

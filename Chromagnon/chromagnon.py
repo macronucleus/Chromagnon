@@ -6,10 +6,19 @@
 # Load image file, make calibration file and then apply calibration to image file
 ##################################################################################
 
+#  prepare for __main__
+if __name__ == '__main__':
+    ## windows support for py2exe
+    import multiprocessing
+    multiprocessing.freeze_support()
+
+    import warnings
+    warnings.simplefilter('ignore')#filterwarnings('ignore')
+
+# ------------- import modules
 import sys, os
 import six
 
-# ------------- import modules
 import wx
 try:
     from PriCommon import guiFuncs as G, commonfuncs as C, listbox
@@ -649,12 +658,6 @@ def command_line():
 
         
 if __name__ == '__main__':
-    ## windows support for py2exe
-    import multiprocessing
-    multiprocessing.freeze_support()
-
-    import warnings
-    warnings.filterwarnings('ignore')
 
     command_line()
     imgio.uninit_javabridge()

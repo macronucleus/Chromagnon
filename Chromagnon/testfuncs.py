@@ -1605,7 +1605,7 @@ def evalfunc_neigh(wid, nid):
 
 
 ### ------- local alignemnt evaluation
-
+# 20180306maptest
 def makeWarp(fn):
     from Priithon.all import F
     h = aligner.Chromagnon(fn)
@@ -1674,10 +1674,10 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
                 yx, regions, cs = alignfuncs.xcorNonLinear(arr, ref, npxls=npxls, threshold=threshold)
                 #region = regions[1] > threshold
                 factor = an.img.nx / regions[1].shape[-1]
-                region = imgFilters.zoomFourier(regions[1], factor, use_abs=True)
+                region = imgFilters.zoomFourier(regions[1], factor, use_abs=True, padd=100)
                 from Priithon.all import Mrc
                 Mrc.save((region > (threshold * 2.5)).astype(N.uint16), 'region%s_win%i.mrc' % (fn[-1], npxls), ifExists='overwrite')
-                continue
+                #continue
                 ind = N.nonzero(region > threshold)
                 ans = chromformat.ChromagnonReader(ansfn, an.img, an)
                 #ansarr = (region * ans.readMap3D(t=0, w=1) * -1)[0]
@@ -1699,7 +1699,7 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
                     
                     writeWarpSingle(ansarr, chm, wtr, truth, names=names, ind=ind)
                 else:
-                    for noiseModel in ['Gaussian', 'Poisson']:
+                    for noiseModel in ['Gaussian']:#, 'Poisson']:
                         nfn = fn + warpst + noiseModel + noise
                         chm = align2D(nfn, npxls)
                         names = [fn[-1], noiseModel, noise, npxls]
@@ -1886,3 +1886,30 @@ def normalizeP(a, mi=6, ma=200):
     aa = N.where(aa > ma-mi, ma-mi, aa)
 
     return aa / ma
+
+
+## --- remap examination ----
+from scipy import interpolate
+def _makeData():
+    data = [[3,2,1], [3,2,1], [1,1,0]]
+    return N.array(data, dtype=N.float32)
+
+def testGridData(zoom=5):
+    data = _makeData()
+
+    y, x = N.indices(data.shape, dtype=N.float32) + 0.5
+    zy = y * zoom
+    zx = x * zoom
+    zyx = N.array((zy.ravel(), zx.ravel()))
+
+    gy = N.arange(0.5*zoom, (data.shape[0]-0.5)*zoom)
+    gx = N.arange(0.5*zoom, (data.shape[1]-0.5)*zoom)
+    gyy, gyx = N.meshgrid(gy, gx, copy=False, indexing='ij')
+    gyx = N.array((gyy.ravel(), gyx.ravel()))
+    
+    #print(zyx.shape, data.shape, gyx.shape, gy.shape, gx.shape)
+
+    zoomed = interpolate.griddata(zyx.T, data.ravel(), gyx.T, method='cubic', fill_value=0).reshape((gy.shape[0], gx.shape[0]))
+
+    p = int(round(0.5 * zoom))
+    return N.pad(zoomed, ((p,p), (p,p)), 'edge')

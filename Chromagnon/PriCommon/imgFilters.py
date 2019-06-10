@@ -370,7 +370,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
         # cutout, shift and cutout
         #print(slc, slc_edge)
         try:
-            canvas = arr[slc]
+            canvas = arr[tuple(slc)]
             if SHIFT:
                 # 20180214 subpixel shift +0.5 was fixed
                 #raise RuntimeError('check')
@@ -520,10 +520,11 @@ def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
         if N.sometrue(subpx_shift):
             img = U.nd.shift(img, subpx_shift)
     # padding
-    canvas[slc] = img
+    canvas[tuple(slc)] = img # future warning 20190604
     if smooth:
         canvas = _smoothBorder(canvas, start, stop, smooth, value)
-    canvas = N.ascontiguousarray(canvas)
+    else:
+        canvas = N.ascontiguousarray(canvas)
     #print shapeS, shapeL, slc
     return canvas
 
@@ -552,13 +553,13 @@ def _smoothBorder(arr, start, stop, smooth, value):
         # start side
         slc = copy.copy(sliceTemplate)
         slc[d] = slice(start[d], start[d]+1, None)
-        edges[0] = arr[slc].reshape(smooth_shape)
+        edges[0] = arr[tuple(slc)].reshape(smooth_shape) # future warning 20190604
         # stop side
         slc = copy.copy(sliceTemplate)
         slc[d] = slice(stop[d]-1, stop[d], None)
-        edges[1] = arr[slc].reshape(smooth_shape)
+        edges[1] = arr[tuple(slc)].reshape(smooth_shape) # future warning 20190604
 
-        edges = (edges - value) / float(smooth + 1) # this value can be array??
+        edges = (edges - value) / float(smooth) # this value can be array??
 
         # both side
         for s, side in enumerate([start, stop]):
@@ -571,9 +572,9 @@ def _smoothBorder(arr, start, stop, smooth, value):
             for f,i in enumerate(rs):
                 slc = copy.copy(sliceTemplate)
                 slc[d] = slice(i,i+1,None)
-                edgeArr = edges[s].reshape(arr[slc].shape)
+                edgeArr = edges[s].reshape(arr[tuple(slc)].shape) # future warning 20190604
                 #arr[slc] += edgeArr * (smooth - f) 
-                arr[slc] = arr[slc] + edgeArr * (smooth - f) # casting rule
+                arr[slc] = arr[tuple(slc)] + edgeArr * (smooth -1 - f) # casting rule # future warning 20190604
 
     arr = N.ascontiguousarray(arr)
     return arr
@@ -674,7 +675,13 @@ def resolutionLimit(wave_nm, NA, n):
     """
     return (0.61 * wave_nm) / (n * NA) 
 
-def zoomFourier(arr, factor, use_abs=False):
+def zoomFourier(arr, factor, use_abs=False, padd=None):
+    """
+    padding: scaler
+    """
+    if padd is not None:
+        arr = paddingValue(arr, N.array(arr.shape) + padd, value=0, shift=None, smooth=padd//2, interpolate=False)
+    
     shape = N.array(arr.shape)
     target = [int(s) for s in shape * factor]
     #target[-1] //= 2
@@ -682,6 +689,14 @@ def zoomFourier(arr, factor, use_abs=False):
     af = F.fft(arr)
     ap = paddingFourier(af, target)
     afp = F.ifft(ap)
+
+    if padd is not None:
+        if hasattr(factor, '__len__'):
+            slc = [slice(s, -s) for s in padd * N.array(factor) // 2]
+        else:
+            slc = [slice(int(padd * factor // 2), int(-padd * factor // 2)) for d in range(arr.ndim)]
+        afp = afp[slc]
+    
     factor = target / shape
     if use_abs:
         return N.abs(afp) * N.product(factor)

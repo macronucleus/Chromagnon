@@ -5,7 +5,7 @@ Image correction software for chromatic shifts in fluorescence microscopy.
 Acceptable image file formats
 -----------------------------
 ### Reading
-* Most microscopy formats
+* Most microscopy formats (same as ImageJ)
 
 ### Writing
 * multipage-tiff (imageJ format or ome.tif format)
@@ -26,7 +26,7 @@ The source code is written in pure python and works on the following platforms a
 Platforms successfully tested:
 * MacOSX64bit (10.9.5 or higher)
 * Windows64bit (XP or higher)
-* Linux Ubuntu(16), CentOS(6)
+* Linux Ubuntu(16-18), CentOS(6)
 
 Dependencies:
 * `python` (v2.7 or v3.6)

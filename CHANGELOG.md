@@ -1,3 +1,30 @@
+v0.8(May. 2019)
+----
+1. ndviewer save screen, show error message when the file
+extension is missing (`ndviewer.main.py`).
+2. (20190509) When local alignment does not work with a window size,
+then it terminate by returning the previous yx (`alignfuncs.py`).
+3. (20190514) `imgio.generalIO.py` and `imgio.multififIO.py` was fixed to
+read custom composite tiff file.
+4. (20190514) temtative wavelength was changed to use fixed step for
+    wavenlengths and the start of the first wavelength was set as
+    0nm (`imgio.generalIO.py`). Accordingly color lookup table was
+    adjusted (`PriCommon.microscope.py`)
+5 (20190514) Local alignment map was improved to remove ripple by
+interpolating by `scipy.interpolate` and padding `numpy pad`
+(`alignfuncs.py`)
+6. (20190514) Local alignment accuracy was improved by setting
+adaptive threshold for window-size (`alignfuncs.py`).
+7. (20190516) Failure in estimating Z tranlation was improved
+    by setting the maxium pxlel shift with a small number in `estimate2D`
+    in (`alignfuncs.py`).
+8. (20190528) Fixed a bug to make time series in imageJ format
+(`multitifIO.py`).
+9. (20190528) Fixed a bug to find the best channel (`aligner.py`)
+10. (20190604) Get rid of future warnings.
+11. (20190604) Error message when bioformats is unavailable was turned
+    into UserWarning and hidden if Chromagnon is run as main.
+
 v0.7(Feb. 2019)
 ----
 1. `PriCommon.xcorr.py` padded region was removed before finding peak.
@@ -15,6 +42,7 @@ of image files (`alignfuncs.py`).
 7. Averaging was changed to max intensity projection
 (`alignfuncs.py`).
 8. bugs in wxpython 3.0 was fixed (`chromeditor.py` and binary for centos).
+9. (v. 0.71 20190603) Fixed broken command line command (`Chromagnon.py`).
 
 
 

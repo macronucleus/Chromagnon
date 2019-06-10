@@ -21,7 +21,7 @@ pyversion = sys.version_info.major
 
 
 block_cipher = None
-
+ENV = 'chrom'
 
 # ------ platform dependence ---
 binaries = []
@@ -55,7 +55,8 @@ else: # mac + linux
     pylib = 'so'
     # mac
     if sys.platform == 'darwin':
-        site=os.path.join(home, conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
+        #site=os.path.join(home, conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
+        site=os.path.join(home, conda, 'envs', ENV, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
         suffix = 'Mac'
         jvm = 'libjvm.dylib'
     # linux
@@ -73,7 +74,7 @@ else: # mac + linux
         # to find python on linux with miniconda, you need
         # LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Public/programs/miniconda3_ubuntu/lib
         ldpath = os.getenv('LD_LIBRARY_PATH', '').split(':')
-        pylibpath = os.sep + os.path.join('Public', 'programs', conda, 'envs', 'chrom', 'lib')
+        pylibpath = os.sep + os.path.join('Public', 'programs', conda, 'envs', ENV, 'lib')
 
         if pylibpath not in ldpath:
             os.environ['LD_LIBRARY_PATH'] = ':'.join((os.getenv('LD_LIBRARY_PATH', ''), pylibpath))
