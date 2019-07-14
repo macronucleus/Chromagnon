@@ -23,7 +23,18 @@ adaptive threshold for window-size (`alignfuncs.py`).
 9. (20190528) Fixed a bug to find the best channel (`aligner.py`)
 10. (20190604) Get rid of future warnings.
 11. (20190604) Error message when bioformats is unavailable was turned
-    into UserWarning and hidden if Chromagnon is run as main.
+into UserWarning and hidden if Chromagnon is run as main.
+12. (v0.81, 20190628) Broken multitif reader for micromanager was
+fixed.
+13. (v0.81, 20190705) Termination of iteration uses max_shift as a
+criteria (`alignfuncs.iteration`)
+14. (v0.81, 20190705) Several error message was made readable.
+15. (v0.81, 20190705) Command line execution has extra parameters.
+16. (v0.81, 20190705) Microscope calibration can be used.
+17. (v0.81, 20190705) Find best z was made faster for large images
+(`alignfuncs.findBestRefZs`).
+18. (v0.81, 20190714) Wavelength difference for the reference and
+    target images fixed (`chromformat.py`).
 
 v0.7(Feb. 2019)
 ----

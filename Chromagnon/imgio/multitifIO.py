@@ -43,13 +43,7 @@ class MultiTiffReader(generalIO.GeneralReader):
         s = self.fp.series[0]
         shape = s.shape
 
-        if 0:#self.fp.is_micromanager:
-            nw = self.metadata['Channels']
-            nz = self.metadata['Slices']
-            nt = self.metadata['Frames']
-            axes = s.axes.replace('C', 'W')
-            imgSeq = self.findImgSequence(axes[:-2])
-        elif self.fp.is_imagej and not self.fp.is_micromanager and 'channels' in self.metadata:
+        if self.fp.is_imagej and not self.fp.is_micromanager and 'channels' in self.metadata:
             imgSeq = 1
             nw = nt = nz = 1
 
@@ -59,8 +53,18 @@ class MultiTiffReader(generalIO.GeneralReader):
                 nz = self.metadata['slices']
             if 'frames' in self.metadata:
                 nt = self.metadata['frames']
+            #print('imagej')
+        
+        elif 0:#self.fp.is_micromanager:
+            nw = self.metadata['Channels']
+            nz = self.metadata['Slices']
+            nt = self.metadata['Frames']
+            axes = s.axes.replace('C', 'W')
+            imgSeq = self.findImgSequence(axes[:-2])
+            #print('micromanager', nw, nz, nt)
             #axes = 'TZCYXS'
         else:
+           # print('other')
             axes = s.axes.replace('S', 'W')    # sample (rgb)
             axes = axes.replace('C', 'W')      # color, emission wavelength
             axes = axes.replace('E', 'W')      # excitation wavelength
@@ -136,12 +140,12 @@ class MultiTiffReader(generalIO.GeneralReader):
 
         if self.fp.is_micromanager: # also is_ome and is_imagej
             self.metadata = meta = self.fp.micromanager_metadata['Summary']
-            px = meta.get('PixelSize_um', 0.1)
+            px = abs(meta.get('PixelSize_um', 0.1))
             if not px:
                 px = 0.1
             asp = meta.get('PixelAspect', 1)
             py = px * asp # is this correct?
-            pz = meta.get('z-step_um', 0.3)
+            pz = abs(meta.get('z-step_um', 0.3))
             if not pz:
                 pz = 0.3
             self.setPixelSize(pz, py, px)
@@ -212,6 +216,7 @@ class MultiTiffReader(generalIO.GeneralReader):
         if self.fp.is_micromanager:
             # my code uses wavelength a lot, and therefore, string name is not accepted...
             #waves = self.metadata['ChNames']
+            self.nw = nw
             self.wave = self.makeWaves()#N.arange(400, 700, 300//nw)[:nw]
         
         elif self.fp.is_ome:

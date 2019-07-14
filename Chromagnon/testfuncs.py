@@ -1634,6 +1634,10 @@ def makeWarp(fn):
     return out
     
 def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
+    """
+    fn: CF405M_2conv_027.dv_deconB
+    then, you need fn+'chromagnon.tif', fn+'_WARP.dv', fn_'Gaussian0020'
+    """
     import csv
     from . import chromformat
     from PriCommon import imgFilters
@@ -1686,6 +1690,7 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
                 ind = None
                 ans = chromformat.ChromagnonReader(ansfn)
             ansarr = (ans.readMap3D(t=0, w=1) * -1)[0]#"""
+            ansarr = ansarr[...,::-1,:]
 
             truth = ans.alignParms[0,1]
             truth[:4] *= -1
@@ -1714,7 +1719,7 @@ def writeWarpSingle(ansarr, chm, wtr, truth, names, ind=None):
     imgSize = N.array((0,chm.img.nx/2), N.float32)
     pxlsiz = chm.pxlsiz[-2:]
     diff = N.abs(truth - chm.alignParms[0,1])
-    dy,dx = diff[1:2] * (pxlsiz * 1000)
+    dy,dx = diff[1:3] * (pxlsiz * 1000)
     dr = (imgGeo.euclideanDist(imgGeo.rotate(imgSize, N.radians(diff[3])), imgSize))*(N.mean(pxlsiz)*1000)
     dmy = diff[-2] * imgSize[1] * pxlsiz[-2] * 1000
     dmx = diff[-1] * imgSize[1] * pxlsiz[-1] * 1000
@@ -1830,7 +1835,7 @@ def repeatCompWarp(fns, n=6, div_step=20, div_max=200):
             print(compareWarp(fn, out=out, div_step=div_step, div_max=div_max))
             
 
-def plotCompWarp(tif, axis=0, minus=False, pxlsizYX=0.08, vmin=-50, vmax=50, colorbar=False):
+def plotCompWarp(tif, axis=0, minus=False, pxlsizYX=0.08, vmin=None, vmax=None, colorbar=False):
     if isinstance(tif, str):
         h = imgio.Reader(tif)
         a = h.get3DArr(w=1)[...,::-1,:]
@@ -1839,9 +1844,15 @@ def plotCompWarp(tif, axis=0, minus=False, pxlsizYX=0.08, vmin=-50, vmax=50, col
     if minus:
         a *= -1
     a *= pxlsizYX * 1000
-    print('max', N.max(a))
-    print('min', N.min(a))
+    ma = N.max(a)
+    mi = N.min(a)
+    print('max', ma)
+    print('min', mi)
     print('mean', N.mean(N.abs(a)))
+    if not vmin:
+        vmin = mi
+    if not vmax:
+        vmax = ma
 
     fig = P.figure(1)
     P.hold(0)

@@ -389,6 +389,15 @@ class BatchPanel(wx.Panel):
             self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
             C.saveConfig(max_shift=self.extra_parms['max_shift'])
 
+            if dlg.usecalib_cb.GetValue() and dlg.calibfn:
+                self.extra_parms['calibfn'] = dlg.calibfn
+                C.saveConfig(calibfn=self.extra_parms['calibfn'])
+            if dlg.usecalib_cb.GetValue():
+                val = 'True'
+            else:
+                val = ''
+            C.saveConfig(use_calib=val)
+
         dlg.Destroy()
         
     def checkGo(self, evt=None):
@@ -505,26 +514,17 @@ class BatchPanel(wx.Panel):
             
             # parameters
             parms = [self.cutoutCb.GetValue(),
-                     self.extra_parms.get('outdir'),#initguess,
+                     self.extra_parms.get('outdir'),
                      self.localListChoice.GetStringSelection(),
-                     self.extra_parms.get('refwave'), #None, #self.maxShift.GetValue(),
-                     int(accur),#self.extra_parms.get('zacuur', confdic.get('accur', aligner.ACCUR_CHOICE[0]))), #self.accurListChoice.GetStringSelection(),
+                     self.extra_parms.get('refwave'),
+                     int(accur),
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
-                     self.extra_parms.get('tseries4wave', 'time'),#[nt for nt in self.listRef.nts], # copy
+                     self.extra_parms.get('tseries4wave', 'time'),
                      form,
                      int(self.min_pxls_choice.GetStringSelection()),
-                         self.extra_parms.get('max_shift', af.MAX_SHIFT)] 
-
-            #print(parms[4], confdic.get('accur', aligner.ACCUR_CHOICE[0]), type(parms[4]))
-            # check the user-inputs
-            old="""
-            try:
-                parms[3] = float(parms[3])
-            except ValueError:
-                G.openMsg(parent=self, msg='The default value (%.2f um) will be used' % af.MAX_SHIFT, title="The value for max shift allowed is missing")
-                parms[3] = af.MAX_SHIFT
-                self.maxShift.SetValue(str(parms[3]))"""
+                         self.extra_parms.get('max_shift', af.MAX_SHIFT),
+                         self.extra_parms.get('calibfn', '')] 
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
@@ -533,8 +533,7 @@ class BatchPanel(wx.Panel):
 
             # save current settings
             C.saveConfig(cutout=parms[0], local=parms[2], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
-            #C.saveConfig(cutout=parms[0], local=parms[2], maxShift=parms[3], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
-
+            
             # run program
             gui = threads.GUImanager(self, __name__)
             
@@ -620,6 +619,15 @@ def command_line():
                      help='suffix for the target files (default=%s)' % aligner.IMG_SUFFIX)
         p.add_argument('--img_format', '-E', default=aligner.WRITABLE_FORMATS[0], choices=aligner.WRITABLE_FORMATS,
                      help='file extension for the target files, choose from %s (default=%s)' % (aligner.WRITABLE_FORMATS, aligner.WRITABLE_FORMATS[0]))
+
+        # extra parameters
+        p.add_argument('--output_directory', '-O', default=None,
+                     help='output directory different from the directory of the input files (same as the input)')
+        p.add_argument('--reference_wavelength', '-r', default=None,
+                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+        p.add_argument('--microscope_calib', '-M', default='',
+                     help='local calibration file of your microscope (default=None)')
+        
         options = p.parse_args(sys.argv[1:])
 
         refs = []
@@ -639,17 +647,22 @@ def command_line():
             refs = af.averageImage(refs, ext=options.img_format)
             print('averaged image was saved as %s' % refs)
 
+        if options.reference_wavelength:
+            options.reference_wavelength = eval(options.reference_wavelength)
+                
+
         parms = [not options.not_crop_mergins,
-                None,#options.outdir
+                options.output_directory,#None,#options.outdir
                 options.local,
-                None, #options.refwave
+                options.reference_wavelength, #None, #options.refwave
                 None,#options.zaccur,
                 options.parm_suffix,
                 options.img_suffix,
                 nts,
                 options.img_format,
                 int(options.localMinWindow),
-                options.maxShift]
+                options.maxShift,
+                options.microscope_calib]
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()

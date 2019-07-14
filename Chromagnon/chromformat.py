@@ -6,9 +6,11 @@ from scipy import ndimage as nd
 try:
     from Chromagnon.PriCommon import imgGeo
     from Chromagnon import imgio
+    from Chromagnon.Priithon.all import F
 except ImportError:
     from PriCommon import imgGeo
     import imgio
+    from Priithon.all import F
 
 
 IDTYPE = '101'
@@ -168,11 +170,12 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
 
 
 class ChromagnonReader(object):
-    def __init__(self, fn, rdr=None, holder=None):
+    def __init__(self, fn, rdr=None, holder=None, setmap2holder=True):
         
         self.rdr = rdr
         self.holder = holder
-
+        self.setmap2holder = setmap2holder
+        
         self.dratio = N.ones((3,), N.float32)
 
         if not is_binary(fn):
@@ -248,6 +251,7 @@ class ChromagnonReader(object):
             self.refwave = int(round(self.reader.wave[refwave]))
             self.refwave_idx = refwave#"""
 
+
     def eval(self, val):
         try:
             return eval(val)
@@ -274,7 +278,7 @@ class ChromagnonReader(object):
         self.pwaves = [int(round(w)) for w in self.wave[:self.nw]]
         self.twaves = [int(round(w)) for w in self.rdr.wave[:self.rdr.nw]]
         self.tids = [self.twaves.index(wave) for wave in self.pwaves if wave in self.twaves]
-        self.pids = [self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
+        self.pids = list(range(self.nw))#[self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
 
         somewaves = [w for w, wave in enumerate(self.pwaves) if wave in self.twaves]
 
@@ -303,7 +307,7 @@ class ChromagnonReader(object):
 
 
         # obtain mapping array
-        if not self.text:
+        if not self.text and self.setmap2holder:
             self.holder.mapyx = self.readMapAll()
 
     def readParmWave(self):
@@ -321,33 +325,32 @@ class ChromagnonReader(object):
             self.alignParms = target
             
     def finalDim(self):
-        nzyx = N.array((self.nz, self.reader.ny, self.reader.nx), N.int)#float32)
-        #nzyx[-2:] *= self.dratio[-2:]
-        return nzyx#N.round_(nzyx).astype(N.int)
+        if self.rdr is not None and hasattr(self.rdr, 'ny'):
+            nzyx = N.array((self.nz, self.rdr.ny, self.rdr.nx), N.int)
+        else:
+            nzyx = N.array((self.nz, self.reader.ny, self.reader.nx), N.int)
+        return nzyx
             
     def readMap3D(self, t=0, w=0):
         nzyx = self.finalDim()
         #print 't,w,nzyx,', t, w, nzyx, self.dratio, self.dratio.dtype
         arr = N.zeros((nzyx[0], 2, nzyx[1], nzyx[2]), self.reader.dtype)
 
-        old="""
-        for z in xrange(self.nz):
-            warr = self.reader.get3DArr(t=t, w=w)
-            warr = warr.reshape((self.nz, 2, self.reader.ny, self.reader.nx))
-            for s in xrange(2):
-                zc = z * 2 + s
-                if self.rdr and any(self.dratio[1:] != 1):
-                    arr[z,s] = nd.zoom(warr[z,s], self.dratio[-2:]) * self.dratio[1+s]#(s%2)]
-                else:
-                    arr[z,s] = warr[:,s]"""
         warr = self.reader.get3DArr(t=t, w=w)
         warr = warr.reshape((self.nz, 2, self.reader.ny, self.reader.nx))
+
+        
         for s in range(2):
             if self.rdr and any(self.dratio[1:] != 1):
                 for z in range(self.nz):
-                    arr[z,s] = warr[z,s] / self.dratio[1+s]#nd.zoom(warr[z,s], self.dratio[-2:]) * self.dratio[1+s]#(s%2)]
+                    #arr[z,s] = warr[z,s] / self.dratio[1+s]
+                    xarr = warr[z,s] / self.dratio[1+s]
+                    F.copyPadded(xarr, arr[z,s])
             else:
-                arr[:,s] = warr[:,s]
+                #arr[:,s] = warr[:,s]
+                xarr = warr[:,s]
+                F.copyPadded(xarr, arr[:,s])
+                
         
         return arr
 
@@ -476,139 +479,6 @@ def summarizeAlignmentData(fns, outfn='', refwave=0, calc_rotmag=True, npxls=(64
                     #else:
                     #    wtr.writerow([r.file, t, wave] + [0,0,0,0,0,0,0])
     return outfn
-
-moved2alignfunc20180806='''
-def makeNonliearImg(holder, out, gridStep=10):
-    """
-    save the result of non-linear transformation into the filename "out"
-    gridStep: spacing of grid (number of pixels)
-
-    return out
-    """
-    ext = ('.ome.tif', '.ome.tiff')
-    if not out.endswith(ext):
-        out = out + ext[0]
-
-    if holder.mapyx.ndim == 6:
-        arr = N.zeros(holder.mapyx.shape[:3]+holder.mapyx.shape[-2:], N.float32)
-    else:
-        arr = N.zeros(holder.mapyx.shape[:2]+holder.mapyx.shape[-2:], N.float32)
-        
-    for t in range(holder.nt):
-        if hasattr(holder, 'img'):
-            a = holder.img.get3DArr(w=holder.refwave, t=t)
-            if holder.mapyx.ndim == 5:
-                a = N.max(a, 0)
-            arr[t,holder.refwave] = a
-            me = a.max()
-        else:
-            me = 1.
-        if holder.mapyx.ndim == 6:
-            arr[t,:,:,::gridStep,:] = me
-            arr[t,:,:,:,::gridStep] = me
-        else:
-            arr[t,:,::gridStep,:] = me
-            arr[t,:,:,::gridStep] = me
-        
-    affine = N.zeros((7,), N.float64)
-    affine[-3:] = 1
-
-    writer = imgio.Writer(out)#bioformatsIO.BioformatsWriter(out)
-
-    if hasattr(holder, 'img'):
-        writer.setFromReader(holder.img)
-    elif hasattr(holder, 'creader'):
-        writer.setFromReader(holder.creader)
-    if holder.mapyx.ndim == 5:
-        writer.nz = 1
-    writer.dtype = N.float32
-
-    for t in range(holder.nt):
-        for w in range(holder.nw):
-            a = arr[t,w]
-            if a.ndim == 2:
-                a = a.reshape((1,a.shape[0], a.shape[1]))
-            a = af.remapWithAffine(a, holder.mapyx[t,w], affine)
-
-            writer.write3DArr(a, t=t, w=w)
-    del arr
-
-    return out
-
-def makeNonliearImg_tmp(holder, out, gridStep=10):
-    """
-    save the result of non-linear transformation into the filename "out"
-    gridStep: spacing of grid (number of pixels)
-
-    return out
-    """
-    ext = ('.ome.tif', '.ome.tiff')
-    if not out.endswith(ext):
-        out = out + ext[0]
-
-    if holder.mapyx.ndim == 6:
-        nz = holder.mapyx.shape[2]
-        arr = N.zeros(holder.mapyx.shape[:3]+holder.mapyx.shape[-2:], N.float32)
-    else:
-        nz = 1
-        arr = N.zeros(holder.mapyx.shape[:2]+holder.mapyx.shape[-2:], N.float32)
-
-    yr = range(gridStep, holder.mapyx.shape[-2]-gridStep, gridStep)
-    xr = range(gridStep, holder.mapyx.shape[-1]-gridStep, gridStep)
-        
-    for t in range(holder.nt):
-        if hasattr(holder, 'img'):
-            a = holder.img.get3DArr(w=holder.refwave, t=t)
-            if holder.mapyx.ndim == 5:
-                a = N.max(a, 0)
-            arr[t,holder.refwave] = a
-            me = a.max()
-        else:
-            me = 1.
-
-        for w in range(holder.nw):
-            if w == holder.refwave:
-                continue
-
-            for z in range(nz):
-                for y in yr:
-                    for x in xr:
-                        pos0 = N.array((y,x))
-                        pos1 = self.mapyx[:,y,x]
-                        
-            
-        if holder.mapyx.ndim == 6:
-            arr[t,:,:,::gridStep,:] = me
-            arr[t,:,:,:,::gridStep] = me
-        else:
-            arr[t,:,::gridStep,:] = me
-            arr[t,:,:,::gridStep] = me
-        
-    affine = N.zeros((7,), N.float64)
-    affine[-3:] = 1
-
-    writer = imgio.Writer(out)#bioformatsIO.BioformatsWriter(out)
-
-    if hasattr(holder, 'img'):
-        writer.setFromReader(holder.img)
-    elif hasattr(holder, 'creader'):
-        writer.setFromReader(holder.creader)
-    if holder.mapyx.ndim == 5:
-        writer.nz = 1
-    writer.dtype = N.float32
-
-    for t in range(holder.nt):
-        for w in range(holder.nw):
-            a = arr[t,w]
-            if a.ndim == 2:
-                a = a.reshape((1,a.shape[0], a.shape[1]))
-            a = af.remapWithAffine(a, holder.mapyx[t,w], affine)
-
-            writer.write3DArr(a, t=t, w=w)
-    del arr
-
-    return out
-'''
 
 class dummyHolder(object):
     def __init__(self):

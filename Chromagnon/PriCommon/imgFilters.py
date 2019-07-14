@@ -573,8 +573,9 @@ def _smoothBorder(arr, start, stop, smooth, value):
                 slc = copy.copy(sliceTemplate)
                 slc[d] = slice(i,i+1,None)
                 edgeArr = edges[s].reshape(arr[tuple(slc)].shape) # future warning 20190604
-                #arr[slc] += edgeArr * (smooth - f) 
-                arr[slc] = arr[tuple(slc)] + edgeArr * (smooth -1 - f) # casting rule # future warning 20190604
+                #arr[slc] += edgeArr * (smooth - f)
+                slc = tuple(slc)
+                arr[slc] = arr[slc] + edgeArr * (smooth -1 - f) # casting rule # future warning 20190604
 
     arr = N.ascontiguousarray(arr)
     return arr

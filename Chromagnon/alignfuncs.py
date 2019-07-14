@@ -396,6 +396,11 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
                 if echofunc:
                     echofunc(msg)
                 switch = True
+
+            if max_shift_pxl is not None:
+                if abs(N.linalg.norm(ret[:2])) > abs(N.linalg.norm(max_shift_pxl)):
+                    switch = True
+                        
                 #print msg
             if switch:
                 if if_failed == 'terminate':
@@ -412,8 +417,12 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
         elif goodImg < 0:
             ll = logpolar(b, c, center-startYX+offset, phaseContrast)
+            if max_shift_pxl is not None:
+                if abs(N.linalg.norm(errPxl(ll, N.array((512,512),N.float32)))) > abs(N.linalg.norm(max_shift_pxl)):
+                    return ret, False
             ret[:3] += ll[:3]
             ret[3:] *= ll[3:]
+                     
             
         elif goodImg == 0:
             #print('doing simplex')
@@ -516,7 +525,10 @@ def logpolar(a2d, ref, center=None, phaseContrast=True):
     if center is None:
         center = (shape[0] / 2., shape[1] / 2.)
 
-    yx, c = list(xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast))
+    try:
+        yx, c = list(xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast))
+    except ValueError:
+        raise ValueError('Phase correlation of logpolar image failed, please check your image')
     #zyx = N.array([0] + yx)
     
    # arr = imgResample.trans3D_affine(a2d, zyx)
@@ -647,6 +659,16 @@ def findBestRefZs(ref, sigma=0.5):
     elif nz <= 3:
         return list(range(nz))
 
+    # to reduce caluclation time...
+    ny,nx = ref.shape[-2:]
+    if nx > 512:
+        #print('in find best z: reducing size X')
+        ref = ref[...,::nx//512]
+    if ny > 512:
+        #print('in find best z: reducing size Y')
+        ref = ref[...,::ny//512,:]
+    #print('in find best z: current shape is', ref.shape)
+    
     # ring array
     ring = F.ringArr(ref.shape[-2:], radius1=ref.shape[-1]//10, radius2=ref.shape[-2]//4, orig=(0,0), wrap=1)
     
@@ -1170,91 +1192,6 @@ def resizeLocal3D(arr, targetShape):
             canvas[zt] = resizeLocal2D(arr[z], targetShape[1:])
         return canvas
 
-def padYX_old(yx, npxl, shape, maxcutY=0, maxcutX=0):
-    """
-    This is the best in terms of accuracy.
-    But this is too slow to implement.
-    """
-    npxl //= 2
-    #npxl /= 2.
-    
-    #pshape = (2,) + tuple([int(s) for s in N.array(yx.shape[-2:]) + 3*2])
-
-    #yxp = F.getPadded(yx, pshape)
-
-    #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl))#, order=1, prefilter=False)
-    #yx = ndimage.zoom(yx, zoom=(1,npxl,npxl), order=1, prefilter=False) # bilinear is better
-    #yx = ndimage.zoom(yx, zoom=(1,npxl-2,npxl), order=1, prefilter=False)
-
-    #yxp = N.array([imgFilters.zoomFourier(aa, (npxl,npxl), padd=100) for aa in yx])
-    #yxp = imgFilters.zoomFourier(yx, (1,npxl,npxl), padd=N.array((1,100,100)))
-    yx = N.array([imgFilters.zoomFourier(yx0, (npxl,npxl), padd=100) for yx0 in yx])
-    #yx = yxp[:,3:-3,3:-3]
-    shift="""
-    yx = U.nd.shift(yx, (0,npxl/2,npxl/2))
-    for z in xrange(npxl//2):
-        yx[:,z] += yx[:,npxl//2+1]
-        yx[:,:,z] += yx[:,:,npxl//2+1]"""
-    
-    # sometimes zoom has empty space at the edge
-    spline="""
-    if N.all(yx[:,:,-1]) == 0:
-        yx[:,:,-1] = yx[:,:,-2]
-    if N.all(yx[:,-1]) == 0:
-        yx[:,-1] = yx[:,-2]"""
-
-    #yx_ori = N.copy(yx)
-    #yx = N.array([cv2.resize(yx0, dsize=None, fx=npxl, fy=npxl, interpolation=cv2.INTER_CUBIC) for yx0 in yx])
-    #print('in padYX, yx0.shape, resulting.shape, npxl, shape', yx_ori.shape, yx.shape, npxl, shape)
-    
-    mimas = chopShapeND(shape, npxls=(npxl,npxl), shiftOrigin=(1,1))#True)#False)
-    #start = [mimas[0][0].start, mimas[1][0].start]
-    #stop = [mimas[0][-1].stop, mimas[1][-1].stop]
-    start = [mimas[0][0].start+npxl//2, mimas[1][0].start+npxl//2]
-    stop = [mimas[0][-1].stop+npxl//2, mimas[1][-1].stop+npxl//2]
-    
-    #-- fill the mergin
-    shape = N.array(shape)
-    ndiv = shape // npxl
-    #start = [int(i) for i in (shape - (npxl * ndiv)) // 2]
-    #stop = [int(i) for i in start + (npxl * ndiv)] # VisibleDeprecationWarning
-    shape = [int(i) for i in shape]
-    start2 = N.array(start) + N.array((int(maxcutY), int(maxcutX)))
-    start2 = [int(s) for s in start2]
-    print('in padYX, start, start2, maxcutY, maxcutX', start, start2, maxcutY, maxcutX)
-
-
-    #print start, stop
-    zeros = N.zeros((2,)+tuple(shape), N.float32)
-    zeros[:,start2[0]:start2[0]+yx.shape[1],start2[1]:start2[1]+yx.shape[2]] += yx
-
-    for d in range(2):
-        # left
-        for x in range(int(start2[1])):
-            zeros[d,:start2[0],x] += yx[d,0,0]
-            zeros[d,start2[0]:start2[0]+yx.shape[1],x] += yx[d,:,0]
-            zeros[d,start2[0]+yx.shape[1]:,x] += yx[d,-1,0]
-        # right
-        for x in range(int(start2[1]+yx.shape[2]),int(zeros.shape[-1])):
-            zeros[d,:start2[0],x] += yx[d,0,-1]
-            zeros[d,start2[0]:start2[0]+yx.shape[1],x] += yx[d,:,-1]
-            zeros[d,start2[0]+yx.shape[1]:,x] += yx[d,-1,-1]
-        # bottom
-        for y in range(int(start2[0])):
-            zeros[d,y,:start2[1]] += yx[d,0,0]
-            zeros[d,y,:start2[1]] /= 2.
-            zeros[d,y,start2[1]:start2[1]+yx.shape[2]] += yx[d,0,:]
-            zeros[d,y,start2[1]+yx.shape[2]:] += yx[d,0,-1]
-            zeros[d,y,start2[1]+yx.shape[2]:] /= 2.
-        # top
-        for y in range(int(start2[0]+yx.shape[1]),int(zeros.shape[-2])):
-            zeros[d,y,:start2[1]] += yx[d,-1,0]
-            zeros[d,y,:start2[1]] /= 2.
-            zeros[d,y,start2[1]:start2[1]+yx.shape[2]] += yx[d,-1,:]
-            zeros[d,y,start2[1]+yx.shape[2]:] += yx[d,-1,-1]
-            zeros[d,y,start2[1]+yx.shape[2]:] /= 2.
-
-    return zeros
 
 def padYX_cv(yx, npxl, shape, maxcutY=0, maxcutX=0):
     """
@@ -1496,6 +1433,9 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
         maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
         maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
         shape = N.subtract(shape, (maxcutY*2, maxcutX*2))
+
+    if N.any(shape < 0):
+        raise ValueError('local alignment failed, please use reference image with more features over the field')
 
     wins = makeWin(shape, minwin)
     #print(wins)

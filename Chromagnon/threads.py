@@ -125,6 +125,7 @@ class ThreadWithExc(threading.Thread):
         self.img_ext = parms[8]
         min_pxls_yx = parms[9]
         max_shift = parms[10]
+        microscopemap = parms[11]
         
         saveAlignParam = True
         alignChannels = True
@@ -169,6 +170,8 @@ class ThreadWithExc(threading.Thread):
                     
                     if (an.nw > 1 and (an.nt == 1 or nts=='channel')):
                         an.findBestChannel()
+                        an.setMicroscopeMap(microscopemap)
+
                         self.echo('Calculating channel alignment...')
                         
                         for t in range(an.nt):
@@ -217,6 +220,8 @@ class ThreadWithExc(threading.Thread):
 
                     an = self.getAligner(target, index, what='target')
                     an.setDefaultOutPutDir(outdir)
+                    an.setMicroscopeMap(microscopemap)
+
                     
                     pgen = self.progressValues(target=True, an=an)
                     an.setProgressfunc(pgen)
@@ -256,6 +261,7 @@ class ThreadWithExc(threading.Thread):
                 
                 an = self.getAligner(target, index, what='target')
                 an.setDefaultOutPutDir(outdir)
+                an.setMicroscopeMap(microscopemap)
                 pgen = self.progressValues(target=True, an=an)
                 an.setProgressfunc(pgen)
                 self.progress(0)

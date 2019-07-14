@@ -95,6 +95,7 @@ class Chromagnon(object):
         self.setParmSuffix()
         self.setIf_failed()
         self.setDefaultOutPutDir()
+        self.setMicroscopeMap()
         
         self.alignParms = N.zeros((self.img.nt, self.img.nw, NUM_ENTRY), N.float32)
         self.alignParms[:,:,4:] = 1
@@ -302,6 +303,13 @@ class Chromagnon(object):
         if outdir and not os.path.isdir(outdir):
             os.path.makedirs(outdir)
         self.outdir = outdir
+
+    def setMicroscopeMap(self, fn=None):
+        if fn:
+            rdr = chromformat.ChromagnonReader(fn, self.img, self, setmap2holder=False)
+            self.microscopemap = rdr.readMapAll()
+        else:
+            self.microscopemap = None
         
     def getSaturation(self, w=0, t=0, only_neighbor=True):
         """
@@ -568,8 +576,11 @@ class Chromagnon(object):
                 self.echo('3D phase correlation for time %i channel %i iter %i' % (t, w, i))
                 img = self.get3DArrayAligned(w=w, t=t)
                 img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
-                
-                zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+
+                try:
+                    zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
+                except ValueError:
+                    raise ValueError('Not enough correlation was found, please check your reference image.')
                 if len(zyx) == 2:
                     zyx = N.array([0] + list(zyx))
                 self.alignParms[t,w,:3] += zyx
@@ -595,7 +606,12 @@ class Chromagnon(object):
 
         # preparing the initial mapyx
         # mapyx is not inherited to avoid too much distortion
-        self.mapyx = N.zeros((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
+
+        # from v0.81 mapyx is inherited from instumental
+        if self.microscopemap is not None:
+            self.mapyx = self.microscopemap#.readMapAll()
+        else:
+            self.mapyx = N.zeros((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
 
         if N.all((N.array(self.mapyx.shape[-2:]) - self.img.shape[-2:]) >= 0):
             slcs = imgGeo.centerSlice(self.mapyx.shape[-2:], win=self.img.shape[-2:], center=None)
@@ -927,12 +943,15 @@ class Chromagnon(object):
 
         return interpolated array
         """
-        if self.mapyx is None:
+        if (self.mapyx is None and self.microscopemap is None):
             raise RuntimeError('This method must be called after calling "findNonLinear2D"')
         
         arr = self.img.get3DArr(w=w, t=t)
-            
-        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
+
+        if self.mapyx is not None:
+            arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
+        else:
+            arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
         arr = arr[self.cropSlice]
         
         return arr
@@ -1084,7 +1103,7 @@ class Chromagnon(object):
                     self.echo('Copying reference image, t: %i, w: %i' % (t, w))
                     arr = self.img.get3DArr(w=w, t=t)
                     arr = arr[self.cropSlice]
-                elif self.mapyx is None:
+                elif (self.mapyx is None and self.microscopemap is None):
                     self.echo('Applying affine transformation to the target image, t: %i, w: %i' % (t, w))
                     arr = self.get3DArrayAligned(w=w, t=t)
                 else:
