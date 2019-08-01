@@ -580,6 +580,23 @@ def _smoothBorder(arr, start, stop, smooth, value):
     arr = N.ascontiguousarray(arr)
     return arr
 
+def triangleApo2d(arr, apo=10):
+    """
+    arr can be 3D
+    triangle apo to 0
+
+    return apodized array
+    """
+    sqr = N.zeros(arr.shape[-2:], dtype=N.float32)
+    for i in range(apo):
+        j = i + 1
+        sqr[j:-j,j:-j] += 1/apo
+    sqr3d = N.empty(arr.shape, dtype=N.float32)
+    sqr3d[:] = sqr
+    
+    return arr * sqr3d
+    
+
 def paddingFourier(arr, shape, value=0, interpolate=True):
     """
     arr:         assuming origin at 0, rfft product (half x size), up to 3D
@@ -704,10 +721,67 @@ def zoomFourier(arr, factor, use_abs=False, padd=None):
     else:
         return N.real(afp) * N.product(factor)
 
+def _makeFourierSlices(oshape, tshape, dim):
+    tslices = []
+    oslices = []
+    ds = tshape - oshape
+    if ds > 0:
+        if dim == -1:
+            tslice = slice(0, oshape)
+            oslice = slice(None, None)
+        else:
+            tslice = slice(0, oshape//2)
+            oslice = tslice
+    else:
+        if dim == -1:
+            oslice = slice(0, tshape)
+            tslice = slice(None, None)
+        else:
+            oslice = slice(0, tshape//2)
+            tslice = oslice
+    tslices.append(tslice)
+    oslices.append(oslice)
+    if dim != -1:
+        if ds > 0:
+            tslice = oslice = slice(-oshape//2, None)
+        else:
+            oslice = tslice = slice(-tshape//2, None)
+        tslices.append(tslice)
+        oslices.append(oslice)
+    return tslices, oslices
+
+    
 def paddingFourier(af, shape, value=0):
-    afo = N.fft.fftshift(af)
-    afp = F.getPadded(afo, shape, pad=value)
-    return N.fft.ifftshift(afp)
+    """
+    3D version broken...., use fft not rfft
+    """
+    
+    if (af.ndim > 1 and ((af.shape[-1]-1)*2) == af.shape[-2]) or (af.ndim==1 and af.shape[0] % 2):
+        afp = N.empty(shape, dtype=af.dtype)
+        afp[:] = value
+        dss = N.subtract(shape, af.shape) // 2
+
+        dimslices = []
+        for d, ds in enumerate(dss):
+            dim = -1 - d
+            slices = _makeFourierSlices(af.shape[dim], shape[dim], dim)
+            dimslices.append(slices)
+        dimslices = dimslices[::-1] # zyx
+
+        tss = [slc[0] for slc in dimslices]
+        oss = [slc[1] for slc in dimslices]
+        if af.ndim == 2:
+            for y, ts in enumerate(tss[0]):
+                afp[ts, tss[-1][0]] = af[oss[0][y], oss[-1][0]]
+        elif af.ndim == 3:
+            for z, tsz in enumerate(tss[0]):
+                for y, tsy in enumerate(tss[1]):
+                    afp[tsz, tsy, tss[-1][0]] = af[oss[0][z], oss[1][y], oss[-1][0]]
+        return afp
+    else:
+        afo = N.fft.fftshift(af)
+        afp = F.getPadded(afo, shape, pad=value)
+        return N.fft.ifftshift(afp)
 
 
 
@@ -1111,3 +1185,13 @@ def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_wid
     else:
         return polar_img
 
+
+#### ----- Fourier funcs
+def fourier_amp_plus_phase(ampArr, phaseArr):
+    """
+    return an array (complex) with speficied amplitude and phase (both float).
+    """
+    canvas = N.zeros(ampArr.shape, dtype=N.complex64)
+    canvas.real = ampArr * N.cos(phaseArr)
+    canvas.imag = ampArr * N.sin(phaseArr)
+    return canvas

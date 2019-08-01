@@ -16,8 +16,11 @@ READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
 
 IMAGEJ_METADATA_TYPES = ['Info', 'Labels', 'Ranges', 'LUTs', 'Plot', 'ROI', 'Overlays']
 
+PXUNIT_FACTORS = {'m': 0, 'mm': -3, u'\xb5'+'m': -6, 'nm': -9, 'micron': -6}
+
+
 def _convertUnit(val, fromwhat='mm', towhat=u'\xb5'+'m'):
-    factors = {'m': 0, 'mm': -3, u'\xb5'+'m': -6, 'nm': -9, 'micron': -6}
+    factors = PXUNIT_FACTORS
     factor = factors[fromwhat] - factors[towhat] or 0
     return float(val) * 10 ** factor
 
@@ -159,7 +162,8 @@ class MultiTiffReader(generalIO.GeneralReader):
             px = meta['Image']['Pixels']
             pxlsiz = [0.1, 0.1, 0.1]
             for d, dim in enumerate(('Z', 'Y', 'X')):
-                pxlsiz[d] = _convertUnit(px['PhysicalSize%s' % dim], px['PhysicalSize%sUnit' % dim])
+                if px['PhysicalSize%sUnit' % dim] in PXUNIT_FACTORS: # unit can be "pixel"
+                    pxlsiz[d] = _convertUnit(px['PhysicalSize%s' % dim], px['PhysicalSize%sUnit' % dim])
             self.setPixelSize(*pxlsiz)
 
             if meta.get('StructuredAnnotations'):

@@ -93,6 +93,11 @@ class ThreadWithExc(threading.Thread):
         Since it uses GUI, this function uses several events to control GUI
         They are called by wx.PostEvent()
         """
+        # memory
+        #import tracemalloc
+        #tracemalloc.start()
+        
+        
         OLD_SCIK = fftmanager.SCIK
         OLD_REIK = fftmanager.REIK
         fftmanager.SCIK = False
@@ -152,7 +157,7 @@ class ThreadWithExc(threading.Thread):
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
-                    an = aligner.Chromagnon(fn)
+                    #an = aligner.Chromagnon(fn)
                     an = self.getAligner(fn, index, what='ref')
                     an.setMaxShift(max_shift)
                     if accur:
@@ -204,6 +209,8 @@ class ThreadWithExc(threading.Thread):
                     #print('Done seconds', (clk1-clk0))
 
                     an.close()
+                    del an
+                    #imgFit.INDS_DIC = {}
                 
                 doneref.append(index)
 
@@ -318,6 +325,14 @@ class ThreadWithExc(threading.Thread):
         fftmanager.SCIK = OLD_SCIK
         fftmanager.REIK = OLD_REIK
 
+        ## memory
+        #snapshot = tracemalloc.take_snapshot()
+        #top_stats = snapshot.statistics('lineno')
+
+        #print("[ Top 10 ]")
+        #for stat in top_stats[:10]:
+        #    print(stat)
+
     def getAligner(self, fn, index, what='ref'):
         """
         what: 'ref' or 'tgt'
@@ -344,7 +359,9 @@ class ThreadWithExc(threading.Thread):
         print(msg)
 
     def log(self, msg, prefix=''):
-        self.logh.write('%s%s\n' % (prefix, msg))
+        if hasattr(self, 'logh'):
+            self.logh.write('%s%s\n' % (prefix, msg))
+            
 
     def progressValues(self, target=False, an=None, alignChannels=None, alignTimeFrames=None, local=None):
         import numpy as N

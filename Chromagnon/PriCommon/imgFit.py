@@ -448,7 +448,7 @@ def yGaussian2DR(param, shape, LD, rot=0):
 
 INDS_DIC = {}
 
-def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
+def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2, store_shape=False):
     """
     slicelist: even shape works much better than odd shape
     rot:       counter-clockwise, xy-plane
@@ -516,7 +516,8 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2):
                 U.trans2d(ind, inds[d], (-dm[1], -dm[0], 0, 1, 0, 1))
         else:
             inds = irs
-        INDS_DIC[shapeTuple] = inds
+        if store_shape:
+            INDS_DIC[shapeTuple] = inds
 
     r_inds = N.empty_like(inds)
     for d, ld in enumerate(LD):

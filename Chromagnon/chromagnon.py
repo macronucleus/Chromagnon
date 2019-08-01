@@ -624,7 +624,7 @@ def command_line():
         p.add_argument('--output_directory', '-O', default=None,
                      help='output directory different from the directory of the input files (same as the input)')
         p.add_argument('--reference_wavelength', '-r', default=None,
-                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+                     help='maximum um possibily misaligned in your system (default=auto)')
         p.add_argument('--microscope_calib', '-M', default='',
                      help='local calibration file of your microscope (default=None)')
         

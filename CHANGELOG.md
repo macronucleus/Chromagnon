@@ -34,7 +34,12 @@ criteria (`alignfuncs.iteration`)
 17. (v0.81, 20190705) Find best z was made faster for large images
 (`alignfuncs.findBestRefZs`).
 18. (v0.81, 20190714) Wavelength difference for the reference and
-    target images fixed (`chromformat.py`).
+target images fixed (`chromformat.py`).
+19. (v0.82, 20190719) Unrecognized pixel size units are accepted by
+`multitifIO.py`
+20. (v0.82, 20190725) Broken Flatfileder was fixed (`flatfielder.py`).
+21. (v0.82, 20190801) Storing index arrays in imgFit.INDS_DIC was
+    changed as an option to save memory (`PriCommon.imgFit.py`).
 
 v0.7(Feb. 2019)
 ----

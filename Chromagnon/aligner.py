@@ -581,6 +581,7 @@ class Chromagnon(object):
                     zyx, c = xcorr.Xcorr(ref, img, phaseContrast=self.phaseContrast, searchRad=searchRad)
                 except ValueError:
                     raise ValueError('Not enough correlation was found, please check your reference image.')
+                del c, img
                 if len(zyx) == 2:
                     zyx = N.array([0] + list(zyx))
                 self.alignParms[t,w,:3] += zyx
@@ -592,6 +593,7 @@ class Chromagnon(object):
                 self.progress()
             for j in range((self.niter_3D-1) - i):
                 self.progress()
+        del ref
         self.echo('Finding affine parameters done!')
 
     ##-- non linear ----
