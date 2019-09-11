@@ -447,12 +447,20 @@ class ImagePanel(wx.Panel):
                     alignParm = self.doc.alignParms[self.doc.t,i]
                     v.updateAlignParm(-1, alignParm)
 
-        if self.doc.nw > 1:
-            for i in range(self.doc.nw):
-                wave = self.doc.wave[i]
-                self.setColor(i, wave, False)
+            if self.doc.nw > 1:
+                for i in range(self.doc.nw):
+                    #wave = self.doc.wave[i]
+                    #self.setColor(i, wave, False)
+                    r,g,b = self.viewers[0].imgList[i][6:9]
+                    v.setColor(i, r,g,b, RefreshNow=False)
 
-        self.autoFitHistL()
+        for i in range(self.doc.nw):
+            l, r = self.viewers[0].imgList[i][4:6]
+            if l is None or r is None:
+                self.hist[i].autoFit()
+            else:
+                self.hist[i].setBraces(l, r)
+
         self._mgr.Update()
 
     def onSaveScr(self, evt=None):

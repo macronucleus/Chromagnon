@@ -96,7 +96,7 @@ class ThreadWithExc(threading.Thread):
         # memory
         #import tracemalloc
         #tracemalloc.start()
-        
+        clk0 = time.clock()
         
         OLD_SCIK = fftmanager.SCIK
         OLD_REIK = fftmanager.REIK
@@ -175,7 +175,7 @@ class ThreadWithExc(threading.Thread):
                     
                     if (an.nw > 1 and (an.nt == 1 or nts=='channel')):
                         an.findBestChannel()
-                        an.setMicroscopeMap(microscopemap)
+
 
                         self.echo('Calculating channel alignment...')
                         
@@ -186,9 +186,22 @@ class ThreadWithExc(threading.Thread):
                                 self.echo('Calculation failed, skipping')
                                 errs.append(index)
                                 continue
+
+                            an.setMicroscopeMap(microscopemap)
+                            #if microscopemap:
+                                #if local in self.localChoice[1:]:
+                                    #self.log('\nUsing microscope map %s as a starting point for local alignment' % microscopemap)
+                                    #self.echo('\nUsing microscope map %s as a starting point for local alignment' % microscopemap, skip_notify=True, doprint=True)
+                                #else:
+                                    #self.log('\nCombining microscope map %s to global alignment' % microscopemap)
+                                    #self.echo('\nCombining microscope map %s to global alignment' % microscopemap, skip_notify=True, doprint=True)
                             
                             if local in self.localChoice[1:]:
+                                if microscopemap:
+                                    self.echo('Using microscope map %s as a starting point for local alignment' % microscopemap, skip_notify=True, doprint=True)
                                 an.findNonLinear2D(t=t, npxls=min_pxls_yx)
+                            elif microscopemap:
+                                self.echo('Combining microscope map %s to global alignment' % microscopemap, skip_notify=True, doprint=True)
                                 
                             if local in self.localChoice[2:]:
                                 arr = an.findNonLinear3D(t=t, npxls=min_pxls_yx)
@@ -211,6 +224,9 @@ class ThreadWithExc(threading.Thread):
                     an.close()
                     del an
                     #imgFit.INDS_DIC = {}
+                    clk1 = time.clock()
+                    self.echo('time taken=%.2f sec' % (clk1-clk0))
+                    clk0 = clk1
                 
                 doneref.append(index)
 
@@ -227,7 +243,6 @@ class ThreadWithExc(threading.Thread):
 
                     an = self.getAligner(target, index, what='target')
                     an.setDefaultOutPutDir(outdir)
-                    an.setMicroscopeMap(microscopemap)
 
                     
                     pgen = self.progressValues(target=True, an=an)
@@ -235,6 +250,10 @@ class ThreadWithExc(threading.Thread):
                     self.progress(0)
 
                     an.loadParm(fn)
+                    if microscopemap and not chromformat.is_binary(fn):
+                        an.setMicroscopeMap(microscopemap)
+                        #self.log('\nUsing microscope map %s' % microscopemap)
+                        self.echo('Using microscope map %s' % microscopemap, skip_notify=True, doprint=True)
                     #if cutout:
                     an.setRegionCutOut(cutout)
 
@@ -242,6 +261,9 @@ class ThreadWithExc(threading.Thread):
                     donetgt.append(index)
 
                     an.close()
+                    clk1 = time.clock()
+                    self.echo('time taken=%.2f sec' % (clk1-clk0))
+                    clk0 = clk1
 
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['tgt', index, wx.BLUE]))
@@ -251,7 +273,6 @@ class ThreadWithExc(threading.Thread):
                         
                 elif self.notify_obj:
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [fn]))
-
 
             # remaining target files use the last alignment file
             for index, target in enumerate(targets[len(fns):]):
@@ -268,13 +289,17 @@ class ThreadWithExc(threading.Thread):
                 
                 an = self.getAligner(target, index, what='target')
                 an.setDefaultOutPutDir(outdir)
-                an.setMicroscopeMap(microscopemap)
+
                 pgen = self.progressValues(target=True, an=an)
                 an.setProgressfunc(pgen)
                 self.progress(0)
 
                 if len(fns):
                     an.loadParm(fn)
+                    if microscopemap and not chromformat.is_binary(fn):
+                        an.setMicroscopeMap(microscopemap)
+                        #self.log('\nUsing microscope map %s' % microscopemap)
+                        self.echo('Using microscope map %s' % microscopemap, skip_notify=True, doprint=True)
 
                 an.setRegionCutOut(cutout)
 
@@ -351,12 +376,13 @@ class ThreadWithExc(threading.Thread):
         return an
 
     
-    def echo(self, msg, skip_notify=False):
+    def echo(self, msg, skip_notify=False, doprint=True):
         if self.notify_obj and not skip_notify:
             wx.PostEvent(self.notify_obj, MyEvent(EVT_ECHO_ID, msg))
 
-        self.log(msg, prefix='    ')
-        print(msg)
+        if doprint:
+            self.log(msg, prefix='    ')
+            print(msg)
 
     def log(self, msg, prefix=''):
         if hasattr(self, 'logh'):

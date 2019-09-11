@@ -158,6 +158,7 @@ class ChromagnonPanel(wx.Panel):
         if w is None:
             wave = int(self.wavechoice.GetStringSelection())
             w = self.clist.wave.index(wave)
+            #print(wave, w)
             
 
         if originalFn is None:
@@ -204,8 +205,8 @@ class ChromagnonPanel(wx.Panel):
         wtr = imgio.Writer(out)
         wtr.setPixelSize(pz=pz, py=py, px=px)
         wtr.setDim(nx=a.shape[-1], ny=a.shape[-2], nz=1, nt=1, nw=2, dtype=a.dtype.type, wave=[self.clist.wave[self.clist.refwave], self.clist.wave[w]], imgSequence=1)
-        for w, a2d in enumerate(a):
-            wtr.writeArr(a2d, w=w)
+        for w0, a2d in enumerate(a):
+            wtr.writeArr(a2d, w=w0)
         wtr.close()
         
         an = aligner.Chromagnon(out)
@@ -431,7 +432,7 @@ class ChromagnonList(wx.ListCtrl,
 
     def getWaveIndex(self, index):
         wave = eval(self.GetItem(index, 0).GetText())
-        return self.waves.index(wave)
+        return list(self.waves).index(wave)
         
     def readFile(self):
         """
@@ -446,7 +447,7 @@ class ChromagnonList(wx.ListCtrl,
         if not hasattr(self, 'mapyx'):
             self.map_str = 'None'
         else:
-            maxval = [self.mapyx[:,w].max() for w in range(self.nw)]
+            maxval = [N.abs(self.mapyx[:,w]).max() for w in range(self.nw)]
             if self.nz == 1:
                 self.map_str = 'Projection (max shift '#%.3f pixel)' % maxval
                 addstrs = ['%i %.3f' % (self.wave[w], maxval[w]) for w in range(self.nw)]

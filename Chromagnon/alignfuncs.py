@@ -147,7 +147,7 @@ def getCQthre(npxls, cqothre=CQOTHRE, cqconst=CTHRE):
     
     return cqothre/npxls + cqconst
 
-def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIFT, debug=False):#None):#5):
+def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIFT, debug=False):
     """
     return [ty,tx,r,my,mx], offset, check
     """
@@ -168,34 +168,9 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIF
 
     cqthre = getCQthre(N.average(shape))
     # pre-treatments
-    # in some reason, putting phaseContrastFilter here, not inside xcorr, gave better accuracy.
-    npad = 4
-    a1234p = [xcorr.paddAndApo(a, npad) for a in a1234]
-    b1234p = [xcorr.paddAndApo(b, npad) for b in b1234]
-
-    if phaseContrast:
-        a1234p = [xcorr.phaseContrastFilter(N.ascontiguousarray(a)) for a in a1234p]
-        b1234p = [xcorr.phaseContrastFilter(N.ascontiguousarray(b)) for b in b1234p]
-
-    center_of_mass="""
-    # obtain cm  (very minor improvement...)
-    abp = [a + b1234p[i] for i, a in enumerate(a1234p)]
-    xcms = [U.nd.center_of_mass(N.max(ab, axis=0)) for ab in abp]
-    xcm1 = shape[1] - xcms[1] # left side should be flipped
-    xcm2 = shape[1] - xcms[2]
-    xcm = N.mean([xcms[0], xcm1, xcm2, xcms[3]])
-    
-    ycms = [U.nd.center_of_mass(N.max(ab, axis=1)) for ab in abp]
-    ycm2 = shape[0] - xcms[2] # bottom side should be flipped
-    ycm3 = shape[0] - xcms[3]
-    ycm = N.mean([ycms[0], ycms[1], ycm2, ycm3])
-    
-    cm2 = N.array((ycm, xcm)) * 2"""
-
-    # quadrisection cross correlation
-    ab = list(zip(a1234p, b1234p))
+    ab = list(zip(a1234, b1234))
     try:
-        yxcs = [xcorr.Xcorr(a, b, phaseContrast=False, searchRad=max_shift_pxl) for a, b in ab]
+        yxcs = [xcorr.Xcorr(a, b, phaseContrast=phaseContrast, searchRad=max_shift_pxl, nyquist=0.3) for a, b in ab]
     except IndexError:
         return N.array((0,0,0,1,1), N.float32), [0,0], [(i, 0) for i in range(4)]
     except (ValueError, ZeroDivisionError):
@@ -203,11 +178,9 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIF
     yxs = [yx for yx, c in yxcs]
     
     # quality check
-    cqvs = [c.max() - c[c.shape[0]//4].std() for yx, c in yxcs]
+    cqvs = [c.max() - c[:,:c.shape[1]//4].std() for yx, c in yxcs]
     
     checks = [(idx, cq) for idx, cq in enumerate(cqvs) if cq < cqthre]
-    #ab_vars = [(a.var(), b.var()) for a, b in ab]
-    #checks += [(idx, threshold) for idx, ab_var in enumerate(ab_vars) if ab_var[0] < threshold or ab_var[1] < threshold]
     
     if debug:
         return [yx for yx, c in yxcs], [c for yx, c in yxcs]
@@ -217,12 +190,12 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIF
     tyx = getTranslation(yxs)
 
     # magnification
-    myx = getMagnification(yxs, center)#cm2)
+    myx = getMagnification(yxs, center)
 
     # rotation
-    theta, offset = getRotation(yxs, center)#cm2)
+    theta, offset = getRotation(yxs, center)
 
-    return list(tyx) + [theta] + list(myx), offset, checks
+    return list(tyx) + [theta] + list(myx), offset, checks, cqthre
 
 def getTranslation(yxs):
     """
@@ -333,7 +306,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
     ret = N.zeros((5,), N.float32)
     ret[3:] = 1
-    if initguess is None or N.all(initguess[:2] == 0):
+    if initguess is None or N.any(initguess[:2] == 0):
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
     else:
@@ -372,7 +345,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         startYX = [maxcutY, maxcutX]
 
         if goodImg > 0:
-            ll, curroff, checks = estimate2D(b, c, center-startYX+offset, phaseContrast=phaseContrast, max_shift_pxl=max(max_shift_pxl/20, 5)) #20190516 max_shift was set at the small number because we already have initial guess. Now what is the best value for this?  #max_shift_pxl)#, cqthre=cqthre)
+            ll, curroff, checks, cqthre = estimate2D(b, c, center-startYX+offset, phaseContrast=phaseContrast, max_shift_pxl=max(max_shift_pxl/20, 5)) #20190516 max_shift was set at the small number because we already have initial guess. Now what is the best value for this?  #max_shift_pxl)#, cqthre=cqthre)
             #print('in iteration: max_shift_pxl', max_shift_pxl) # 253 -> 5 px was too small -> 10 was good.
             # 130 -> 5 was good but 10 was too big
 
@@ -392,7 +365,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             # instead of using low-correlation results, such images are sent to alternative calculation.
             if len(checks):
                 regions = [(QUADRATIC_AREA[idx], round(cq, 5)) for idx, cq in checks]
-                msg = '%s quadratic regions had too-low correlation, using alternative algorithm' % regions
+                msg = '%s quadratic regions had too-low correlation (threshold=%.5f, using alternative algorithm' % (regions, cqthre)
                 if echofunc:
                     echofunc(msg)
                 switch = True
@@ -438,6 +411,8 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         if echofunc:
             echofunc('%i %s' % (i, ret), skip_notify=True)
         errs = errPxl(ll, center)
+        if echofunc and i > 0:
+            echofunc('Iteration %i: Difference from the previous iteration=%.5f nm' % (i, N.average(errs)), doprint=False)
         try:
             if len(maxErr) ==2:
                 if N.all(errs[:2] < maxErr) and N.all(errs[2] < N.mean(maxErr)) and N.all(errs[3:] < maxErr):

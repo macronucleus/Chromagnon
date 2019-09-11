@@ -139,6 +139,8 @@ class BasicFileListCtrl(wx.ListCtrl,
             print('file %s was not recognized..., skip' % fn)
             raise
             return
+        if not h:
+            return
 
         # column 0
         index0 = len(self.columnkeys)

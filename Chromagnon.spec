@@ -10,7 +10,7 @@
 # $ source activate chrom
 # $ pyinstaller --clean ~/codes/py/Chromagnon/Chromagnon.spec
 # on mac, make disk image
-# on linux
+# on linux (centOS use arcadia not omx)
 # tar -jcvf ChromagnonV065Ubuntu.tar.bz2 ChromagnonV065Ubuntu
 # on windows
 # pyinstaller --clean Z:\py\Chromagnon\Chromagnon.spec

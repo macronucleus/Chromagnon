@@ -170,7 +170,7 @@ def mexhatFilter(a, mexSize=1):#, trimRatio=0.9):
 
 GAUSS=None
 
-def phaseContrastFilter(a, inFourier=False, removeNan=True, nyquist=0.6):
+def phaseContrastFilter(a, inFourier=False, nyquist=NYQUIST):
     global GAUSS
     if inFourier:
         af = a.copy()
@@ -178,23 +178,22 @@ def phaseContrastFilter(a, inFourier=False, removeNan=True, nyquist=0.6):
         af = F.rfft(a)
 
     # here is the phase contrast
-    amp = N.abs(af)
-    afa = af / amp
-
-    if removeNan:
-        afa = nanFilter(afa)
+    phase = N.arctan2(af.imag, af.real)
+    afa = N.empty_like(af)
+    afa.real = N.cos(phase)
+    afa.imag = N.sin(phase)
 
     # lowpass gaussian filter of phase image
     if nyquist: # since this takes long time, gaussian array is re-used if possible
         if GAUSS is not None and GAUSS[0] == nyquist and GAUSS[1].shape == afa.shape:
             nq, gf = GAUSS
         else:
-            #sigma = af.shape[-1] * nyquist
-            #gf = F.gaussianArr(afa.shape, sigma, peakVal=1, orig=0, wrap=(1,)*(afa.ndim-1)+(0,))#, dtype=afa.dtype.type)
-            gshape = N.array(af.shape)
+            gshape = N.array(a.shape)
             if inFourier:
+                gshape[-1] -= 1
                 gshape[-1] *= 2
             sigma = gshape * nyquist
+            #print('sigma', sigma, 'gshape', gshape, 'nyquist', nyquist)
             gf = imgFilters.gaussianArrND(gshape, sigma, peakVal=1)
             gf = N.fft.fftshift(gf)[Ellipsis, :af.shape[-1]]
             
@@ -209,7 +208,7 @@ def phaseContrastFilter(a, inFourier=False, removeNan=True, nyquist=0.6):
 
 #DATA=[]
 
-def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=None, searchRad=None, npad=4):
+def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=None, searchRad=None, napo=10):#npad=4):
     """
     sigma uses F.gaussianArr in the Fourier domain
     if ret is None:
@@ -235,8 +234,11 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
     #pshape = N.array(a.shape[:-2] + (nyx,nyx))
 
     # apodize
-    a = paddAndApo(a, npad)#, pshape) #apodize(a)
-    b = paddAndApo(b, npad)#, pshape) #apodize(b)
+    #a = paddAndApo(a, npad)
+    #b = paddAndApo(b, npad)
+    if napo:
+        a = apodize(a, napo)
+        b = apodize(b, napo)
 
     # fourier transform
     af = F.rfft(a.astype(N.float32))
@@ -252,8 +254,7 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
         bfa = bf
     del af, bf
 
-    #targetShape = shape + (npad * 2)
-    targetShape = shape + (npad * 2)
+    targetShape = shape #+ (npad * 2)
 
     # shift array
     delta = targetShape / 2.
@@ -266,8 +267,8 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
     c = F.irfft(afa * bfa)
 
     # 20180214 the padded region was cutout before finding the peak.
-    c = cc = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
-    #cc = c
+    #c = cc = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)
+    cc = c
     center = N.divide(c.shape, 2)
     if searchRad:
         slc = imgGeo.nearbyRegion(c.shape, center, searchRad)
@@ -290,34 +291,7 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
     else:
         return zyx, c
 
-def nanFilter(af, kernel=3):
-    """
-    3D phase contrast filter often creates 'nan'
-    this filter removes nan by averaging surrounding pixels
-    return af
-    """
-    af = af.copy()
-    shape = N.array(af.shape)
-    radius = N.subtract(kernel, 1) // 2
-    box = kernel * af.ndim
-    nan = N.isnan(af)
-    nids = N.array(N.nonzero(nan)).T
-    for nidx in nids:
-        slc = [slice(idx,idx+1) for idx in nidx]
-        slices = []
-        for dim in range(af.ndim):
-            slc2 = slice(slc[dim].start - radius, slc[dim].stop + radius)
-            while slc2.start < 0:
-                slc2 = slice(slc2.start + 1, slc2.stop)
-            while slc2.stop > shape[dim]:
-                slc2 = slice(slc2.start, slc2.stop -1)
-            slices.append(slc2)
-            
-        val = af[slices]
-        nanlocal = N.isnan(val)
-        ss = N.sum(N.where(nanlocal, 0, val)) / float((box - N.sum(nanlocal)))
-        af[slc] = ss
-    return af
+
 
 def normalizedXcorr(a, b):
     std = N.std(a) * N.std(b)
@@ -360,8 +334,8 @@ def apodize(img, napodize=10, doZ=True):
                 slc1 = [Ellipsis,slice(-(napo+1),None)] + [slice(None)] * abs(idx+1)
             else:
                 slc1 = [Ellipsis,slice(-(napo+1),-(napo))] + [slice(None)] * abs(idx+1)
-            img[slc0] *= fact[napo]
-            img[slc1] *= fact[napo]
+            img[tuple(slc0)] *= fact[napo]
+            img[tuple(slc1)] *= fact[napo]
                 #img[slc0] = img[slc0] * fact[napo] # casting rule
                 #img[slc1] = img[scl1] * fact[napo]
     return img

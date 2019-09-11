@@ -16,6 +16,7 @@ except ValueError:
 import numpy as N
 
 URL='http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html'
+#newURL='http://jdk.java.net/12/' # 20190829
 HAS_JDK = False
 
 try:

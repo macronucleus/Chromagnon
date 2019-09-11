@@ -37,7 +37,7 @@ ACCUR_CHOICE_DIC = {'fast': 1, 'good': 2, 'best': 10}
 #ACCUR_CHOICE = [x[0] for x in sorted(list(ACCUR_CHOICE_DIC.items()), key=lambda x: x[1])]
 ACCUR_CHOICE = sorted(list(ACCUR_CHOICE_DIC.values()))
 #print('accu', ACCUR_CHOICE)
-MAXITER_3D = ACCUR_CHOICE_DIC['good']
+MAXITER_3D = ACCUR_CHOICE_DIC['fast']#good']
 
 # file extention
 IMG_SUFFIX='_ALN'
@@ -135,6 +135,7 @@ class Chromagnon(object):
         self.y = self.img.y
         self.x = self.img.x
         self.wave = self.img.wave
+        self.shape = self.img.shape
 
         self.pxlsiz = self.img.pxlsiz
 
@@ -345,13 +346,16 @@ class Chromagnon(object):
                 fpxls = [N.where(a > modes[i])[0].size/float(a.size) for i, a in enumerate(arrs)]
                 # bleach half time
                 halfs = []
-                for w in range(self.nw):
-                    mes = [self.img.get3DArr(w=w, t=t).mean() for t in range(self.nt)]
-                    parm, check = U.fitDecay(mes)
-                    halfs.append(parm[-1] / float(self.nt))
+                if self.nt > 3:
+                    for w in range(self.nw):
+                        mes = [self.img.get3DArr(w=w, t=t).mean() for t in range(self.nt)]
+                        parm, check = U.fitDecay(mes)
+                        halfs.append(parm[-1] / float(self.nt))
 
-                channels = N.add(fpxls, halfs)
-                refwave = N.argmax(channels)
+                    channels = N.add(fpxls, halfs)
+                    refwave = N.argmax(channels)
+                else:
+                    refwave = 0
                 print('The channel to align is %i' % refwave)
 
             # if wavelengths are only 2, then use the channel 0
@@ -423,7 +427,7 @@ class Chromagnon(object):
 
         self.refyz = refyz
         self.refyx = refyx
-
+        
     def findAlignParamWave(self, t=0, doWave=True, init_t=None):
         """
         do findBestChannel() before calling this function
@@ -468,6 +472,7 @@ class Chromagnon(object):
                         searchRad = None
                     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=self.phaseContrast, searchRad=searchRad)
                     ret[w,1:3] = yx
+                    #print(yx)
                     del ref, c
                 # create 2D projection image
                 self.echo('calculating shifts for time %i channel %i' % (t, w))
@@ -479,6 +484,16 @@ class Chromagnon(object):
 
                 imgyz = af.prep2D(img.T, zs=xs)
 
+                # add X corr for Z 20190826
+                if doXcorr:
+                    if self.max_shift_pxl:
+                        searchRad = [searchRad, searchRad * (self.img.pxlsiz[0]/self.img.pxlsiz[1])]
+                        if searchRad[1] > self.img.nz:
+                            searchRad[1] = self.img.nz
+                    yz, c = xcorr.Xcorr(self.refyz, imgyz, phaseContrast=self.phaseContrast, searchRad=searchRad)
+                    ret[w,0] = yz[1]
+                    #print(yz, ret[w])
+                    
                 # try quadratic cross correlation
                 zdif = max(self.refzs) - min(self.refzs)
                 zzoom = 1.
@@ -843,7 +858,7 @@ class Chromagnon(object):
         return output file name
         """
         if not fn:
-            fn = chromformat.makeChromagnonFileName(self.img.filename + self.parm_suffix, self.mapyx is not None)
+            fn = chromformat.makeChromagnonFileName(self.img.filename + self.parm_suffix, self.mapyx is not None or self.microscopemap is not None)
             if self.outdir:
                 fn = os.path.join(self.outdir, os.path.basename(fn))
         self.cwriter = chromformat.ChromagnonWriter(fn, self.img, self)

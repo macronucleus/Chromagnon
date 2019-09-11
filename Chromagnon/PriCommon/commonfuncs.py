@@ -56,6 +56,22 @@ def saveConfig(**newkwds):
         h.write('%s=%s%s' % (key, val, os.linesep))
     h.close()
 
+def deleteConfig(name, **kwds):
+    """
+    delete entry with "name"
+    """
+    fn = getConfigPath(kwds.pop('confpath', CONFPATH))
+    kwds = readConfig()
+
+    if sys.version_info.major == 3:
+        h = open(fn, 'w', newline='')
+    else:
+        h = open(fn, 'w')
+    for key, val in kwds.items():
+        if key != name:
+            h.write('%s=%s%s' % (key, val, os.linesep))
+    h.close()
+
 # a helper function for debugging the packaged software
 def main_is_frozen():
    return (getattr(sys, "frozen", False) or # new py2exe + pyinstaller

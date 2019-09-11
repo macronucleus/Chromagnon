@@ -166,3 +166,67 @@ def merge(fns, out=None, along='t'):
     o.close()
 
     return out
+
+def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,None)):
+    """
+    twzyx0: starting index (minus values accepcted)
+    twzyx1: ending index (minus values accepcted)
+
+    return output filename
+    """
+    def formatTWZYX(twzyxs, h, start=True):
+        ret = []
+        for dim, v in twzyxs:
+            n = h.__getattribute__('n%s' % dim)
+            if v is None and start:
+                ret.append((dim, 0))
+            if v is None and not start:
+                ret.append((dim, n))
+            elif v < 0:
+                v = n + v
+                ret.append((dim, v))
+            elif v >= n:
+                raise ValueError('number of %s is only %i but you specified %i' % (upper(dim), n, v))
+            else:
+                ret.append((dim, v))
+        return ret
+    
+    dimstr = 'twzyx'
+    twzyx0s = list(zip(dimstr, twzyx0))
+    twzyx1s = list(zip(dimstr, twzyx1))
+    with Reader(fn) as h:
+        if not out:
+            what0 = ''.join([s.lower() + str(v) for s,v in twzyx0s if v])
+            what1 = ''.join([s.upper() + str(v) for s,v in twzyx1s if v is not None])
+            whats = '_'.join((what0, what1))
+            base, ext = os.path.splitext(fn)
+            out = base + whats + ext
+            
+        twzyx0s = formatTWZYX(twzyx0s, h, start=True)
+        twzyx1s = formatTWZYX(twzyx1s, h, start=False)
+        ts = range(twzyx0s[0][1], twzyx1s[0][1])
+        ws = range(twzyx0s[1][1], twzyx1s[1][1])
+        zs = range(twzyx0s[2][1], twzyx1s[2][1])
+        ys = slice(twzyx0s[3][1], twzyx1s[3][1])
+        xs = slice(twzyx0s[4][1], twzyx1s[4][1])
+
+        if type(h) == mrcIO.MrcReader:
+            hdr = mrcIO.makeHdrFromRdr(h)
+            hdr.NumTimes = len(ts)
+            hdr.NumWaves = len(ws)
+            hdr.Num[2] = len(zs) * hdr.NumTimes * hdr.NumWaves
+            hdr.Num[1] = ys.stop - ys.start
+            hdr.Num[0] = xs.stop - xs.start
+            o = Writer(out, hdr=hdr)
+        else:
+            o = Writer(out, h)
+            o.setDim(nx=xs.stop - xs.start, ny=ys.stop - ys.start, nz=len(zs), nt=len(ts), nw=len(ws))
+        
+        for t0, t1 in enumerate(ts):
+            for w0, w1 in enumerate(ws):
+                for z0, z1 in enumerate(zs):
+                    a = h.getArr(t=t1, w=w1, z=z1)[ys,xs]
+                    o.writeArr(a, t=t0, w=w0, z=z0)
+        o.close()
+
+    return out

@@ -11,7 +11,7 @@ except ImportError:
     from Chromagnon.PriCommon import xcorr, imgGeo
     from Chromagnon import imgio
 
-from . import aligner, alignfuncs
+from . import aligner, alignfuncs, cutoutAlign
 
 import os, tempfile
 
@@ -44,16 +44,41 @@ def prepImg4AffineZ(fn, w=None, phaseContrast=True):
      
     imgyz = alignfuncs.prep2D(img.T, zs=xs)
 
-    return an.refyz, imgyz
+    
+    shape = N.array(imgyz.shape)
+    yz, c = xcorr.Xcorr(an.refyz, imgyz, phaseContrast=phaseContrast)
+    ret = N.zeros((5,), N.float32)
+    ret[3:] = 1
+    ret[:2] = yz#[::-1]
+    offset = N.zeros((2,), N.float32)
+    b = alignfuncs.applyShift(imgyz, [0]+list(ret), offset)
+    #from Priithon.all import Y
+    #Y.view([b, imgyz, an.refyz, c])
+    #print(yx)
 
-    a1234 = alignfuncs.chopImg(an.refyz)
+    shiftZYX = cutoutAlign.getShift([0]+list(ret), [0]+list(shape))
+    maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
+    maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
+    slc = [slice(int(maxcutY), int(shape[0]-maxcutY)),
+               slice(int(maxcutX), int(shape[1]-maxcutX))]
+    slc = tuple(slc) # future warning 20190604
+    imgyz = b[slc]
+    refyz = an.refyz[slc]
+
+    zzoom = imgyz.shape[0] / imgyz.shape[1]
+    an.echo('Z axis zoom factor=%.2f' % zzoom)
+    imgyz = U.nd.zoom(imgyz, (1, zzoom))
+    refyz = U.nd.zoom(refyz, (1, zzoom))
+    #return an.refyz, imgyz
+    
+    a1234 = alignfuncs.chopImg(refyz)
     b1234 = alignfuncs.chopImg(imgyz)
 
     ab = list(zip(a1234, b1234))
-
-    yxcs = [xcorr.Xcorr(a, b, phaseContrast=phaseContrast) for a, b in ab]
+    yxcs = [xcorr.Xcorr(a, b, phaseContrast=phaseContrast) for a, b in ab]#"""
+    
     yxs = [yx for yx, c in yxcs]
-    cqs = [c.max() - c[c.shape[0]//4].std() for yx, c in yxcs]
+    cqs = [c.max() - c[:,:c.shape[1]//4].std() for yx, c in yxcs]
 
     return ab, cqs, [c for yx, c in yxcs], yxs, an    
 

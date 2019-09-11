@@ -3,18 +3,18 @@ import wx
 import numpy as N
 
 try:
-    from PriCommon import guiFuncs as G
+    from PriCommon import guiFuncs as G, commonfuncs as C, listbox
 except (ValueError, ImportError):
-    from Chromagnon.PriCommon import guiFuncs as G
+    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, listbox
     
 
 if sys.version_info.major == 2:
     import aligner, alignfuncs as af
 elif sys.version_info.major >= 3:
     try:
-        from . import aligner, alignfuncs as af
+        from . import aligner, alignfuncs as af, chromformat
     except (ValueError, ImportError):
-        from Chromagnon import aligner, alignfuncs as af
+        from Chromagnon import aligner, alignfuncs as af, chromformat
 
 
 class ExtraDialog(wx.Dialog):
@@ -100,15 +100,13 @@ class ExtraDialog(wx.Dialog):
         box = G.newSpaceV(sizer)
         bb, box = G.newStaticBox(self, box, title='Local distortion of your microscope instrument', size=wx.DefaultSize)
 
-        G.makeTxt(self, box, 'Local alignment of Tetraspec beads (chromagnon.tif)')
-        
-        self.chooseOurCalibButton = G.makeButton(self, box, self.OnHelpCalib, title='help?')
-        self.chooseOurCalibButton = G.makeButton(self, box, self.OnChooseCalib, title='Choose', tip='')
-        self.usecalib_cb = G.makeCheck(self, box, "Use calibration", tip='', defChecked=bool(confdic.get('use_calib', '')), targetFunc=self.OnUseCalib)
+        calibHelpButton = G.makeButton(self, box, self.OnHelpCalib, title='help?')
 
-        self.calibfn = confdic.get('calibfn', '')
+        self.calibfn = self.parent.extra_parms.get('calibfn', '')
+        self.makeCalibChoice(box)
         self.calibfn_label = G.makeTxt(self, box, self.calibfn)
-        self.calibfn_label.Enable(not(self.usecalib_cb.GetValue()))
+
+        calibClearButton = G.makeButton(self, box, self.OnClearCalib, title='Erace selected', tip='')
         
         # -------- OK and Cancel -----------
         btnsizer = wx.StdDialogButtonSizer()
@@ -163,5 +161,194 @@ class ExtraDialog(wx.Dialog):
         self.calibfn_label.Enable(self.usecalib_cb.GetValue())
 
     def OnHelpCalib(self, evt=None):
-        msg = 'By using this option, you can always apply local chromatic correction of your microscope which is expected to be constant.\n  You still have to measure your biological calibration sample or blead through methods to obtain alignment parameters of your samples in addition to this instrumental calibration.\n  To measure local distortion of your microscope, obtain multiple (>5) images with 200nm tetraspec beads as many as possible in the field of view.\n  Then put the files in the reference image list box of Chromagnon and turn on "average reference" check box, choose "Projection" from the local align choice list, and run measurement. The resulting ".chromagnon.tif" can be used as instrumental calibration of your microscope.'
+        msg = 'By using this option, you can always apply local chromatic correction of your microscope which is expected to be constant.\n  You still have to measure your biological calibration or blead through reference images to obtain alignment parameters of your samples in addition to this instrumental calibration.\n  To measure local distortion of your microscope, obtain multiple (>5) images with 200nm tetraspec beads as many as possible in the field of view.\n  Then put the files in the reference image list box of Chromagnon and turn on "average reference" check box, choose "Projection" from the local align choice list, and run measurement. The resulting ".chromagnon.tif" can be used as instrumental calibration of your microscope.\n When measuring your biological calibration or blead through reference images, choose "None" for Local align'
         G.openMsg(self, msg=msg, title='Instruction on calibration')
+
+    def OnClearCalib(self, evt=None):
+        name = self.calib_choice.GetStringSelection()
+        if name and name != self.calib_new:
+            C.deleteConfig('calib_'+name)
+            self.calibfn_label.SetLabel('')
+            self.calibfn = ''
+            self.makeCalibChoice()
+            old="""
+            self.usecalib_c.SetValue(0)"""
+        
+    def makeCalibChoice(self, box=None):
+        confdic = C.readConfig()
+        self.calib_microscopes = [key.replace('calib_', '') for key in confdic.keys() if key.startswith('calib_')]
+        self.calib_fns = dict([(micro, confdic['calib_'+micro]) for micro in self.calib_microscopes])
+
+        micro = [name for name, fn in self.calib_fns.items() if fn == self.calibfn]
+        if micro:
+            micro = micro[0]
+        else:
+            micro = ''
+
+        self.calib_microscopes.insert(0, '')
+        self.calib_new = 'New...'
+        self.calib_microscopes.append(self.calib_new)
+        if box:
+            label, self.calib_choice = G.makeListChoice(self, box, 'Microscope', self.calib_microscopes, defValue=micro, targetFunc=self.OnCalibChoice)
+        else:
+            for i in range(self.calib_choice.GetCount()):
+                self.calib_choice.Delete(0)
+            for micro in self.calib_microscopes:
+                self.calib_choice.Append(micro)
+
+        
+    def OnCalibChoice(self, evt=None):
+        val = self.calib_choice.GetStringSelection()
+        if not val:
+            self.setCalib()
+
+        elif val == self.calib_new:
+            dlg = CalibrationDialog(self, self.calibfn)
+            val1 = dlg.ShowModal()
+            if val1 == wx.ID_OK:
+                try:
+                    fn = os.path.join(*dlg.listCalib.getFile(0)[:2])
+                except:
+                    G.openMsg(self, 'A .chromagnon.tif file is required', 'Error')
+                    self.setCalib()
+                    return
+                name = dlg.microscope_name.GetValue()
+                if name and fn:
+                    if name in self.calib_fns:
+                         val0 = G.askMsg(parent=self, msg='Would you like to overwrite for %s with new file %s? The previous file was %s' % (name, os.path.basename(fn), self.calib_fns[name]), title='The microscope name already exists')
+                         if val0 == wx.ID_NO:
+                             return
+
+                    kwds = {'calib_%s' % name: fn}
+                    C.saveConfig(**kwds)
+                    self.makeCalibChoice()
+
+                    self.calib_fns[name] = fn
+
+                    self.setCalib(name, fn)
+                else:
+                    self.setCalib()
+                    if not name:
+                        G.openMsg(self, 'Microscope name is required', 'Error')
+            else:
+                self.setCalib()
+        else:
+            self.setCalib(val, self.calib_fns[val])
+
+    def setCalib(self, name='', fn=''):
+        self.calib_choice.SetStringSelection(name)
+        self.calibfn = fn
+        self.calibfn_label.SetLabel(fn)
+
+class CalibrationDialog(wx.Dialog):
+    def __init__(self, parent, calibfn=''):
+        wx.Dialog.__init__(self, parent, id=-1, title='Microscope calibration file')
+
+        self.calibfn = calibfn
+        self.parent = parent.parent
+        self.lastpath = None
+        #self.aui = None
+
+        # ------ GUI ------
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(sizer)
+
+        box = G.newSpaceV(sizer)
+        calibChooseButton = G.makeButton(self, box, self.OnChooseCalibFile, title='Choose file', tip='', enable=True)
+
+        calibClearButton = G.makeButton(self, box, self.OnclearSelected, title='Clear', tip='', enable=True)
+        
+        # \n
+        box = G.newSpaceV(sizer)
+
+        LISTSIZE_X = sum((listbox.SIZE_COL0, listbox.SIZE_COL1, listbox.SIZE_COL2))#, listbox.SIZE_COL3, listbox.SIZE_COL4))
+        LISTSIZE_Y = 40
+        if sys.platform.startswith('win'):
+            LISTSIZE_Y += 20
+        elif sys.platform.startswith('linux'):
+            LISTSIZE_Y += 10
+        self.listCalib = listbox.BasicFileListCtrl(self, wx.NewId(),
+                                 style=wx.LC_REPORT
+                                 | wx.BORDER_NONE,
+                                 #| wx.LC_SORT_ASCENDING,
+                                 size=(LISTSIZE_X, LISTSIZE_Y),
+                                 multiple=False)
+        box.Add(self.listCalib)
+        self.listCalib.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
+        self.listCalib.setDefaultFileLoadFunc(self._load_func)
+
+        # \n
+        box = G.newSpaceV(sizer)
+        
+        label, self.microscope_name = G.makeTxtBox(self, box, 'Name of microscope', defValue='', tip='Microscope name to identify', sizeX=150, sizeY=-1)
+
+        # -------- OK and Cancel -----------
+        btnsizer = wx.StdDialogButtonSizer()
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+
+        sizer.Fit(self)
+
+    def OnChooseCalibFile(self, evt=None):
+        if self.calibfn:
+            dd = os.path.split(self.calibfn)[0]
+        elif self.lastpath:
+            dd = self.lastpath
+        else:
+            dd = self.parent.lastpath
+        dlg = G.FileSelectorDialog(self, dd, wildcard='*.chromagnon.tif', multiple=False)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.calibfn = dlg.GetPath()
+        dlg.Destroy()
+
+        self.listCalib.clearAll()
+        self.listCalib.addFile(self.calibfn)
+
+    def OnclearSelected(self, evt=None):
+        #print(self.listCalib.columnkeys)
+        self.listCalib.clearAll()#clearRaw(0)
+
+    def OnDoubleClick(self, evt=None):
+        #import six
+        #from ndviewer import main as aui
+        #from . import chromeditor
+        fn = os.path.join(*self.listCalib.getFile(0)[:2])
+        self.parent.view(fn)
+        old="""
+        target = fn
+        if not self.aui:
+            self.aui = aui.MyFrame(parent=self)
+            self.aui.Show()
+
+        newpanel = chromeditor.ChromagnonEditor(self.aui, target)
+
+        if isinstance(target, six.string_types):
+            name = os.path.basename(target)
+        else:
+            name = target.file
+
+        if sys.platform in ('linux2', 'win32'):
+            wx.CallAfter(self.aui.imEditWindows.addPage, newpanel, name, select=True)
+        else:
+            self.aui.imEditWindows.addPage(newpanel, name, select=True)"""
+
+    def _load_func(self, fn):
+        if chromformat.is_chromagnon(fn) and chromformat.is_binary(fn):
+            h = chromformat.ChromagnonReader(fn)
+        else:
+            dlg = wx.MessageDialog(self, 'Only ".chromagnon.tif" file is accepted', 'Error in the file format', wx.OK | wx.ICON_EXCLAMATION)
+            if dlg.ShowModal() == wx.ID_OK:
+                return
+                
+        self.lastpath = os.path.dirname(fn)
+        #C.saveConfig(lastpath=self.lastpath)
+        return h

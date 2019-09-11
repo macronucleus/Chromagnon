@@ -39,7 +39,36 @@ target images fixed (`chromformat.py`).
 `multitifIO.py`
 20. (v0.82, 20190725) Broken Flatfileder was fixed (`flatfielder.py`).
 21. (v0.82, 20190801) Storing index arrays in imgFit.INDS_DIC was
-    changed as an option to save memory (`PriCommon.imgFit.py`).
+changed as an option to save memory (`PriCommon.imgFit.py`).
+22. (v0.83, 20190802) Xcorr uses apodize without padding
+(`PriCommon.xcorr.py`).
+23. (v0.83, 20190802) A bug of time align for short movies was fixed
+(`aligner.py`).
+24. (v0.83, 20190813) Averaged files were written in the log files.
+25. (v0.83, 20190814) CQ value estimation uses larger area as the
+background (`alignfuncs.estimate2D`)
+26. (v0.83, 20190816) Chromeditor can use "auto focus" by adding
+"shape" attribute to Chromagnon class (`alginer.py`).
+27. (v0.82, 20190816) Viewer crosshair moves Z with z slider (`ndviewer.viewer2.py`).
+28. (v0.83, 20190821) Difference in the number of wavelength was fixed
+(`chromformat.py`).
+29. (v0.83, 20190826) Initial guess includes Z cross correlation
+before quadrisection cross correlation (`alignfuncs.iteration`)
+30. (v0.83, 20190826) For Z quadrisection phase correlation, phase
+contrast nyquist was changed to 0.3 (`alignfuncs.estimate2D`).
+31. (v0.83, 20190826) Error values are shown in the GUI.
+32. (v0.83, 20190826) NDviewer orhogonal viewer changes to orthogonal
+view without resetting colors and scale (`ndviewer.main.py`).
+33. (v0.83, 20190909) Chromeditor, a broken button "add wavelength"
+was fixed.
+34. (v0.83, 20190911) Phase contrast filter use real and imag
+    assignment instead of division of amplitude
+    (`PriCommon.xcorr.py`).
+35. (v0.83, 20190911) User interface of microscpe calibration uses
+choice list to support multiple microscopes.
+36. (v0.83, 20190911) A bug in wavelength selection for Chromagnon
+local viewer was fixed.
+37. (v0.83, 20190911) Disable all possible buttons and choices while running.
 
 v0.7(Feb. 2019)
 ----

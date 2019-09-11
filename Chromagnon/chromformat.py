@@ -81,12 +81,13 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
         self.holder = holder
         self.fp = None
         self._closed = False
-
+        self.setMap()
+        
         self.num_entry = self.holder.alignParms.shape[-1]
         self.refwave = self.holder.refwave#)#list(self.rdr.wave).index(self.holder.refwave)
 
         # text formats
-        if self.holder.mapyx is None:
+        if self.mapyx is None:#holder.mapyx is None:
             if sys.version_info.major == 3:
                 self.fp = open(outfn, 'w', newline='')
             else:
@@ -96,7 +97,7 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
         else:
             self.writer = imgio.Writer(outfn, self.rdr)
 
-            if holder.mapyx.ndim == 6:
+            if self.mapyx.ndim == 6:#holder.mapyx.ndim == 6:
                 self.writer.setDim(nz=self.writer.nz*2)#self.writer.nz *= 2
             else:
                 self.writer.setDim(nz=2) #self.writer.nz = 2
@@ -110,15 +111,23 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
 
     def close(self):
         if not self._closed:
-            if self.holder.mapyx is None:
+            if self.mapyx is None:#holder.mapyx is None:
                 self.fp.close()
             else:
                 self.writer.close()
 
             self._closed = True
 
+    def setMap(self):
+        if self.holder.mapyx is not None:
+            self.mapyx = self.holder.mapyx
+        elif self.holder.microscopemap is not None:
+            self.mapyx = self.holder.microscopemap
+        else:
+            self.mapyx = None
+            
     def writeHdr(self):
-        if self.holder.mapyx is None:
+        if self.mapyx is None:#holder.mapyx is None:
             self.writer.writerow(('nt', self.rdr.nt))
             self.writer.writerow(('nw', self.rdr.nw))
             self.writer.writerow(('pxlsize_z_y_x',) + tuple(self.rdr.pxlsiz))
@@ -139,7 +148,7 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
     def writeAlignParmSingle(self, t=0, w=0):
         parm = self.holder.alignParms[t,w]
 
-        if self.holder.mapyx is None:
+        if self.mapyx is None:#holder.mapyx is None:
             self.writer.writerow([t, self.rdr.wave[w]]+list(parm))
         else:
             for i, key in enumerate(DIMSTRS):
@@ -153,19 +162,19 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
             for w in range(self.rdr.nw):
                 self.writeAlignParmSingle(t=t,w=w)
 
-        if self.holder.mapyx is not None:
+        if self.mapyx is not None:#holder.mapyx is not None:
             self.writeMapAll()
             
     def writeMapAll(self):
         for t in range(self.rdr.nt):
             for w in range(self.rdr.nw):
                 for z in range(self.writer.nz):
-                    if self.holder.mapyx.ndim == 6:
+                    if self.mapyx.ndim == 6:#holder.mapyx.ndim == 6:
                         d = z % 2
                         z0 = z // 2
-                        arr = self.holder.mapyx[t,w,z0,d]
+                        arr = self.mapyx[t,w,z0,d]#holder.mapyx[t,w,z0,d]
                     else:
-                        arr = self.holder.mapyx[t,w,z]
+                        arr = self.mapyx[t,w,z]#holder.mapyx[t,w,z]
                     self.writer.writeArr(arr, t=t, w=w, z=z)
 
 
@@ -278,7 +287,7 @@ class ChromagnonReader(object):
         self.pwaves = [int(round(w)) for w in self.wave[:self.nw]]
         self.twaves = [int(round(w)) for w in self.rdr.wave[:self.rdr.nw]]
         self.tids = [self.twaves.index(wave) for wave in self.pwaves if wave in self.twaves]
-        self.pids = list(range(self.nw))#[self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
+        self.pids = [w for w in range(self.nw) if self.pwaves[w] in self.twaves]#[self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
 
         somewaves = [w for w, wave in enumerate(self.pwaves) if wave in self.twaves]
 

@@ -81,6 +81,10 @@ def rescan_optimum_spot_width(fwhm_emi=250, fwhm_exc=250):
     b = (fwhm_emi**2) + (fwhm_exc**2)
     return a / (b**0.5)
 
+def opra_resolution(fwhm_emi=250, fwhm_exc=250):
+    mag = (fwhm_exc**2) / (fwhm_exc**2 + fwhm_emi**2)
+    return mag * ((fwhm_exc**2 + fwhm_emi**2)**0.5)
+
 #------------ color LUT -----------------#
 
 COLOR_TABLE=[(1,0,1),   (0,0,1), (0,1,1), (0,1,0), (1,1,0),  (1,0,0), (1,0,1), (1,1,1)]

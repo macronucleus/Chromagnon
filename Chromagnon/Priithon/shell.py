@@ -2,6 +2,7 @@ from wx.py.shell import *
 from wx.py import introspect
 import sys
 import six
+import warnings
 
 ### ---- py2 ------
 try:
@@ -11,10 +12,12 @@ except NameError:
 
 ###---- introspect ---------------
 def hasattr(obj, attr):# am python3
-    try:
-        return bool(getattr(obj, attr, None))
-    except (NameError, ValueError):
-        return False
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        try:
+            return bool(getattr(obj, attr, None))
+        except (NameError, ValueError):
+            return False
 
 #def hasattrAlwaysReturnsTrue(obj):
 #    return hasattr(obj, 'bogu5_123_aTTri8ute')

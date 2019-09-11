@@ -914,6 +914,11 @@ class GLViewer(GLViewerCommon):
                     viewer2update = self.dims[0]
                     if self.dims[0] == 0:
                         self.mydoc.z = v
+                        if 0 <= v < pic_ny:
+                            parent = self.GetParent()
+                            parent.zSliderBox.SetValue(str(int(v)))
+                            parent.zSlider.SetValue(int(v))
+                            #parent.OnZSliderBox()
                     elif self.dims[0] == 1:
                         self.mydoc.y = v
                     elif self.dims[0] == 2:
@@ -924,6 +929,11 @@ class GLViewer(GLViewerCommon):
 
                     if self.dims[1] == 0:
                         self.mydoc.z = v
+                        if 0<= v < pic_nx:
+                            parent = self.GetParent()
+                            parent.zSliderBox.SetValue(str(int(v)))
+                            parent.zSlider.SetValue(int(v))
+                            #parent.OnZSliderBox()
                     elif self.dims[1] == 1:
                         self.mydoc.y = v
                     elif self.dims[1] == 2:

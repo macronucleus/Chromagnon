@@ -122,13 +122,13 @@ class BatchPanel(wx.Panel):
 
         self.refClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Clear selected', tip='', enable=False)
 
-        parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
+        self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
 
-        extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Extra parameters')
+        self.extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Extra parameters')
         
         # ---- target ------
 
-        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + extraButton.GetSize()[0]
+        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + self.parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + self.extraButton.GetSize()[0]
         G.newSpaceH(box, LISTSIZE_X+LISTSPACE-refsize)
 
         self.tgtAddButton = G.makeButton(self, box, lambda ev:self.OnChooseImgFiles(ev,'target'), title='Target files', tip='', enable=True)
@@ -137,7 +137,7 @@ class BatchPanel(wx.Panel):
 
         self.cutoutCb = G.makeCheck(self, box, "crop margins", tip='', defChecked=bool(confdic.get('cutout', True)))
 
-        label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
+        self.img_suffix_label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
 
         self.outext_choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
         label, self.outextch = G.makeListChoice(self, box, '', self.outext_choices, defValue=confdic.get('format', aligner.WRITABLE_FORMATS[0]), tip='tif: ImageJ format, dv: DeltaVision format, ome.tif: OME-tif format (slow)', targetFunc=self.OnOutFormatChosen)
@@ -151,7 +151,6 @@ class BatchPanel(wx.Panel):
         self.listRef = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
                                  | wx.BORDER_NONE,
-                                 #| wx.LC_SORT_ASCENDING,
                                  size=(LISTSIZE_X, LIST_Y)
                                  )
         box.Add(self.listRef)
@@ -164,7 +163,6 @@ class BatchPanel(wx.Panel):
         self.listTgt = listbox.FileListCtrl(self, wx.NewId(),
                                  style=wx.LC_REPORT
                                  | wx.BORDER_NONE,
-                                # | wx.LC_SORT_ASCENDING,
         size=(LISTSIZE_X, LIST_Y)
                                  )
         box.Add(self.listTgt)
@@ -194,9 +192,9 @@ class BatchPanel(wx.Panel):
         self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are maximum intensity projected to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
 
         self.localChoice = LOCAL_CHOICE
-        label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
+        self.local_label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
 
-        self.min_pxls_label, self.min_pxls_choice = G.makeListChoice(self, box, 'min window size', af.MIN_PXLS_YXS, defValue=confdic.get('min_pxls_yx', af.MIN_PXLS_YXS[1]), tip='Minimum number of pixel to divide as elements of local alignment')
+        self.min_pxls_label, self.min_pxls_choice = G.makeListChoice(self, box, 'minimum window size', af.MIN_PXLS_YXS, defValue=confdic.get('min_pxls_yx', af.MIN_PXLS_YXS[1]), tip='Minimum number of pixel to divide as elements of local alignment')
 
         self.OnLocalListChose()
 
@@ -216,7 +214,7 @@ class BatchPanel(wx.Panel):
         self.flatButton = wx.Button(self, -1, 'Open Flat Fielder')
         self.flatButton.SetToolTip(wx.ToolTip('Open a graphical interphase to flat field images'))
 
-        flatsize = self.goButton.GetSize()[0] + self.averageCb.GetSize()[0] + label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
+        flatsize = self.goButton.GetSize()[0] + self.averageCb.GetSize()[0] + self.local_label.GetSize()[0] + self.localListChoice.GetSize()[0] + self.min_pxls_label.GetSize()[0] + self.min_pxls_choice.GetSize()[0] + self.progress.GetSize()[0] + self.flatButton.GetSize()[0] + 5
 
         G.newSpaceH(box, FRAMESIZE_X-flatsize)
 
@@ -389,14 +387,7 @@ class BatchPanel(wx.Panel):
             self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
             C.saveConfig(max_shift=self.extra_parms['max_shift'])
 
-            if dlg.usecalib_cb.GetValue() and dlg.calibfn:
-                self.extra_parms['calibfn'] = dlg.calibfn
-                C.saveConfig(calibfn=self.extra_parms['calibfn'])
-            if dlg.usecalib_cb.GetValue():
-                val = 'True'
-            else:
-                val = ''
-            C.saveConfig(use_calib=val)
+            self.extra_parms['calibfn'] = dlg.calibfn
 
         dlg.Destroy()
         
@@ -429,9 +420,14 @@ class BatchPanel(wx.Panel):
         """
         enable or disable buttons that should not be hit while running the program
         """
-        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb]
+        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.parmSuffixLabel, self.parm_suffix_txt, self.extraButton, self.img_suffix_label, self.img_suffix_txt, self.outextch, self.averageCb, self.local_label, self.localListChoice, self.min_pxls_label, self.min_pxls_choice]
 
         [button.Enable(enable) for button in buttons]
+        
+        # fix for min_pxls_choice
+        if enable:
+            if not self.localListChoice.GetCurrentSelection():
+                self.min_pxls_choice.Enable(0)
 
     def OnOutFormatChosen(self, evt=None):
         outext = self.outextch.GetStringSelection()
@@ -466,7 +462,6 @@ class BatchPanel(wx.Panel):
             targets = [os.path.join(*self.listTgt.getFile(index)[:2]) for index in self.listTgt.columnkeys]
 
             # other parameters
-            #initguess = ''
             confdic = C.readConfig()
 
             form = self.outextch.GetStringSelection()
@@ -493,14 +488,31 @@ class BatchPanel(wx.Panel):
                     self.quit('There are inconsistency in channel composition in the reference files', title="Reference files are not appropriate for averaging")
                     return
                 
+                self.label.SetLabel('averaging...')
+                self.label.SetForegroundColour('red')
+                wx.Yield()
+
+                # log
+                outdir = self.extra_parms.get('outdir')
+                if outdir and not os.path.isdir(outdir):
+                    raise ValueError('Output directory does not exist')
+                elif outdir:
+                    logh = open(os.path.join(outdir, 'Chromagnon.log'), 'a')
+                else:
+                    logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
                 try:
-                    self.label.SetLabel('averaging...')
-                    self.label.SetForegroundColour('red')
-                    wx.Yield()
                     ave_fn = af.averageImage(fns, ext=form)
                 except Exception as e:
                     self.quit(e.args[0], title="Reference files are not appropriate for averaging")
                     return         
+
+                import time
+                tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
+                logh.write('\n**Averaging at %s' % tstf)
+                for fn in fns:
+                    logh.write('\n    * %s' % fn)
+                logh.close()
+                    
                 self.listRef.clearAll()
                 self.listRef.addFile(ave_fn)
                 fns = [ave_fn]
@@ -603,14 +615,14 @@ def command_line():
                      help='target images files')
         p.add_argument('--reference', '-R', required=True, nargs='*',
                      help='reference image or chromagnon files (required)')
-        p.add_argument('--local', '-l', default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
-                     help='choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
+        p.add_argument('--local', '-l', action='store_true',#default=LOCAL_CHOICE[0], choices=LOCAL_CHOICE,
+                     help='use this option to use local alignment (default=None)')#'choose from %s (default=%s)' % (LOCAL_CHOICE, LOCAL_CHOICE[0]))
         p.add_argument('--localMinWindow', '-w', default=af.MIN_PXLS_YXS[1], choices=af.MIN_PXLS_YXS,
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
-                     help='maximum um possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
+                     help='maximum shift in micrometers possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
         p.add_argument('--not_crop_mergins', '-c', action='store_false',
-                     help='crop mergins after alignment (default=False; do crop mergins)')
+                     help='do not crop mergins after alignment (default=False; do crop mergins)')
         p.add_argument('--average_references', '-a', action='store_true',
                      help='average reference image (default=False)')
         p.add_argument('--parm_suffix', '-P', default='',
@@ -624,7 +636,9 @@ def command_line():
         p.add_argument('--output_directory', '-O', default=None,
                      help='output directory different from the directory of the input files (same as the input)')
         p.add_argument('--reference_wavelength', '-r', default=None,
-                     help='maximum um possibily misaligned in your system (default=auto)')
+                     help='reference channel that is never moved (default=auto)')
+        p.add_argument('--n3diter', '-z', default=aligner.MAXITER_3D, type=int,
+                     help='number of iteration for 3D phase correlation (default=%i)' % aligner.MAXITER_3D)
         p.add_argument('--microscope_calib', '-M', default='',
                      help='local calibration file of your microscope (default=None)')
         
@@ -649,13 +663,15 @@ def command_line():
 
         if options.reference_wavelength:
             options.reference_wavelength = eval(options.reference_wavelength)
-                
+
+        if options.local:
+            options.local = LOCAL_CHOICE[1]
 
         parms = [not options.not_crop_mergins,
-                options.output_directory,#None,#options.outdir
+                options.output_directory,
                 options.local,
-                options.reference_wavelength, #None, #options.refwave
-                None,#options.zaccur,
+                options.reference_wavelength,
+                options.n3diter,
                 options.parm_suffix,
                 options.img_suffix,
                 nts,
