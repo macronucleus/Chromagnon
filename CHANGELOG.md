@@ -68,7 +68,14 @@ was fixed.
 choice list to support multiple microscopes.
 36. (v0.83, 20190911) A bug in wavelength selection for Chromagnon
 local viewer was fixed.
-37. (v0.83, 20190911) Disable all possible buttons and choices while running.
+37. (v0.83, 20190911) Disable all possible buttons and choices while
+running.
+34. (v0.84, 20191001) Xcorr.apodize was changed so that intensity goes
+down to median instead of zero (`PriCommon.xcorr.py`).
+35. (v0.84, 20191011) FindAlignParamTime does findBestChannel
+automatically (`aligner.py`).
+36. (v0.84, 20191015) A bug in miroscope map was fixed (global
+    parameters were read from beads in v0.83).
 
 v0.7(Feb. 2019)
 ----

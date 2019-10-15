@@ -178,7 +178,10 @@ class ThreadWithExc(threading.Thread):
 
 
                         self.echo('Calculating channel alignment...')
-                        
+
+                        if microscopemap:
+                            self.echo('Using microscope map %s as a starting point for global alignment' % microscopemap, skip_notify=True, doprint=True)
+                            an.loadParm(microscopemap)#setMicroscopeMap(microscopemap, set2holder=True) #this also loads an initial guess for the global align parameters
                         for t in range(an.nt):
                             try:
                                 an.findAlignParamWave(t=t)
@@ -187,7 +190,6 @@ class ThreadWithExc(threading.Thread):
                                 errs.append(index)
                                 continue
 
-                            an.setMicroscopeMap(microscopemap)
                             #if microscopemap:
                                 #if local in self.localChoice[1:]:
                                     #self.log('\nUsing microscope map %s as a starting point for local alignment' % microscopemap)
@@ -249,11 +251,13 @@ class ThreadWithExc(threading.Thread):
                     an.setProgressfunc(pgen)
                     self.progress(0)
 
-                    an.loadParm(fn)
+                    #an.loadParm(fn)
                     if microscopemap and not chromformat.is_binary(fn):
-                        an.setMicroscopeMap(microscopemap)
+                        #an.setMicroscopeMap(microscopemap)
                         #self.log('\nUsing microscope map %s' % microscopemap)
                         self.echo('Using microscope map %s' % microscopemap, skip_notify=True, doprint=True)
+                        an.loadParm(microscopemap)
+                    an.loadParm(fn)
                     #if cutout:
                     an.setRegionCutOut(cutout)
 
@@ -295,11 +299,13 @@ class ThreadWithExc(threading.Thread):
                 self.progress(0)
 
                 if len(fns):
-                    an.loadParm(fn)
+                    #an.loadParm(fn)
                     if microscopemap and not chromformat.is_binary(fn):
-                        an.setMicroscopeMap(microscopemap)
+                        #an.setMicroscopeMap(microscopemap)
                         #self.log('\nUsing microscope map %s' % microscopemap)
                         self.echo('Using microscope map %s' % microscopemap, skip_notify=True, doprint=True)
+                        an.loadParm(microscopemap)
+                    an.loadParm(fn)
 
                 an.setRegionCutOut(cutout)
 

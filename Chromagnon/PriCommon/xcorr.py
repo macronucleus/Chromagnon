@@ -310,7 +310,7 @@ def paddAndApo(img, npad=4, shape=None):
     return imgFilters.paddingMed(img, shape + (npad * 2), smooth=npad)
 
 
-def apodize(img, napodize=10, doZ=True):
+def apodize_old(img, napodize=10, doZ=True):
     """
     softens the edges of a singe xy section to reduce edge artifacts and improve the fits
 
@@ -339,6 +339,29 @@ def apodize(img, napodize=10, doZ=True):
                 #img[slc0] = img[slc0] * fact[napo] # casting rule
                 #img[slc1] = img[scl1] * fact[napo]
     return img
+
+def apodize(img, napodize=10, doZ=True):
+    """
+    softens the edges of a single xy section to reduce edge artifacts and improve the fits
+
+    return copy of the img
+    """
+    if napodize:
+        if doZ and img.ndim >= 3:
+            shape = img.shape[-3:]
+        else:
+            shape = img.shape[-2:]
+
+        one = N.ones(shape, N.float32)
+        ones = [F.getPadded(one[(slice(i,-i),)*len(shape)], shape) for i in range(1,napodize+1)]
+        fact = N.mean(ones, axis=0)
+        val = img[:] * fact
+
+        frame = (1 - fact) * N.median(img)
+
+        return val + frame
+    else:
+        return img
 
 def iteration(a, b, niter=5, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=None, searchRad=None, npad=4):
     """

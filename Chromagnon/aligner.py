@@ -95,7 +95,7 @@ class Chromagnon(object):
         self.setParmSuffix()
         self.setIf_failed()
         self.setDefaultOutPutDir()
-        self.setMicroscopeMap()
+        #self.setMicroscopeMap()
         
         self.alignParms = N.zeros((self.img.nt, self.img.nw, NUM_ENTRY), N.float32)
         self.alignParms[:,:,4:] = 1
@@ -305,12 +305,12 @@ class Chromagnon(object):
             os.path.makedirs(outdir)
         self.outdir = outdir
 
-    def setMicroscopeMap(self, fn=None):
-        if fn:
-            rdr = chromformat.ChromagnonReader(fn, self.img, self, setmap2holder=False)
-            self.microscopemap = rdr.readMapAll()
-        else:
-            self.microscopemap = None
+    #def setMicroscopeMap(self, fn=None, set2holder=False):
+    #    if fn:
+    #        rdr = chromformat.ChromagnonReader(fn, self.img, self, set2holder=set2holder)
+    #        self.microscopemap = rdr.readMapAll()
+    #    else:
+    #        self.microscopemap = None
         
     def getSaturation(self, w=0, t=0, only_neighbor=True):
         """
@@ -625,9 +625,10 @@ class Chromagnon(object):
         # mapyx is not inherited to avoid too much distortion
 
         # from v0.81 mapyx is inherited from instumental
-        if self.microscopemap is not None:
-            self.mapyx = self.microscopemap#.readMapAll()
-        else:
+        #if self.microscopemap is not None:
+        #    self.mapyx = self.microscopemap#.readMapAll()
+        #else:
+        if self.mapyx is None:
             self.mapyx = N.zeros((self.img.nt, self.img.nw, 2, self.img.ny, self.img.nx), N.float32)
 
         if N.all((N.array(self.mapyx.shape[-2:]) - self.img.shape[-2:]) >= 0):
@@ -829,6 +830,7 @@ class Chromagnon(object):
         """
         niter = self.niter
         self.niter = 3
+        self.findBestChannel()
         for t in range(self.img.nt):
             if t == self.reftime:
                 continue
@@ -858,7 +860,7 @@ class Chromagnon(object):
         return output file name
         """
         if not fn:
-            fn = chromformat.makeChromagnonFileName(self.img.filename + self.parm_suffix, self.mapyx is not None or self.microscopemap is not None)
+            fn = chromformat.makeChromagnonFileName(self.img.filename + self.parm_suffix, self.mapyx is not None)# or self.microscopemap is not None)
             if self.outdir:
                 fn = os.path.join(self.outdir, os.path.basename(fn))
         self.cwriter = chromformat.ChromagnonWriter(fn, self.img, self)
@@ -960,15 +962,15 @@ class Chromagnon(object):
 
         return interpolated array
         """
-        if (self.mapyx is None and self.microscopemap is None):
+        if (self.mapyx is None):# and self.microscopemap is None):
             raise RuntimeError('This method must be called after calling "findNonLinear2D"')
         
         arr = self.img.get3DArr(w=w, t=t)
 
-        if self.mapyx is not None:
-            arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
-        else:
-            arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
+        #if self.mapyx is not None:
+        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
+        #else:
+        #    arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
         arr = arr[self.cropSlice]
         
         return arr
@@ -1120,7 +1122,7 @@ class Chromagnon(object):
                     self.echo('Copying reference image, t: %i, w: %i' % (t, w))
                     arr = self.img.get3DArr(w=w, t=t)
                     arr = arr[self.cropSlice]
-                elif (self.mapyx is None and self.microscopemap is None):
+                elif (self.mapyx is None):# and self.microscopemap is None):
                     self.echo('Applying affine transformation to the target image, t: %i, w: %i' % (t, w))
                     arr = self.get3DArrayAligned(w=w, t=t)
                 else:

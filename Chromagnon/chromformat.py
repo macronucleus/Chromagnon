@@ -121,8 +121,8 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
     def setMap(self):
         if self.holder.mapyx is not None:
             self.mapyx = self.holder.mapyx
-        elif self.holder.microscopemap is not None:
-            self.mapyx = self.holder.microscopemap
+        #elif self.holder.microscopemap is not None:
+        #    self.mapyx = self.holder.microscopemap
         else:
             self.mapyx = None
             
@@ -179,11 +179,11 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
 
 
 class ChromagnonReader(object):
-    def __init__(self, fn, rdr=None, holder=None, setmap2holder=True):
+    def __init__(self, fn, rdr=None, holder=None):#, set2holder=True):
         
         self.rdr = rdr
         self.holder = holder
-        self.setmap2holder = setmap2holder
+        #self.set2holder = set2holder
         
         self.dratio = N.ones((3,), N.float32)
 
@@ -204,7 +204,9 @@ class ChromagnonReader(object):
 
         self.readParms()
             
-        if rdr and holder:
+        if rdr and holder:# and set2holder:
+            self.setwaves()
+            #if set2holder:
             self.loadParm()
 
     def close(self):
@@ -266,11 +268,28 @@ class ChromagnonReader(object):
             return eval(val)
         except NameError:
             return val
+
+    def setwaves(self):
+        if hasattr(self.rdr, 'pxlsiz'):
+            self.dratio = N.asarray(self.pxlsiz, N.float32) / N.asarray(self.rdr.pxlsiz, N.float32)
+        else: # chromeditor
+            self.dratio = N.ones((3,), N.float32)
+            self.rdr.pxlsiz = self.pxlsiz
+            self.rdr.wave = self.wave
+            self.rdr.nw = self.nw
+            self.rdr.nt = self.nt
+            self.rdr.nz = self.nz
+        
+        self.pwaves = [int(round(w)) for w in self.wave[:self.nw]]
+        self.twaves = [int(round(w)) for w in self.rdr.wave[:self.rdr.nw]]
+        self.tids = [self.twaves.index(wave) for wave in self.pwaves if wave in self.twaves]
+        self.pids = [w for w in range(self.nw) if self.pwaves[w] in self.twaves]
             
     def loadParm(self):
         """
         load a chromagnon file
         """
+        old=""""
 
         # reading the header
         if hasattr(self.rdr, 'pxlsiz'):
@@ -287,7 +306,7 @@ class ChromagnonReader(object):
         self.pwaves = [int(round(w)) for w in self.wave[:self.nw]]
         self.twaves = [int(round(w)) for w in self.rdr.wave[:self.rdr.nw]]
         self.tids = [self.twaves.index(wave) for wave in self.pwaves if wave in self.twaves]
-        self.pids = [w for w in range(self.nw) if self.pwaves[w] in self.twaves]#[self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]
+        self.pids = [w for w in range(self.nw) if self.pwaves[w] in self.twaves]#[self.pwaves.index(wave) for wave in self.twaves if wave in self.pwaves]"""
 
         somewaves = [w for w, wave in enumerate(self.pwaves) if wave in self.twaves]
 
@@ -316,7 +335,7 @@ class ChromagnonReader(object):
 
 
         # obtain mapping array
-        if not self.text and self.setmap2holder:
+        if not self.text:# and self.setmap2holder:
             self.holder.mapyx = self.readMapAll()
 
     def readParmWave(self):

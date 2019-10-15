@@ -162,7 +162,9 @@ class MrcWriter(generalIO.GeneralWriter):
         self.extFloats = extFloats
         self.extInts = extInts
         
-    def writeHeader(self, hdr):
+    def writeHeader(self, hdr=None):
+        if hdr is None:
+            hdr = self.hdr
         Mrc.initHdrArrayFrom(self.fp.hdr, hdr)
         self.fp.hdr.Num = hdr.Num
         self.fp.hdr.PixelType = hdr.PixelType

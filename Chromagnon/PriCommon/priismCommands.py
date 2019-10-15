@@ -134,7 +134,7 @@ def Proj(fn, out=None, along='z', step=3, group=3, method=TRUNPROJ_METHODS[1], *
     program = 'RunProj'
     if along == 't':
         program = 'T-' + program
-    options = '-%s_group=%i -%s_step=%i -%s_%s' % (along, group, along, step, method, along)
+    options = '-%s_group=%i -%s_step=%i -%s_%s -mode=float' % (along, group, along, step, method, along)
     options += _generalOptions(*args, **kwds)
     com = '%s %s %s %s' % (program, fn, out, options)
 

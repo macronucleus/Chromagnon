@@ -1197,6 +1197,7 @@ def plotFitAny(func, parms, min=None,max=None,step=None,hold=True,dataset=0,doFi
         
     #plotxy(x,func(parms,x), s, hold=hold, logY=logY, logX=logX, logZeroOffset=logZeroOffset, figureNo=figureNo)
     plotxy(x,func(parms,x), c='-', hold=hold, figureNo=figureNo)#, symbolSize=0)
+    plothold(0)
     if doFit:
         return parms, ret
 

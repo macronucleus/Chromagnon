@@ -881,6 +881,39 @@ def ifft(af, minCdtype=fftw.CTYPE):#normalize=True, minCdtype=fftw.CTYPE):
         af = N.asarray(af, minCdtype)
 
     return fftw.ifft(af)#, normalize=normalize)
+
+def fft2d(a):#, minCdtype=fftw.CTYPE):
+    func = fft
+    return _process2d(func, a)#, minCdtype)
+
+def ifft2d(a):#, minCdtype=fftw.CTYPE):
+    func = ifft
+    return _process2d(func, a)#, minCdtype)
+
+def _process2d(func, a, minCdtype=fftw.CTYPE):
+    if a.dtype.type not in fftw.CTYPES:
+        aDtype = minCdtype
+    else:
+        aDtype = a.dtype.type # ensures native byte-order ?
+
+    s2 = a.shape
+    af = N.empty(shape=s2, dtype=aDtype)
+    
+    for tup in N.ndindex(a.shape[:-2]):
+        af[tup] = func(N.asarray(a[tup], aDtype))#, nthreads=nthreads)
+    return af
+
+def sfft(a):
+    """
+    center shifted full fft
+    """
+    return N.fft.ifftshift(fft(N.fft.fftshift(a)))
+
+def isfft(af):
+    """
+    center shifted full ifft
+    """
+    return N.fft.fftshift(ifft(N.fft.ifftshift(af)))
         
 def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
