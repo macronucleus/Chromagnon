@@ -22,7 +22,7 @@ The ready to use packages are available
 
 Example Images
 --------------
-Example images for testing are available  ["here"](https://github.com/macronucleus/Chromagnon/releases/exampleimage)
+Example images for testing are available  [here](https://github.com/macronucleus/Chromagnon/releases/exampleimages)
 
 The source
 ----------
