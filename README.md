@@ -13,7 +13,7 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/v070/ChromagnonDocumentV083.pdf)
+Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/ChromagnonDocumentV085.pdf)
 
 Downloads
 ---------
@@ -22,7 +22,7 @@ The ready to use packages are available
 
 Example Images
 --------------
-Example images for testing are available  [here](https://github.com/macronucleus/Chromagnon/releases/exampleimages)
+Example images for testing are available  [(422 MB)](https://github.com/macronucleus/Chromagnon/releases/exampleimages/SampleImages.zip)
 
 The source
 ----------
