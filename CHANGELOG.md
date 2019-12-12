@@ -75,7 +75,37 @@ down to median instead of zero (`PriCommon.xcorr.py`).
 35. (v0.84, 20191011) FindAlignParamTime does findBestChannel
 automatically (`aligner.py`).
 36. (v0.84, 20191015) A bug in miroscope map was fixed (global
-    parameters were read from beads in v0.83).
+parameters were read from beads in v0.83).
+37. (v0.85, 20191024) A choice to turn on and off rotation calculation was added for time
+alignment.
+38. (v0.85, 20191024) Region cut out also calculate reference channel
+(for time alignment).
+39. (v0.85, 20191024) Z zoom up for thin stack is used for time align.
+40. (v0.85, 20191024) A choice to turn on and off z translation
+calculation was added.
+41. (v0.85, 20191122) Misspelling "mergin" was corrected for the
+commandline help.
+42. (v0.85, 20191122) Broken commandline was fixed.
+43. (v0.85, 20191128) Saving .ome.tif was fixed to avoid 0 in emission
+or excitation wavelength (`imgio.bioformatsIO.py`)
+44. (v0.85, 20191128) Othogonal view of ndviewer used array data
+    instead of file object (`ndviewer.main.py`)
+45. (v0.85, 20191128) Words in log files are refined (initial guesses
+in `alignfunc.py` and affine to global in `aligner.py`)
+56. (v0.85, 20191128) Averaging from command-line was fixed.
+57. (v0.85, 20191204) Log file output was re-organized.
+58. (v0.85, 20191204) "Load whole data into memory" button was added
+to ndviewer.
+59. (v0.85, 20191204) Some unused menus for histogram in the viewer
+was removed.
+60. (v0.85, 20191204) Save screen shot menu of ndviewer was fixed.
+61. (v0.85, 20191205) `Orthogonal projection` was renamed to `Orthgonal
+view` in ND viewer.
+62. (v0.85, 20191211) wxpython is made despensable for commandline
+execution.
+63. (v0.85, 20191211) Warning is disabled if run from a binary file in
+the absence of bioformats.
+64. (v0.85, 20191212) A broken code in ImageSequence reader was fixed `imgio.imgSeqIO.py`
 
 v0.7(Feb. 2019)
 ----

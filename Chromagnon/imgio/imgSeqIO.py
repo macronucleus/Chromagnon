@@ -34,7 +34,7 @@ class ImgSeqReader(generalIO.GeneralReader):
         #self.fns = self.filename
         self.fns.sort()
         self.file = os.path.commonprefix([os.path.basename(fn) for fn in self.fns])
-        self.filename = os.path.commonprefix(self.fns)
+        self.filename = os.path.dirname(self.fns[0])#commonprefix(self.fns)
 
         self.i = 0
 
@@ -85,7 +85,8 @@ class ImgSeqReader(generalIO.GeneralReader):
                         break
         elif len(name) == 3:
             patstr = '_%s[0-9]+_%s[0-9]+_%s[0-9]+'
-            pats = [seq.lower() for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]#IMGSEQ]#['ztw', 'wzt', 'zwt']
+            #pats = [seq.lower() for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]#IMGSEQ]#['ztw', 'wzt', 'zwt']
+            pats = [seq for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]
             for imgseq, st in enumerate(pats):
                 pat = re.compile(patstr % tuple(st))
                 if pat.search(self.fns[0]):

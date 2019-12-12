@@ -66,18 +66,18 @@ class ImagePanel(wx.Panel):
         self._mgr.SetManagedWindow(self)
 
         self._perspectives = []
-
+        #self.loaded = False
         
         ## self.doc contains all the information on the displayed image
         if isinstance(imFile, six.string_types):#str):
-            self.doc = imgio.Reader(imFile)#bioformatsIO.load(imFile)#aligner.Chromagnon(imFile)
+            self.doc = imgio.Reader(imFile)
         else:
             self.doc = imFile
 
         #self.zsec  = [self.doc.nz//2]
         #self.zlast = [0]
         
-        if self.doc:
+        if self.doc: # can be ChromagnonEditor
             self.doc.zlast = 0
             self.addImageXY()
 
@@ -279,7 +279,7 @@ class ImagePanel(wx.Panel):
             #/n
             box = G.newSpaceV(sizer)
 
-            self.orthogonal_toggle = G.makeToggleButton(self.sliderPanel, box, self.onOrthogonal, title='Orthogonal projections')
+            self.orthogonal_toggle = G.makeToggleButton(self.sliderPanel, box, self.onOrthogonal, title='Orthogonal view')
 
             #/n
             box = G.newSpaceV(sizer)
@@ -310,6 +310,10 @@ class ImagePanel(wx.Panel):
             if self.doc.nz == 1:
                 self.sliderPanel.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
             self.tSlider.Bind(wx.EVT_KEY_DOWN, self.OnKeyTSlider)
+
+        if self.doc.nz > 1 or self.doc.nt > 1:
+            box = G.newSpaceV(sizer)
+            self.loadImgButton = G.makeButton(self.sliderPanel, box, self.loadImage2Memory, title='Load whole data into memory', tip='If the Z/T slider or changing scaling is too slow, try this funtion.')
 
 
     def OnAutoFocus(self, evt=None):
@@ -361,12 +365,31 @@ class ImagePanel(wx.Panel):
         self.zSliderBox.SetValue(str(z))
         self.OnZSliderBox()
         self.OnAutoScale()
+
+    def loadImage2Memory(self, evt=False):
+        # since bioformats is too slow, orthogonal view needs to read array data into memory
+        # On my second thought, 2k x 2k image also takes long to read, it is better to load into memory always.
+        if (self.doc.nz > 1 or self.doc.nt > 1) and self.loadImgButton.IsEnabled() and issubclass(type(self.doc), imgio.generalIO.GeneralReader):
+            zlast = self.doc.zlast
+            z = self.doc.z
+            self.doc = imgio.arrayIO.ArrayReader(self.doc)
+            self.doc.zlast = zlast
+            self.doc.z = z
+            #self.loaded = True
+            self.viewers[-1].setMyDoc(self.doc, self)
+            #print('loadImage2Memory called')
+            self.loadImgButton.Enable(0)
             
     def onOrthogonal(self, evt=None):
         """
         transform to the orthogonal viewer
         """
         if self.orthogonal_toggle.GetValue() and len(self.viewers) == 1:
+            
+            #if issubclass(type(self.doc), imgio.generalIO.GeneralReader):#type(self.doc) == imgio.bioformatsIO.BioformatsReader:
+            self.loadImage2Memory()
+                #self.viewers[-1].setMyDoc(self.doc, self)
+                
             self._mgr.GetPane('Image').Left().Position(1)
             self.OnAddX()
             self.OnAddY()
@@ -541,6 +564,8 @@ class ImagePanel(wx.Panel):
                 self.hist[i].Bind(wx.EVT_MENU, self.OnHistColorChange, id=_rgbList_menuIDs[ii])
 
             self.hist[i].menu.InsertSeparator(ii+1)
+            self.hist[i].menu.Remove(histogram.Menu_Log)
+            self.hist[i].menu.Remove(histogram.Menu_FitYToSeen)
 
 
             self.hist_toggleID2col[ self.hist_toggleButton[i].GetId() ] = i

@@ -13,54 +13,79 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
     import warnings
-    warnings.simplefilter('ignore')#filterwarnings('ignore')
+    warnings.simplefilter('ignore')
 
-# ------------- import modules
+# ------------- import basic modules
 import sys, os
 import six
 
-import wx
 try:
-    from PriCommon import guiFuncs as G, commonfuncs as C, listbox
-    from ndviewer import main as aui
+    from PriCommon import commonfuncs as C
     from Priithon.all import U, N, Mrc
     import imgio
 except (ValueError, ImportError):
-    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, listbox
-    from Chromagnon.ndviewer import main as aui
+    from Chromagnon.PriCommon import commonfuncs as C
     from Chromagnon.Priithon.all import U, N, Mrc
     from Chromagnon import imgio
 
 ## for packaging, here the relative import was impossible to run this script as __main__
 try:
     if sys.version_info.major == 2:
-        import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
+        import aligner, cutoutAlign, alignfuncs as af, threads, chromformat, version
     elif sys.version_info.major >= 3:
-        from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
+        from .Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromformat, version
 except ImportError: # run as __main__
-    from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromeditor, chromformat, flatfielder, version, extrapanel
+    from Chromagnon import aligner, cutoutAlign, alignfuncs as af, threads, chromformat, version
 
 #----------- Global constants
 C.CONFPATH = 'Chromagnon.conf'
-
-LISTSIZE_X=sum([val for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')])
-LISTSPACE=10
-FRAMESIZE_X= LISTSIZE_X * 2 + LISTSPACE
-FRAMESIZE_Y=220
-
-if sys.platform.startswith('win'):
-    LIST_Y=140
-    FRAMESIZE_Y += 10
-elif sys.platform.startswith('darwin'):
-    LIST_Y=155
-else:
-    LIST_Y=150
-
 FILTER = '*'
-
-
 LOCAL_CHOICE = ['None', 'Projection']#, 'Section-wise']
 
+# ---------- GUI specific modules and constants
+try:
+    import wx
+    try:
+        from PriCommon import guiFuncs as G, listbox
+        from ndviewer import main as aui
+    except (ValueError, ImportError):
+        from Chromagnon.PriCommon import guiFuncs as G, listbox
+        from Chromagnon.ndviewer import main as aui
+        
+    try:
+        if sys.version_info.major == 2:
+            import chromeditor, flatfielder, extrapanel
+        elif sys.version_info.major >= 3:
+            from .Chromagnon import chromeditor, flatfielder, extrapanel
+    except ImportError: # run as __main__
+        from Chromagnon import chromeditor, flatfielder, extrapanel
+
+    # GUI constants
+    LISTSIZE_X=sum([val for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')])
+    LISTSPACE=10
+    FRAMESIZE_X= LISTSIZE_X * 2 + LISTSPACE
+    FRAMESIZE_Y=220
+
+    if sys.platform.startswith('win'):
+        LIST_Y=140
+        FRAMESIZE_Y += 10
+    elif sys.platform.startswith('darwin'):
+        LIST_Y=155
+    else:
+        LIST_Y=150
+        
+except ImportError:
+    if len(sys.argv) > 1: # commandline use
+        # a dummy class for wx
+        class wx(object):
+            def __init__(self):
+                pass
+            class Panel(object):
+                def __init__(self):
+                    pass
+    else:
+        raise
+    
 #----------- Execute this function to start
 def _main(sysarg=None, title="Chromagnon v%s" % version.version):
     """
@@ -389,6 +414,12 @@ class BatchPanel(wx.Panel):
 
             self.extra_parms['calibfn'] = dlg.calibfn
 
+            self.extra_parms['dorot4time'] = dlg.dorot4time_cb.GetValue()
+            #C.saveConfig(dorot4time=self.extra_parms['dorot4time'])
+
+            self.extra_parms['doZ'] = dlg.doZ_cb.GetValue()
+            #C.saveConfig(doZ=self.extra_parms['doZ'])
+
         dlg.Destroy()
         
     def checkGo(self, evt=None):
@@ -536,7 +567,10 @@ class BatchPanel(wx.Panel):
                      form,
                      int(self.min_pxls_choice.GetStringSelection()),
                          self.extra_parms.get('max_shift', af.MAX_SHIFT),
-                         self.extra_parms.get('calibfn', '')] 
+                         self.extra_parms.get('calibfn', ''),
+                         self.extra_parms.get('dorot4time', True),
+                         self.extra_parms.get('doZ', True)
+                         ] 
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
@@ -621,8 +655,8 @@ def command_line():
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
                      help='maximum shift in micrometers possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
-        p.add_argument('--not_crop_mergins', '-c', action='store_false',
-                     help='do not crop mergins after alignment (default=False; do crop mergins)')
+        p.add_argument('--not_crop_margins', '-c', action='store_false',
+                     help='do not crop margins after alignment (default=False; do crop margins)')
         p.add_argument('--average_references', '-a', action='store_true',
                      help='average reference image (default=False)')
         p.add_argument('--parm_suffix', '-P', default='',
@@ -641,6 +675,10 @@ def command_line():
                      help='number of iteration for 3D phase correlation (default=%i)' % aligner.MAXITER_3D)
         p.add_argument('--microscope_calib', '-M', default='',
                      help='local calibration file of your microscope (default=None)')
+        p.add_argument('--donotRot4Time', '-t', action='store_true',
+                     help='turn off rotation calculation for time series (default=False, i.e. calculate rotation)')
+        p.add_argument('--donotZ', '-n', action='store_true',
+                     help='turn off Z-axis calculation (default=False, i.e. calculate Z-axis)')
         
         options = p.parse_args(sys.argv[1:])
 
@@ -658,7 +696,7 @@ def command_line():
             h.close()
 
         if options.average_references:
-            refs = af.averageImage(refs, ext=options.img_format)
+            refs = [af.averageImage(refs, ext=options.img_format)]
             print('averaged image was saved as %s' % refs)
 
         if options.reference_wavelength:
@@ -667,7 +705,7 @@ def command_line():
         if options.local:
             options.local = LOCAL_CHOICE[1]
 
-        parms = [not options.not_crop_mergins,
+        parms = [not options.not_crop_margins,
                 options.output_directory,
                 options.local,
                 options.reference_wavelength,
@@ -678,7 +716,9 @@ def command_line():
                 options.img_format,
                 int(options.localMinWindow),
                 options.maxShift,
-                options.microscope_calib]
+                options.microscope_calib,
+                not(options.donotRot4Time), # dorot4time
+                not(options.donotZ)] # doZ
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()

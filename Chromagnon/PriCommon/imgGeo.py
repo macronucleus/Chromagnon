@@ -290,6 +290,15 @@ def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
         start = int(zyx - r[j] / 2.)# + 0.5000001)
         end = int(zyx + r[j] / 2.)# + 0.5000001)
         #print(start, end, r)
+        if end == start:
+            if end < (shape[j]-1):
+                #print('found')
+                end += 1
+            elif start > 0:
+                start -= 1
+            else:
+                raise RuntimeError('cannot make slice for pos %s' % pos)
+        
         if start < 0:
             if adjustEdge:
                 start = 0

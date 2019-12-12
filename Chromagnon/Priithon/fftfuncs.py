@@ -787,8 +787,8 @@ def fourierShiftArr(shape=defshape, delta=None, meantForRealFFT=False, dtype=N.f
     f = 2j*N.pi
 
     if len(shape) == 1:
-        nX = shape
-        dx = delta
+        nX = shape[0]
+        dx = delta[0]
         dx = - float(dx) / float(nX)
         if meantForRealFFT:
             shape = shape[:-1] + ( shape[-1]//2 + 1 ,)

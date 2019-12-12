@@ -320,7 +320,7 @@ def _reshapeExtHdr(extHdr):
 
 
 #### imgManager ####
-def shapeFromNum(Num, NumWaves=1, NumTimes=1, imgSequence=1):
+def shapeFromNum(Num, NumWaves=1, NumTimes=1, imgSequence=1, squeeze=True):
     nz = int(Num[2]) // (int(NumWaves) * int(NumTimes)) # int() to avoid byte swap
     if imgSequence == 0:
         shape = [NumWaves, NumTimes, nz, Num[1], Num[0]]
@@ -330,7 +330,9 @@ def shapeFromNum(Num, NumWaves=1, NumTimes=1, imgSequence=1):
         shape = [NumTimes, NumWaves, nz, Num[1], Num[0]]
     elif imgSequence == 3:
         shape = [NumWaves, nz, NumTimes, Num[1], Num[0]]
-    return _slimShape(shape)
+    if squeeze:
+        shape = _slimShape(shape)
+    return tuple(shape)
 
 def shapeFromHdr(hdr):
     return shapeFromNum(hdr.Num, hdr.NumWaves, hdr.NumTimes, hdr.ImgSequence)

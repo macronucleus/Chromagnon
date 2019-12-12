@@ -5,7 +5,18 @@ __author__  = "Sebastian Haase <haase@msg.ucsf.edu>"
 __license__ = "BSD license - see LICENSE file"
 
 import six
-import wx
+try:
+    import wx
+    _wx = True
+except ImportError:
+    _wx = False
+    class wx(object):
+        def __init__(self):
+            pass
+        class FileDropTarget(object):
+            def __init__(self):
+                pass
+    
 import numpy as N
 from . import PriConfig
 
@@ -1042,7 +1053,8 @@ def iterChildrenTree(parent, includeParent=True):
 
 
 #from . import plt
-from .usefulP import *
+if _wx:
+    from .usefulP import *
 
 
 
@@ -1258,14 +1270,14 @@ try:
 except ImportError:
     pass
 
-#  try:
-from .histogram import hist as histogram
-from .mmviewer import mview
-from .scalePanel import scalePanel
-from .zslider import ZSlider
+if _wx:
+    from .histogram import hist as histogram
+    from .mmviewer import mview
+    from .scalePanel import scalePanel
+    from .zslider import ZSlider
 
-from .buttonbox import *
-from .guiParams import guiParams
+    from .buttonbox import *
+    from .guiParams import guiParams
 
 #HIST= #dictionary
 #VIEW= #dictionary
@@ -1364,12 +1376,13 @@ try:
 except:
     viewers=[]
 
-from .splitND import run as view
-from .splitND2 import run as view2
+if _wx:
+    from .splitND import run as view
+    from .splitND2 import run as view2
 
 
-from .DragAndDrop import DropFrame
-from .viewerRubberbandMode import viewerRubberbandMode as vROI
+    from .DragAndDrop import DropFrame
+    from .viewerRubberbandMode import viewerRubberbandMode as vROI
 
 def vd(id=-1):
     """
@@ -2735,8 +2748,8 @@ def vmScale(id, zscale):
     return viewers[id].m.setZScale(zscale)
 
 
-
-from OpenGL import GL
+if _wx:
+    from OpenGL import GL
 # def glTex2Don():
 #   pass# #20050520 GL.glEnable( GL.GL_TEXTURE_2D)
 # def glTex2Doff():

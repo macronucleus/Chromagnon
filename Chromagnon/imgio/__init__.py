@@ -6,19 +6,19 @@ import six
 import numpy as N
 
 if sys.version_info.major == 2:
-    import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
+    import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
 elif sys.version_info.major >= 3:
     try:
-        from . import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
+        from . import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
     except ImportError:
-        from imgio import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO
+        from imgio import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
         
 from .bioformatsIO import uninit_javabridge
 
 READABLE_FORMATS = []
 WRITABLE_FORMATS = []
 _names = ['seq', 'tif', 'mrc', 'bio']
-for module in [generalIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO]:
+for module in [generalIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO, arrayIO]:
     reload(module)
     READABLE_FORMATS += module.READABLE_FORMATS
     WRITABLE_FORMATS += module.WRITABLE_FORMATS

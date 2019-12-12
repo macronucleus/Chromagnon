@@ -154,7 +154,8 @@ except:
 OMETIFF = ('ome.tif', 'ome.tiff')
 
 WAVE_START = 400
-WAVE_END = 700
+#WAVE_END = 700
+WAVE_STEP = 100
 
 ### -------- Javabridge --------------####
 # javabridge.start_vm(class_path=bioformats.JARS)# cannot call at once
@@ -352,7 +353,12 @@ class AbstractChannels(DynamicList):
 
         else:
             nw = self.ome.pixels.get_SizeC()
-            waves = generalIO.makeWaves(nw)
+            # guessing the excitation wavelength
+            if self.node_name == 'Channel' and self.key == 'ExcitationWavelength' and self.ome.get('EmissionWavelength', node_name=self.node_name, idx=0):
+                waves = [str(float(self.ome.get('EmissionWavelength', node_name=self.node_name, idx=w)) - 40) for w in range(nw)]
+            else:
+                # because 0 is not allowed for wavelength in Bioformats or ome.tiff?? WAVE_START and WAVE_STEP mimics visible wavelength.
+                waves = generalIO.makeWaves(nw, WAVE_START, WAVE_STEP)
             if self.ome.pixels.get_channel_count() == nw:
                 for w in range(nw):
                     unit = self.ome.get(self.key + 'Unit', self.node_name, w)
@@ -555,18 +561,18 @@ class AbstractReader(object):
             self.dtype = dtype
 
         if len(wave):
-            if len(wave) > 1 and wave[0] == wave[-1]:
-                self.wave = AbstractChannels(N.arange(400, 700, 300//self.nw)[:self.nw])
+            if len(wave) > 1 and (wave[0] == wave[-1] or 0 in wave): # because 0 is not allowed for wavelength in Bioformats or ome.tiff?? WAVE_START and WAVE_STEP mimics visible wavelength.
+                self.wave = AbstractChannels(generalIO.makeWaves(nw, WAVE_START, WAVE_STEP))
             else:
                 self.wave = AbstractChannels(wave)
             self.wave.setup(self.ome)
         elif (hasattr(self, 'wave') and not len(self.wave)) and not len(wave) and self.nw:
-            self.wave = AbstractChannels(N.arange(400, 700, 300//self.nw)[:self.nw])
+            self.wave = AbstractChannels(generalIO.makeWaves(nw, WAVE_START, WAVE_STEP))
             self.wave.setup(self.ome)
         elif not (hasattr(self, 'wave')):
-            self.wave = AbstractChannels(N.arange(400, 700, 300//self.nw)[:self.nw])
+            self.wave = AbstractChannels(generalIO.makeWaves(nw, WAVE_START, WAVE_STEP))
             self.wave.setup(self.ome)
-            
+
         if imgSequence is not None:
             self.imgSequence = imgSequence
 
@@ -870,7 +876,7 @@ class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
     def setup(self, arr):
        # ome = bioformats.omexml
         # bioformats/formatwriter.py
-
+        
         if arr.ndim == 3:
             p = self.omexml.image(0).Pixels
             p.SizeC = arr.shape[2]
@@ -884,6 +890,7 @@ class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
         clsOMEXMLService = javabridge.JClassWrapper('loci.formats.services.OMEXMLService')
         serviceFactory = javabridge.JClassWrapper('loci.common.services.ServiceFactory')()
         service = serviceFactory.getInstance(clsOMEXMLService.klass)
+        #print(self.xml)
         metadata = service.createOMEXMLMetadata(self.xml)
 
         if self.file.endswith(OMETIFF):

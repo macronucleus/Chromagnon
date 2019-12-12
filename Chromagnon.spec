@@ -18,76 +18,80 @@
 # pyinstaller --clean Z:\py\Chromagnon\Chromagnon.spec
 # if applicable... --upx-dir=upx394w
 
+# pyinstaller should be installed from pip 
+
 import sys, os
 pyversion = sys.version_info.major
 
+PLUGIN='' # 'vcat5'
+if PLUGIN == '':
+    console=False
+    ex_suffix = ''
+    module='chromagnon.py'
+elif PLUGIN:
+    console=True
+    ex_suffix = '_%s' % PLUGIN
+    module='%s_chromagnon.py' % PLUGIN
+
 
 block_cipher = None
-ENV = 'chrom'
 
 # ------ platform dependence ---
+conda = os.getenv('CONDA_PREFIX')
 binaries = []
 home=os.path.expanduser('~')
 name = 'Chromagnon'
 
 # win
 if sys.platform.startswith('win'):
-    conda = 'Miniconda%i' % pyversion
-    site=os.path.join(home, conda, 'Lib', 'site-packages')
+    if not conda:
+        conda = os.path.join(home, 'Miniconda%i' % pyversion)
+    
+    site=os.path.join(conda, 'Lib', 'site-packages')
+    libbin = os.path.join(conda, 'Library', 'bin')
 
     code=os.path.abspath(os.path.join('Z:', 'py'))
     src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
-    
-    libbin = os.path.join(home, conda, 'Library', 'bin')
-    if pyversion == 3:
-        glut = 'glut64.dll'
-    elif pyversion == 2:
-        glut = os.path.join(libbin, 'freeglut.dll')
-    binaries = [(os.path.join(libbin, 'mkl_avx.dll'), ''), (os.path.join(libbin, 'mkl_avx2.dll'), ''), (os.path.join(home, conda, glut), '')]
+
+
+    binaries = [(os.path.join(libbin, 'mkl_avx.dll'), '.'), (os.path.join(libbin, 'mkl_avx2.dll'), '.')]
+    if not PLUGIN:
+        if pyversion == 3:
+            glut = 'glut64.dll'
+        elif pyversion == 2:
+            glut = os.path.join(libbin, 'freeglut.dll')
+        binaries += [(os.path.join(home, conda, glut), '.')]
     pylib = 'pyd'
     jvm = 'jvm.dll'
-    suffix = 'Win'
+    suffix = 'Win' + ex_suffix
+    
 else: # mac + linux
-    conda = 'miniconda%i' % pyversion
-
-
     code=os.path.join(home, 'codes', 'py')
     src = os.path.join(home, 'codes', 'src', 'Chromagnon', 'Chromagnon')
-    
+
+    site=os.path.join(conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
+
     pylib = 'so'
     # mac
     if sys.platform == 'darwin':
-        #site=os.path.join(home, conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
-        site=os.path.join(home, conda, 'envs', ENV, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
-        suffix = 'Mac'
+        suffix = 'Mac' + ex_suffix
         jvm = 'libjvm.dylib'
     # linux
     else:
         suffix = ''
         import platform
         dist = platform.dist()[0]
-        if dist in ('debian', 'ubuntu'):
-            #suffix = 'Ubuntu'
-            conda = '_'.join((conda, 'ubuntu'))
-        else:
-            #suffix = dist
-            conda = 'miniconda2_' + dist.lower()
-
-        # to find python on linux with miniconda, you need
-        # LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Public/programs/miniconda3_ubuntu/lib
         ldpath = os.getenv('LD_LIBRARY_PATH', '').split(':')
-        pylibpath = os.sep + os.path.join('Public', 'programs', conda, 'envs', ENV, 'lib')
 
+        pylibpath = os.path.join(conda, 'lib')
         if pylibpath not in ldpath:
             os.environ['LD_LIBRARY_PATH'] = ':'.join((os.getenv('LD_LIBRARY_PATH', ''), pylibpath))
-        
-        site = os.path.join(pylibpath, 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
 
         jvm = 'libjvm.so'
         name = name.lower()
 
 
-prog = os.path.abspath(os.path.join(src, 'Chromagnon', 'chromagnon.py'))
+prog = os.path.abspath(os.path.join(src, 'Chromagnon', module))
 #DISTPATH=os.path.relpath(os.path.join(src, 'dist')) # not working??
         
 # ------ chromagnon version
@@ -98,10 +102,16 @@ if sys.platform.startswith(('win', 'darwin')):
 else:
     cversion = ''
 # ------- pyinstaller
+
+datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
+    
+if not PLUGIN:
+    datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
+    
 a = Analysis([prog],
              pathex=[code],
              binaries=binaries,
-             datas=[(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars')), (os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')],
+             datas=datas,
              hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs'],
 
              hookspath=[],
@@ -123,7 +133,7 @@ exe = EXE(pyz,
           strip=False,
           upx=False, #True,
           runtime_tmpdir=None,
-          console=False)
+          console=console)#False)
 
 if sys.platform.startswith('darwin'):
     app = BUNDLE(exe,

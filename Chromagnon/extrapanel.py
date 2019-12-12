@@ -71,6 +71,8 @@ class ExtraDialog(wx.Dialog):
         # \n
         box = G.newSpaceV(sizer)
         bb, box = G.newStaticBox(self, box, title='Z-accuracy', size=wx.DefaultSize)
+        self.doZ_cb = G.makeCheck(self, box, "align Z", tip='Uncheck if Z axis alignment is not desired', defChecked=True)#bool(confdic.get('doZ', True)))
+        
         accurChoice = [str(i) for i in aligner.ACCUR_CHOICE]
         label, self.accurListChoice = G.makeListChoice(self, box, 'Iteration of 3D phase correlation', accurChoice, defValue=confdic.get('accur', accurChoice[0]))
 
@@ -79,6 +81,12 @@ class ExtraDialog(wx.Dialog):
         box = G.newSpaceV(sizer)
         bb, box = G.newStaticBox(self, box, title='Maximum shift the channels are possibly misaligned', size=wx.DefaultSize)
         label, self.maxshift_text = G.makeTxtBox(self, box, 'Shift (um)', defValue=confdic.get('max_shift', str(af.MAX_SHIFT)), tip='Maximum shift the channels are possibly misaligned', sizeX=40)
+
+        # --------- Do rotation for time series ------
+        # \n
+        box = G.newSpaceV(sizer)
+        bb, box = G.newStaticBox(self, box, title='Time series alignment', size=wx.DefaultSize)
+        self.dorot4time_cb = G.makeCheck(self, box, "Calculate rotation", tip='By default translation in XYZ is examined. If this check box is checked, rotation in addition to translation is aligned as well', defChecked=True)#bool(confdic.get('dorot4time', True)))
         
         # -------- what to do for time series --------
         # \n

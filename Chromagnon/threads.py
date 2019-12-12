@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import os, threading, time, sys
-import wx
 
 try:
     from PriCommon import flatConv
@@ -11,7 +10,7 @@ except ImportError:
     from Chromagnon.Priithon import fftmanager
 
 if sys.version_info.major == 2:
-    import alignfuncs, chromformat, aligner
+    import alignfuncs, chromformat, aligner, alignfuncs as af
 elif sys.version_info.major >= 3:
     try:
         from . import alignfuncs as af, chromformat, aligner
@@ -22,29 +21,38 @@ elif sys.version_info.major >= 3:
 if not getattr(__builtins__, "WindowsError", None):
     class WindowsError(OSError): pass
 
-###--- thread-safe gui -----------
-# http://wiki.wxpython.org/LongRunningTasks
 
-EVT_COLOR_ID = wx.NewId()
-EVT_DONE_ID = wx.NewId()
-EVT_VIEW_ID = wx.NewId()
-EVT_ABORT_ID = wx.NewId()
-EVT_ERROR_ID = wx.NewId()
-EVT_ECHO_ID = wx.NewId()
-#EVT_INITGUESS_ID = wx.NewId()
-EVT_SETFLAT_ID = wx.NewId()
-EVT_CLOSE_PAGE_ID = wx.NewId()
-EVT_PROGRESS_ID = wx.NewId()
+try:
+    ###--- thread-safe gui -----------
+    # http://wiki.wxpython.org/LongRunningTasks
+    import wx
+    _wx = True
 
-# Dine events
-def BindEvent(win, func, evt_id):
-    win.Connect(-1, -1, evt_id, func)
+    EVT_COLOR_ID = wx.NewId()
+    EVT_DONE_ID = wx.NewId()
+    EVT_VIEW_ID = wx.NewId()
+    EVT_ABORT_ID = wx.NewId()
+    EVT_ERROR_ID = wx.NewId()
+    EVT_ECHO_ID = wx.NewId()
+    #EVT_INITGUESS_ID = wx.NewId()
+    EVT_SETFLAT_ID = wx.NewId()
+    EVT_CLOSE_PAGE_ID = wx.NewId()
+    EVT_PROGRESS_ID = wx.NewId()
 
-class MyEvent(wx.PyEvent):
-    def __init__(self, evt_id, data):
-        wx.PyEvent.__init__(self)
-        self.SetEventType(evt_id)
-        self.data = data
+    # events
+    def BindEvent(win, func, evt_id):
+        win.Connect(-1, -1, evt_id, func)
+
+    class MyEvent(wx.PyEvent):
+        def __init__(self, evt_id, data):
+            wx.PyEvent.__init__(self)
+            self.SetEventType(evt_id)
+            self.data = data
+        
+except ImportError:
+    _wx = False
+
+
 
 
 ###---- funcs to cancel execution ---------
@@ -131,6 +139,8 @@ class ThreadWithExc(threading.Thread):
         min_pxls_yx = parms[9]
         max_shift = parms[10]
         microscopemap = parms[11]
+        dorot4time = parms[12]
+        doZ = parms[13]
         
         saveAlignParam = True
         alignChannels = True
@@ -158,7 +168,7 @@ class ThreadWithExc(threading.Thread):
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
                     #an = aligner.Chromagnon(fn)
-                    an = self.getAligner(fn, index, what='ref')
+                    an = self.getAligner(fn, index, what='ref', doZ=doZ)
                     an.setMaxShift(max_shift)
                     if accur:
                         an.setMaxIter3D(accur)
@@ -183,6 +193,7 @@ class ThreadWithExc(threading.Thread):
                             self.echo('Using microscope map %s as a starting point for global alignment' % microscopemap, skip_notify=True, doprint=True)
                             an.loadParm(microscopemap)#setMicroscopeMap(microscopemap, set2holder=True) #this also loads an initial guess for the global align parameters
                         for t in range(an.nt):
+                            #an.findAlignParamWave(t=t)
                             try:
                                 an.findAlignParamWave(t=t)
                             except af.AlignError: # in xcorr or else
@@ -214,7 +225,7 @@ class ThreadWithExc(threading.Thread):
                         self.echo('Calculating timelapse alignment...')
                         an.findBestChannel()
                         an.findBestTimeFrame(an.refwave)
-                        
+                        an.setDoRotate4timeSeries(dorot4time)
                         an.findAlignParamTime(doWave=False)
 
                     fn = an.saveParm()
@@ -243,7 +254,7 @@ class ThreadWithExc(threading.Thread):
                     tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
                     self.log('\n**Applying to %s using %s at %s' % (os.path.basename(target), os.path.basename(fn), tstf))
 
-                    an = self.getAligner(target, index, what='target')
+                    an = self.getAligner(target, index, what='target', doZ=doZ)
                     an.setDefaultOutPutDir(outdir)
 
                     
@@ -291,7 +302,7 @@ class ThreadWithExc(threading.Thread):
                 else:
                     self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
                 
-                an = self.getAligner(target, index, what='target')
+                an = self.getAligner(target, index, what='target', doZ=doZ)
                 an.setDefaultOutPutDir(outdir)
 
                 pgen = self.progressValues(target=True, an=an)
@@ -364,7 +375,7 @@ class ThreadWithExc(threading.Thread):
         #for stat in top_stats[:10]:
         #    print(stat)
 
-    def getAligner(self, fn, index, what='ref'):
+    def getAligner(self, fn, index, what='ref', doZ=True):
         """
         what: 'ref' or 'tgt'
         """
@@ -373,6 +384,7 @@ class ThreadWithExc(threading.Thread):
             an.setImgSuffix(self.img_suffix)
             an.setFileFormats(self.img_ext)
             an.setParmSuffix(self.parm_suffix)
+            an.setDoZ(doZ)
 
         except IOError:
             raise IOError('filename %s, index %i, fns %s' % (fn, index, fns))
@@ -432,148 +444,149 @@ class ThreadWithExc(threading.Thread):
         if self.notify_obj:
             return wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [val]))
         #print 'pval', val
-            
-class GUImanager(wx.EvtHandler):
-    def __init__(self, panel, name=None):
-        """
-        This class handles events
-        """
-        wx.EvtHandler.__init__(self)
-        self.panel = panel
-        self.name = name
-        self.stopWithErr = False
-        
-        BindEvent(self, self.OnColor, EVT_COLOR_ID)
 
-        BindEvent(self, self.OnView, EVT_VIEW_ID)
+if _wx:
+    class GUImanager(wx.EvtHandler):
+        def __init__(self, panel, name=None):
+            """
+            This class handles events
+            """
+            wx.EvtHandler.__init__(self)
+            self.panel = panel
+            self.name = name
+            self.stopWithErr = False
 
-        BindEvent(self, self.OnDone, EVT_DONE_ID)
+            BindEvent(self, self.OnColor, EVT_COLOR_ID)
 
-        BindEvent(self, self.OnCancel, EVT_ABORT_ID)
-        
-        BindEvent(self, self.OnError, EVT_ERROR_ID)
+            BindEvent(self, self.OnView, EVT_VIEW_ID)
 
-        BindEvent(self, self.OnEcho, EVT_ECHO_ID)
+            BindEvent(self, self.OnDone, EVT_DONE_ID)
 
-        #BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
+            BindEvent(self, self.OnCancel, EVT_ABORT_ID)
 
-        BindEvent(self, self.OnSetFlat, EVT_SETFLAT_ID)
+            BindEvent(self, self.OnError, EVT_ERROR_ID)
 
-        BindEvent(self, self.OnClosePage, EVT_CLOSE_PAGE_ID)
+            BindEvent(self, self.OnEcho, EVT_ECHO_ID)
 
-        BindEvent(self, self.OnProgress, EVT_PROGRESS_ID)
+            #BindEvent(self, self.OnInitGuess, EVT_INITGUESS_ID)
 
+            BindEvent(self, self.OnSetFlat, EVT_SETFLAT_ID)
 
-        self.OnStart()
-        
-    def OnStart(self):
-        self.panel.goButton.SetLabel('Cancel')
-        self.panel.buttonsEnable(0)
-        #self.panel.label.SetLabel('processing, please wait ...')
-        #self.panel.label.SetForegroundColour('red')
-        self.echo('preparing, please wait ...')
+            BindEvent(self, self.OnClosePage, EVT_CLOSE_PAGE_ID)
 
-    def OnColor(self, evt):
-        if evt.data[0] == 'ref':
-            listbox = self.panel.listRef
-        else:
-            listbox = self.panel.listTgt
-        index = evt.data[1]
-        color = evt.data[2]
-
-        #item = listbox.GetItem(index)
-        listbox.SetItemTextColour(index, 'red')
-        #item.SetTextColour(color)
-        #listbox.SetItem(item)
-            
-        self.currlist = self.panel.listRef
-        self.item     = listbox.GetItem(index)#item
+            BindEvent(self, self.OnProgress, EVT_PROGRESS_ID)
 
 
-    def OnView(self, evt):
-        #if len(evt.data) == 2:
-        #    fn, chrom = evt.data
-        #else:
-        fn = evt.data[0]
-            #    chrom = None
+            self.OnStart()
 
-        if sys.platform == 'linux2': # or wx.__version__.startswith('2.8')??
-            self.panel.view(fn)#, calib=chrom)
-        else:
-            wx.CallAfter(self.panel.view,fn)#, calib=chrom)
-        #wx.Yield()
+        def OnStart(self):
+            self.panel.goButton.SetLabel('Cancel')
+            self.panel.buttonsEnable(0)
+            #self.panel.label.SetLabel('processing, please wait ...')
+            #self.panel.label.SetForegroundColour('red')
+            self.echo('preparing, please wait ...')
 
-    def OnDone(self, evt=None):
-
-        if not self.stopWithErr:
-            doneref, donetgt, err = evt.data
-            doneref.sort(reverse=True)
-            donetgt.sort(reverse=True)
-            [self.panel.listRef.clearRaw(i) for i in doneref]
-            [self.panel.listTgt.clearRaw(i) for i in donetgt]
-                #self.panel.listRef.clearAll()
-                #self.panel.listTgt.clearAll()
-            
-            #self.panel.label.SetLabel('Done!!')
-            #self.panel.label.SetForegroundColour('black')
-            if err:
-                self.echo('Done with %i errs' % len(err), 'blue')
+        def OnColor(self, evt):
+            if evt.data[0] == 'ref':
+                listbox = self.panel.listRef
             else:
-                self.echo('Done!!', 'blue')
+                listbox = self.panel.listTgt
+            index = evt.data[1]
+            color = evt.data[2]
 
-            self.panel.goButton.Enable(0)
-            #self.panel.viewButton.Enable(0)
+            #item = listbox.GetItem(index)
+            listbox.SetItemTextColour(index, 'red')
+            #item.SetTextColour(color)
+            #listbox.SetItem(item)
 
-        self.panel.goButton.SetValue(0)
-        self.panel.goButton.SetLabel('Run all')
-        self.panel.buttonsEnable(1)
-        self.panel.OnItemSelected()
+            self.currlist = self.panel.listRef
+            self.item     = listbox.GetItem(index)#item
 
-    def OnCancel(self, evt):
-        if self.currlist:
-            self.item.SetTextColour(wx.BLACK)
-            self.currlist.SetItem(self.item)
 
-            #self.panel.label.SetLabel('Cancelled')
-            #self.panel.label.SetForegroundColour('black')
-        self.echo('Cancelled', 'blue')
+        def OnView(self, evt):
+            #if len(evt.data) == 2:
+            #    fn, chrom = evt.data
+            #else:
+            fn = evt.data[0]
+                #    chrom = None
 
-        self.stopWithErr = True
+            if sys.platform == 'linux2': # or wx.__version__.startswith('2.8')??
+                self.panel.view(fn)#, calib=chrom)
+            else:
+                wx.CallAfter(self.panel.view,fn)#, calib=chrom)
+            #wx.Yield()
 
-        self.OnDone()
-        
-    def OnError(self, evt):
-        try:
-            from Priithon import guiExceptionFrame
-        except ImportError:
-            from Chromagnon.Priithon import guiExceptionFrame
-        self.panel.label.SetLabel('')
-        self.panel.label.SetForegroundColour('black')
-        self.stopWithErr = True
-        f = guiExceptionFrame.MyFrame(*evt.data)
-        self.OnDone()
-        #raise evt.data[0], evt.data[1]
+        def OnDone(self, evt=None):
 
-    def OnEcho(self, evt):
-        self.echo(evt.data)
-        
-    def echo(self, msg, color='red'):
-        self.panel.label.SetLabel(msg)
-        self.panel.label.SetForegroundColour(color)
-        #print(msg)
+            if not self.stopWithErr:
+                doneref, donetgt, err = evt.data
+                doneref.sort(reverse=True)
+                donetgt.sort(reverse=True)
+                [self.panel.listRef.clearRaw(i) for i in doneref]
+                [self.panel.listTgt.clearRaw(i) for i in donetgt]
+                    #self.panel.listRef.clearAll()
+                    #self.panel.listTgt.clearAll()
 
-    #def OnInitGuess(self, evt):
-    #    self.panel._setInitGuess(evt.data[0])
+                #self.panel.label.SetLabel('Done!!')
+                #self.panel.label.SetForegroundColour('black')
+                if err:
+                    self.echo('Done with %i errs' % len(err), 'blue')
+                else:
+                    self.echo('Done!!', 'blue')
 
-    
-    def OnSetFlat(self, evt):
-        self.panel._setFlat(evt.data)
+                self.panel.goButton.Enable(0)
+                #self.panel.viewButton.Enable(0)
 
-    def OnClosePage(self, evt):
-        self.panel.aui.imEditWindows.DeletePage(evt.data[0])
+            self.panel.goButton.SetValue(0)
+            self.panel.goButton.SetLabel('Run all')
+            self.panel.buttonsEnable(1)
+            self.panel.OnItemSelected()
 
-    def OnProgress(self, evt):
-        self.panel.progress.SetValue(evt.data[0])
+        def OnCancel(self, evt):
+            if self.currlist:
+                self.item.SetTextColour(wx.BLACK)
+                self.currlist.SetItem(self.item)
+
+                #self.panel.label.SetLabel('Cancelled')
+                #self.panel.label.SetForegroundColour('black')
+            self.echo('Cancelled', 'blue')
+
+            self.stopWithErr = True
+
+            self.OnDone()
+
+        def OnError(self, evt):
+            try:
+                from Priithon import guiExceptionFrame
+            except ImportError:
+                from Chromagnon.Priithon import guiExceptionFrame
+            self.panel.label.SetLabel('')
+            self.panel.label.SetForegroundColour('black')
+            self.stopWithErr = True
+            f = guiExceptionFrame.MyFrame(*evt.data)
+            self.OnDone()
+            #raise evt.data[0], evt.data[1]
+
+        def OnEcho(self, evt):
+            self.echo(evt.data)
+
+        def echo(self, msg, color='red'):
+            self.panel.label.SetLabel(msg)
+            self.panel.label.SetForegroundColour(color)
+            #print(msg)
+
+        #def OnInitGuess(self, evt):
+        #    self.panel._setInitGuess(evt.data[0])
+
+
+        def OnSetFlat(self, evt):
+            self.panel._setFlat(evt.data)
+
+        def OnClosePage(self, evt):
+            self.panel.aui.imEditWindows.DeletePage(evt.data[0])
+
+        def OnProgress(self, evt):
+            self.panel.progress.SetValue(evt.data[0])
 
 
 class ThreadFlat(ThreadWithExc):

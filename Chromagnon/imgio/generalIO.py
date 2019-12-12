@@ -3,9 +3,8 @@ import numpy as N
 
 IMGSEQ = ['WTZ', 'TZW', 'TWZ', 'WZT']
 
-WAVE_START = 0#100
-#WAVE_END   = 700
-WAVE_STEP  =  1#20 # step has to be a constant for Chromagnon
+WAVE_START = 0
+WAVE_STEP  =  1
 
 READABLE_FORMATS = WRITABLE_FORMATS = []
 
@@ -22,7 +21,7 @@ class GeneralReader(object):
         """
         self.filename = self.fn = fn
         self.dr, self.file = os.path.split(fn)
-        self.pxlsiz = N.ones((3,), N.float32)#[1.,1.,1.] # z,y,x
+        self.pxlsiz = N.ones((3,), N.float32) # z,y,x
         self.nseries = 1
         self.series = 0
         self.imgseqs = IMGSEQ
@@ -489,7 +488,5 @@ class GeneralWriter(GeneralReader):
             self.writeArr(a, t=t, w=w, z=z)
 
 
-def makeWaves(nw):
-    #return list(range(WAVE_START, WAVE_END, (WAVE_END - WAVE_START)//nw))[:nw]
-    #return N.array(list(range(WAVE_START, WAVE_END, WAVE_STEP//nw))[:nw])
-    return N.arange(WAVE_START, WAVE_START+WAVE_STEP*nw, WAVE_STEP)#WAVE_END, WAVE_STEP//nw)[:nw]
+def makeWaves(nw, start=WAVE_START, step=WAVE_STEP):
+    return N.arange(start, start+step*nw, step)

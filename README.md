@@ -13,11 +13,16 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [domument](https://github.com/macronucleus/Chromagnon/releases/download/v070/ChromagnonDocumentV083.pdf)
+Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/v070/ChromagnonDocumentV083.pdf)
 
 Downloads
 ---------
-The ready to use packages are available [here](https://github.com/macronucleus/Chromagnon/releases)
+The ready to use packages are available
+[here](https://github.com/macronucleus/Chromagnon/releases)
+
+Example Images
+--------------
+Example images for testing are available  ["here"](https://github.com/macronucleus/Chromagnon/releases)
 
 The source
 ----------
@@ -32,9 +37,9 @@ Dependencies:
 * `python` (v2.7 or v3.6)
 * `numpy`
 * `scipy`
-* `wxPython` (v3 or v4)
-* `PyOpenGL`
-* `tifffile` (v0.14.0-v0.15.1)
+* `tifffile` (v0.14.0-v0.15.1) 
+* `wxPython` (v3 or v4, optional for GUI)
+* `PyOpenGL` (optional for GUI)
 * `pyFFTW` (optional for fast Fourier transform)
 * `javabridge` (optional for reading more image file formats)
 * `python-bioformats` (optional for reading more image file formats)

@@ -3,14 +3,19 @@ from __future__ import print_function
 import os
 import six
 import numpy as N
-from . import guiFuncs as G
 try:
     import imgio
 except ImportError:
     from .. import imgio
 
 # GUI
-import wx, time
+try:
+    import wx
+    import time
+    from . import guiFuncs as G
+    _wx = True
+except ImportError:
+    _wx = False
 
 __version__ = 0.2
 
@@ -130,147 +135,148 @@ def makeFrame(title=''):
     return frame
 
 # GUI
-class BatchPanel(wx.Panel):
-    def __init__(self, frame):
-        """
-        This panel is the main panel to do batch alignment
-        """
-        wx.Panel.__init__(self, frame)
-        
-        self.prevImgFns = []
-        self.aui = None
+if _wx:
+    class BatchPanel(wx.Panel):
+        def __init__(self, frame):
+            """
+            This panel is the main panel to do batch alignment
+            """
+            wx.Panel.__init__(self, frame)
 
-        # draw / arrange
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        self.SetSizer(sizer)
+            self.prevImgFns = []
+            self.aui = None
 
-        # \n
-        box = G.newSpaceV(sizer)
+            # draw / arrange
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            self.SetSizer(sizer)
 
-        label, self.fileNameTxt = G.makeTxtBox(self, box, 'Image files', defValue='', tip='image files to be flatfield', sizeX=400, sizeY=80, style=wx.TE_MULTILINE|wx.TE_PROCESS_ENTER)
+            # \n
+            box = G.newSpaceV(sizer)
 
-        G.makeButton(self, box, self.OnChooseFile, title='Choose files', tip='', enable=True)
+            label, self.fileNameTxt = G.makeTxtBox(self, box, 'Image files', defValue='', tip='image files to be flatfield', sizeX=400, sizeY=80, style=wx.TE_MULTILINE|wx.TE_PROCESS_ENTER)
 
-
-        # \n
-        box = G.newSpaceV(sizer)
-
-        label, self.calibNameTxt = G.makeTxtBox(self, box, 'Calibration files', defValue='', tip='calibration file', sizeX=300, sizeY=-1)
-
-        G.makeButton(self, box, self.OnChooseCalib, title='Choose files', tip='', enable=True)
-        G.makeButton(self, box, self.OnClearCalib, title='Clear', tip='', enable=True)
+            G.makeButton(self, box, self.OnChooseFile, title='Choose files', tip='', enable=True)
 
 
-        # \n
-        box = G.newSpaceV(sizer)
+            # \n
+            box = G.newSpaceV(sizer)
 
-        self.goButton = G.makeButton(self, box, self.OnGo, title='Go', tip='', enable=False)
+            label, self.calibNameTxt = G.makeTxtBox(self, box, 'Calibration files', defValue='', tip='calibration file', sizeX=300, sizeY=-1)
 
-        self.label = G.makeTxt(self, box, ' ')
+            G.makeButton(self, box, self.OnChooseCalib, title='Choose files', tip='', enable=True)
+            G.makeButton(self, box, self.OnClearCalib, title='Clear', tip='', enable=True)
 
-        ## new box
-        sb, group1Box = G.newStaticBox(self, sizer, title='making a new calibration')
 
-        # \n
-        box = G.newSpaceV(group1Box)
+            # \n
+            box = G.newSpaceV(sizer)
 
-        self.newCalibCb = G.makeCheck(self, box, "Make a new calibration --- separate images of different colors will be merged into a single file", tip='', defChecked=False)
-        self.Bind(wx.EVT_CHECKBOX, self.checkGo, self.newCalibCb)
+            self.goButton = G.makeButton(self, box, self.OnGo, title='Go', tip='', enable=False)
 
-        
-    def OnChooseFile(self, ev=None):
-        dlg = G.FileSelectorDialog(self)#wx.FileDialog(self, 'Choose image files', style=wx.FD_MULTIPLE)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.fns = dlg.GetPaths()
-            fns = "\n".join(self.fns)
-            self.fileNameTxt.SetValue(fns)
+            self.label = G.makeTxt(self, box, ' ')
 
+            ## new box
+            sb, group1Box = G.newStaticBox(self, sizer, title='making a new calibration')
+
+            # \n
+            box = G.newSpaceV(group1Box)
+
+            self.newCalibCb = G.makeCheck(self, box, "Make a new calibration --- separate images of different colors will be merged into a single file", tip='', defChecked=False)
+            self.Bind(wx.EVT_CHECKBOX, self.checkGo, self.newCalibCb)
+
+
+        def OnChooseFile(self, ev=None):
+            dlg = G.FileSelectorDialog(self)#wx.FileDialog(self, 'Choose image files', style=wx.FD_MULTIPLE)
+            if dlg.ShowModal() == wx.ID_OK:
+                self.fns = dlg.GetPaths()
+                fns = "\n".join(self.fns)
+                self.fileNameTxt.SetValue(fns)
+
+                self.checkGo()
+
+        def OnChooseCalib(self, ev=None):
+            dlg = G.FileSelectorDialog(self, wildcard='*')#wx.FileDialog(self, 'Choose a calibration file')#, wildcard=os.path.extsep.join(('*','py')))
+            if dlg.ShowModal() == wx.ID_OK:
+                flt = dlg.GetPath()
+                self.calibNameTxt.SetValue(flt)
+                self.checkGo()
+
+        def OnClearCalib(self, evt=None):
+            self.calibNameTxt.SetValue('')
             self.checkGo()
 
-    def OnChooseCalib(self, ev=None):
-        dlg = G.FileSelectorDialog(self, wildcard='*')#wx.FileDialog(self, 'Choose a calibration file')#, wildcard=os.path.extsep.join(('*','py')))
-        if dlg.ShowModal() == wx.ID_OK:
-            flt = dlg.GetPath()
-            self.calibNameTxt.SetValue(flt)
-            self.checkGo()
+        def checkGo(self, evt=None):
+            if (self.fileNameTxt.GetValue() and self.calibNameTxt.GetValue()) or \
+                    (self.fileNameTxt.GetValue() and self.newCalibCb.GetValue()):
+                self.goButton.Enable(1)
+            else:
+                self.goButton.Enable(0)
 
-    def OnClearCalib(self, evt=None):
-        self.calibNameTxt.SetValue('')
-        self.checkGo()
+        def OnGo(self, ev=None):
 
-    def checkGo(self, evt=None):
-        if (self.fileNameTxt.GetValue() and self.calibNameTxt.GetValue()) or \
-                (self.fileNameTxt.GetValue() and self.newCalibCb.GetValue()):
-            self.goButton.Enable(1)
-        else:
+            fns = self.fileNameTxt.GetValue().split('\n')
+            if not fns:
+                return
+
+            self.label.SetLabel('processing, please wait ...')
+            self.label.SetForegroundColour('red')
+            wx.Yield()
+
+            flt = self.calibNameTxt.GetValue()
+
+            outs = []
+
+            # calibration
+            if fns and self.newCalibCb.GetValue():
+                #outs = [makeFlatConv(fn) for fn in fns]
+                for fn in fns:
+                    out = makeFlatConv(fn)
+                    self.view(out)
+                    outs.append(out)
+
+                self.calibNameTxt.SetValue(outs[-1])
+
+            # making aligned images
+            else:
+                #outs = [flatConv(fn, flatFile=flt) for fn in fns]
+
+                for fn in fns:
+                    out = flatConv(fn, flatFile=flt)
+                    self.view(out)
+                    outs.append(out)
+
+            bases = [os.path.basename(out) for out in outs]
+            self.label.SetLabel('%s Done!! at %s' % (bases, time.strftime('%H:%M')))
+            self.label.SetForegroundColour('black')
+            self.fileNameTxt.SetValue('')
+
             self.goButton.Enable(0)
-
-    def OnGo(self, ev=None):
-
-        fns = self.fileNameTxt.GetValue().split('\n')
-        if not fns:
-            return
-
-        self.label.SetLabel('processing, please wait ...')
-        self.label.SetForegroundColour('red')
-        wx.Yield()
-
-        flt = self.calibNameTxt.GetValue()
-
-        outs = []
-        
-        # calibration
-        if fns and self.newCalibCb.GetValue():
-            #outs = [makeFlatConv(fn) for fn in fns]
-            for fn in fns:
-                out = makeFlatConv(fn)
-                self.view(out)
-                outs.append(out)
-                
-            self.calibNameTxt.SetValue(outs[-1])
-
-        # making aligned images
-        else:
-            #outs = [flatConv(fn, flatFile=flt) for fn in fns]
-
-            for fn in fns:
-                out = flatConv(fn, flatFile=flt)
-                self.view(out)
-                outs.append(out)
-
-        bases = [os.path.basename(out) for out in outs]
-        self.label.SetLabel('%s Done!! at %s' % (bases, time.strftime('%H:%M')))
-        self.label.SetForegroundColour('black')
-        self.fileNameTxt.SetValue('')
-
-        self.goButton.Enable(0)
-        self.newCalibCb.SetValue(0)
+            self.newCalibCb.SetValue(0)
 
 
-    def view(self, target):
-        """
-        view with viewer
-        """
-        from PriCommon import ndviewer
-        import sys
-        # prepare viewer
-        if not self.aui:
-            self.aui = ndviewer.main.MyFrame(parent=self)
-            self.aui.Show()
+        def view(self, target):
+            """
+            view with viewer
+            """
+            from PriCommon import ndviewer
+            import sys
+            # prepare viewer
+            if not self.aui:
+                self.aui = ndviewer.main.MyFrame(parent=self)
+                self.aui.Show()
 
-        # draw
-        if isinstance(target, six.string_types):
-            newpanel = ndviewer.main.ImagePanel(self.aui, target)
-            #newpanel = chromeditor.ChromagnonEditor(self.aui, target)
+            # draw
+            if isinstance(target, six.string_types):
+                newpanel = ndviewer.main.ImagePanel(self.aui, target)
+                #newpanel = chromeditor.ChromagnonEditor(self.aui, target)
 
-        if isinstance(target, six.string_types):
-            name = os.path.basename(target)
-        else:
-            name = target.file
-        if sys.platform in ('linux2', 'win32'):
-            wx.CallAfter(self.aui.imEditWindows.AddPage, newpanel, name, select=True)
-        else:
-            self.aui.imEditWindows.AddPage(newpanel, name, select=True)
+            if isinstance(target, six.string_types):
+                name = os.path.basename(target)
+            else:
+                name = target.file
+            if sys.platform in ('linux2', 'win32'):
+                wx.CallAfter(self.aui.imEditWindows.AddPage, newpanel, name, select=True)
+            else:
+                self.aui.imEditWindows.AddPage(newpanel, name, select=True)
         
 
 if __name__ == '__main__':

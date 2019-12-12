@@ -69,6 +69,7 @@ class Chromagnon(object):
         ## time frame alignment
         ## fn: the reference image (time projected for 10 frames for example)
         >>> an = Chromagnon(fn)
+        >>> an.setDoRotate4timeSeries(True) # or Flase if rotation is not required
         >>> an.findBestTimeFrame()
         >>> an.findAlignParamTime()
         >>> an.setRegionCutOut()
@@ -88,6 +89,8 @@ class Chromagnon(object):
         self.setImageCenter()
         self.setMultipageTiff()
         self.setphaseContrast()
+        self.setDoRotate4timeSeries()
+        self.setDoZ()
         self.setEchofunc()
         self.setProgressfunc()
         self.setImgSuffix()
@@ -193,12 +196,18 @@ class Chromagnon(object):
     def setZmagSwitch(self, value='Always'):#'Auto'):
         self.zmagSwitch = value
 
+    def setDoRotate4timeSeries(self, doRot=True):
+        self.doRotate4tSeries = doRot
+
+    def setDoZ(self, doZ=True):
+        self.doZ = doZ
+
     def setEchofunc(self, func=None):
         self.echofunc = func
 
-    def echo(self, msg=''):
+    def echo(self, msg='', **kwd):
         if self.echofunc:
-            self.echofunc(msg)
+            self.echofunc(msg, **kwd)
         else:
             print(msg)
 
@@ -408,7 +417,7 @@ class Chromagnon(object):
                         self.refzs = af.findBestRefZs(ref)
                         #print('using slices', self.refzs)
                         if self.echofunc:
-                            self.echofunc('using slices %s' % self.refzs, skip_notify=True)
+                            self.echofunc('Using Z slices %s for projection' % self.refzs, skip_notify=True)
 
                     self.zs = N.array(self.refzs)
                     refyx = af.prep2D(ref, zs=self.refzs, removeEdge=removeEdge)
@@ -428,7 +437,7 @@ class Chromagnon(object):
         self.refyz = refyz
         self.refyx = refyx
         
-    def findAlignParamWave(self, t=0, doWave=True, init_t=None):
+    def findAlignParamWave(self, t=0, doWave=True, init_t=None, useQuadri4YX=True):
         """
         do findBestChannel() before calling this function
 
@@ -453,14 +462,17 @@ class Chromagnon(object):
             if (doWave and w == self.refwave) or (not doWave and w != self.refwave):
                 continue
 
+            self.echo('', skip_notify=True)
+            self.echo('Calculating shifts for time %i channel %i' % (t, w))
+
             # vertical alignment
-            if self.img.nz > 1:
+            if self.img.nz > 1 and self.doZ:
+                self.echo('Starting ZY plane alignment')
                 img = self.img.get3DArr(w=w, t=t)
                 img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
                 
                 # get initial guess if no initial guess was given
                 if doXcorr:
-                    self.echo('making an initial guess for channel %i' % w)
                     ref = self.img.get3DArr(w=self.refwave, t=t)
                     prefyx = N.max(ref, 0)
                     pimgyx = N.max(img, 0)
@@ -472,10 +484,10 @@ class Chromagnon(object):
                         searchRad = None
                     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=self.phaseContrast, searchRad=searchRad)
                     ret[w,1:3] = yx
+                    self.echo('XY shift rough estimate tx:%.3f ty:%.3f' % tuple(yx[::-1]))
                     #print(yx)
                     del ref, c
                 # create 2D projection image
-                self.echo('calculating shifts for time %i channel %i' % (t, w))
                 xs = N.round_(self.refxs-ret[w,2]).astype(N.int)
                 if xs.max() >= self.img.nx:
                     xsbool = (xs < self.img.nx)
@@ -492,13 +504,26 @@ class Chromagnon(object):
                             searchRad[1] = self.img.nz
                     yz, c = xcorr.Xcorr(self.refyz, imgyz, phaseContrast=self.phaseContrast, searchRad=searchRad)
                     ret[w,0] = yz[1]
+                    self.echo('Z shift rough estimate tz:%.3f' % yz[1])
                     #print(yz, ret[w])
                     
-                # try quadratic cross correlation
+                # zoom up Z if necessary
                 zdif = max(self.refzs) - min(self.refzs)
                 zzoom = 1.
 
-                if self.zmagSwitch != ZMAG_CHOICE[2] and not ((zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[0]): # not "never" and go for zmag
+                if (zdif <= 7 or self.img.nz <= 10):
+                    zzoom = imgyz.shape[0] / imgyz.shape[1]
+                    self.echo('Z complexity low, Z axis is zoomed up %.2f times' % zzoom)
+                    imgyz = nd.zoom(imgyz, (1, zzoom))
+                    refyz = nd.zoom(self.refyz, (1, zzoom))
+                    maxErrZ = self.maxErrZ * zzoom
+                else:
+                    refyz = self.refyz
+                    maxErrZ = self.maxErrZ
+
+                # try quadratic cross correlation
+                if self.zmagSwitch != ZMAG_CHOICE[2] and not ((zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[0]):
+                    self.echo('Measuring ZY quadrisection phase correlation [ty,tz,rx,my,mz]')
                     initguess = N.zeros((5,), N.float32)
                     initguess[:2] = ret[w,:2][::-1]
                     initguess[3:] = ret[w,4:6][::-1]
@@ -507,32 +532,22 @@ class Chromagnon(object):
                         if_failed = 'simplex'
                     else:
                         if_failed = af.IF_FAILED[-1] # 'terminate' -> xcorr
-
-                    if (zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[1]: # always but number of z sections is not enough
-                        zzoom = imgyz.shape[0] / imgyz.shape[1]
-                        self.echo('Z axis zoom factor=%.2f' % zzoom)
-                        imgyz = nd.zoom(imgyz, (1, zzoom))
-                        refyz = nd.zoom(self.refyz, (1, zzoom))
-                        maxErrZ = self.maxErrZ * zzoom
-                    else:
-                        refyz = self.refyz
-                        maxErrZ = self.maxErrZ
                         
                     #return imgyz, refyz
                     val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=if_failed)
 
-                    #if check:# is not None:
-                    ty2,tz,_,_,mz = val#check
+                    ty2,tz,_,_,mz = val
                     ret[w,0] = tz / zzoom
                     ret[w,4] = mz
                     if not check: # chage to normal cross correlation
+                        self.echo('method changed to ZY phase correlation [ty,tz]')
                         initguess = ret[w,:2][::-1]
                         yz = af.iterationXcor(imgyz, refyz, maxErr=(self.maxErrYX,maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc)
                         ret[w,0] = yz[1]
-                # since number of section is not enough, do normal cross correlation
                 else:
+                    self.echo('Measuring ZY phase correlation [ty,tz]')
                     initguess = ret[w,:2][::-1]
-                    yz = af.iterationXcor(imgyz, self.refyz, maxErr=(self.maxErrYX,self.maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc)
+                    yz = af.iterationXcor(imgyz, refyz, maxErr=(self.maxErrYX,maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, napo=0)
                     ret[w,0] = yz[1]
 
 
@@ -541,19 +556,35 @@ class Chromagnon(object):
                     zsbool = (zs < self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
                     zs = zs[zsinds]
+                if not len(zs):
+                    zs = Ellipsis
 
                 imgyx = af.prep2D(img, zs=zs)
                 del img
             else:
-                imgyx = self.img.getArr(w=w, t=t, z=0)
+                if self.img.nz > 1:
+                    img = self.img.get3DArr(w=w, t=t)
+                    imgyx = af.prep2D(img, zs=self.refzs)
+                    del img
+                else:
+                    imgyx = self.img.getArr(w=w, t=t, z=0)
 
             initguess = N.zeros((5,), N.float32)
             initguess[:3] = ret[w,1:4] # ty,tx,r
             initguess[3:] = ret[w,5:7] # my, mx
             try:
-                val, check = af.iteration(imgyx, self.refyx, maxErr=self.maxErrYX, niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=self.if_failed)
+                if useQuadri4YX:
+                    self.echo('Measuring XY quadrisection phase correlation [ty,tx,rz,my,mx]', skip_notify=True)
+                    #print('before iteration', imgyx.shape, self.refyx.shape)
+                    val, check = af.iteration(imgyx, self.refyx, maxErr=self.maxErrYX, niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=self.if_failed)
+                else:
+                    self.echo('Measuring XY phase correlation [ty,tx]', skip_notify=True)
+                    initguess = initguess[:2]
+                    yx = af.iterationXcor(imgyx, self.refyx, maxErr=self.maxErrYX, niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc)
+                    val = (yx[0], yx[1], 0, 1, 1)
             except ZeroDivisionError:
-                if self.phaseContrast:
+                if self.phaseContrast and useQuadri4YX:
+                    self.echo('Measuring XY quadrisection cross correlation [ty,tx,rz,my,mx]', skip_notify=True)
                     val, check = af.iteration(imgyx, self.refyx, maxErr=self.maxErrYX, niter=self.niter, phaseContrast=False, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=self.if_failed)
                 else: # XY alignment failed
                     raise
@@ -561,17 +592,16 @@ class Chromagnon(object):
             ret[w,1:4] = ty,tx,r
             ret[w,5:7] = my,mx
 
-            if self.img.nz > 1:
-                self.echo('time: %i, wave: %i, tx:%.3f, ty:%.3f, tz:%.3f, r:%.3f, mx:%.3f, my:%.3f, mz:%.3f' % (t,w,tx,ty,ret[w,0],r,mx,my,ret[w,4]))
-            else:
-                self.echo('time: %i, wave: %i, tx:%.3f, ty:%.3f, r:%.3f, mx:%.3f, my:%.3f' % (t,w,tx,ty,r,mx,my))
-
             self.progress()
 
         self.alignParms[t] = ret
 
-
         # final 3D cross correlation
+
+        if self.img.nz <= 1 or not self.doZ:
+            self.progress()
+            return
+        
         if self.max_shift_pxl:
             searchRad = self.max_shift_pxl * 2
             if searchRad > min((self.img.nx, self.img.ny)):
@@ -588,7 +618,8 @@ class Chromagnon(object):
                 continue
 
             for i in range(self.niter_3D):
-                self.echo('3D phase correlation for time %i channel %i iter %i' % (t, w, i))
+                self.echo('', skip_notify=True)
+                self.echo('Measuring 3D phase correlation for time %i channel %i iteration %i' % (t, w, i))
                 img = self.get3DArrayAligned(w=w, t=t)
                 img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
 
@@ -600,16 +631,20 @@ class Chromagnon(object):
                 if len(zyx) == 2:
                     zyx = N.array([0] + list(zyx))
                 self.alignParms[t,w,:3] += zyx
-                print('the result of the last correlation', zyx)
+                #print('the result of the last correlation', zyx)
+                self.echo('3D phase correlation result tx:%.3f ty:%.3f tz:%.3f' % tuple(zyx[::-1]))
 
                 if abs(zyx[0]) < self.maxErrZ and N.all(N.abs(zyx[1:]) < self.maxErrYX):
                     break
 
                 self.progress()
+
+            self.echo('time: %i, wave: %i, tz:%.3f, ty:%.3f, tx:%.3f, r:%.3f, mz:%.3f, my:%.3f, mx:%.3f' % ((t,w)+tuple(self.alignParms[t,w])))
+
             for j in range((self.niter_3D-1) - i):
                 self.progress()
         del ref
-        self.echo('Finding affine parameters done!')
+        self.echo('Finding global parameters done!')
 
     ##-- non linear ----
     def findNonLinear2D(self, t=0, npxls=af.MIN_PXLS_YX, phaseContrast=True):
@@ -644,6 +679,7 @@ class Chromagnon(object):
                 self.mapyx[t,w] = 0
                 continue
 
+            self.echo('\n')
             self.echo('Projection local alignment -- W: %i' % w)
             if self.img.nz > 1:
                 img = self.img.get3DArr(w=w, t=t)
@@ -829,8 +865,13 @@ class Chromagnon(object):
         return nw*[tz,ty,tx,r,mz,my,mx]
         """
         niter = self.niter
+        oldzmagSwitch = self.zmagSwitch
+        
         self.niter = 3
+        self.zmagSwitch = ZMAG_CHOICE[-1]
+
         self.findBestChannel()
+
         for t in range(self.img.nt):
             if t == self.reftime:
                 continue
@@ -839,16 +880,18 @@ class Chromagnon(object):
                 init_t = 0
             else:
                 init_t = t - 1
-                                    
-            self.findAlignParamWave(t=t, doWave=doWave, init_t=init_t)
-            if not doMag:
+
+            self.findAlignParamWave(t=t, doWave=doWave, init_t=init_t, useQuadri4YX=self.doRotate4tSeries)
+            if not doMag and self.doRotate4tSeries:
                 self.alignParms[t,self.refwave,4:] = 1
                 
+                    
             if not doWave and self.img.nw > 1:
                 for w in range(self.img.nw):
                     self.alignParms[t,w] = self.alignParms[t,self.refwave]
 
-        self.niter = 3
+        self.niter = niter
+        self.zmagSwitch = oldzmagSwitch
 
     ### save and load align parameters
 
@@ -913,9 +956,10 @@ class Chromagnon(object):
 
             for t in range(self.img.nt):
                 for w in range(self.img.nw):
-                    if w != self.refwave:
-                        shift = self.getShift(w=w, t=t)
-                        shiftZYX[t,w] = cutoutAlign.getShift(shift, ZYX)
+                    #if w != self.refwave:
+                    shift = self.getShift(w=w, t=t)
+                    shiftZYX[t,w] = cutoutAlign.getShift(shift, ZYX)
+
 
             mm = shiftZYX[:,:,::2].max(0).max(0)
             MM = shiftZYX[:,:,1::2].min(0).min(0)
@@ -1069,14 +1113,46 @@ class Chromagnon(object):
             fn = fntools.nextFN(fn)
             des = imgio.Writer(fn, self.img)
 
-        nx = self.cropSlice[-1].stop - self.cropSlice[-1].start
-        ny = self.cropSlice[-2].stop - self.cropSlice[-2].start
-        nz = self.cropSlice[-3].stop - self.cropSlice[-3].start
+        try:
+            nx = self.cropSlice[-1].stop - self.cropSlice[-1].start
+            ny = self.cropSlice[-2].stop - self.cropSlice[-2].start
+            nz = self.cropSlice[-3].stop - self.cropSlice[-3].start
 
-        des.setDim(nx, ny, nz)
+            des.setDim(nx, ny, nz)
+            if type(des) == imgio.mrcIO.MrcWriter:
+                des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
+                des.doOnSetDim()
+
+        except TypeError: # start and stop of cropSlice is None
+            # in other words, setRegionCutOut was not called.
+            pass
+
+        ##   --- extended header ----
         if type(des) == imgio.mrcIO.MrcWriter:
-            des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
-            des.doOnSetDim()
+            nsecs = self.img.hdr.Num[-1]
+            if hasattr(des.fp, 'extFloats') and des.fp.extFloats.shape[0] >= nsecs:
+                if self.cropSlice[-3].start is not None and self.cropSlice[-3].stop is not None:
+                    zrange = range(self.cropSlice[-3].start, self.cropSlice[-3].stop)
+                else:
+                    zrange = range(self.img.nz)
+
+                ne = des.extFloats.shape[-1]
+                ni = des.extInts.shape[-1]
+                extF = N.empty((des.nt*des.nw*des.nz, ne,), des.extFloats.dtype)
+                extI = N.empty((des.nt*des.nw*des.nz, ni,), des.extInts.dtype)
+                
+                for t in range(self.img.nt):
+                    for w in range(self.img.nw):
+                        for z2, z1 in enumerate(zrange):
+                            i1 = self.img.findFileIdx(t=t, w=w, z=z1)
+                            i2 = des.findFileIdx(t=t, w=w, z=z2)
+                            extF[i2] = des.extFloats[i1]
+                            extI[i2] = des.extInts[i1]
+                des.extFloats[:len(extF)] = extF
+                des.extInts[:len(extI)] = extI
+
+                des.writeHeader()
+
         return des
         
 
@@ -1123,7 +1199,7 @@ class Chromagnon(object):
                     arr = self.img.get3DArr(w=w, t=t)
                     arr = arr[self.cropSlice]
                 elif (self.mapyx is None):# and self.microscopemap is None):
-                    self.echo('Applying affine transformation to the target image, t: %i, w: %i' % (t, w))
+                    self.echo('Applying global transformation to the target image, t: %i, w: %i' % (t, w))
                     arr = self.get3DArrayAligned(w=w, t=t)
                 else:
                     self.echo('Remapping local alignment, t: %i, w: %i' % (t, w))

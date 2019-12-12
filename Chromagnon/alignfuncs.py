@@ -310,9 +310,10 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
     else:
-        #print('in iteration, initial geuss is', initguess)
+        #print('in iteration, initial guess is', initguess)
         if echofunc:
-            echofunc('in iteration, initial geuss is %s' % initguess, skip_notify=True)
+            #echofunc('Before quadrisection phase correlation, initial guess by phase correlation: %s' % initguess, skip_notify=True)
+            echofunc('initial guess %s' % initguess, skip_notify=True)
         ret[:] = initguess[:]
 
     if if_failed == IF_FAILED[2]:#force_simplex':
@@ -409,7 +410,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             #echofunc('%i: %s' % (i, ll))#ref))
         #print(i, ret)
         if echofunc:
-            echofunc('%i %s' % (i, ret), skip_notify=True)
+            echofunc('Iteration %2d %s' % (i+1, ret), skip_notify=True)
         errs = errPxl(ll, center)
         if echofunc and i > 0:
             echofunc('Iteration %i: Difference from the previous iteration=%.5f nm' % (i, N.average(errs)), doprint=False)
@@ -450,7 +451,7 @@ def errPxl(yxrm, center):
 
     return N.abs(N.array(errlist))
 
-def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess=None, echofunc=None):
+def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess=None, echofunc=None, napo=10):
     """
     find out translation along X axis
     this function is used for alignment of the Z axis
@@ -465,7 +466,7 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
     if initguess is not None:
         yxs[:] = initguess
         if echofunc:
-            echofunc('initguess Xcorr: %s' % yxs, skip_notify=True)
+            echofunc('initial guess: %s' % yxs, skip_notify=True)
     
     for i in range(niter):
         if i == 0 and initguess is None:
@@ -483,11 +484,11 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
             b = b[slc]
             c = ref[slc]
 
-        yx = xcorr.Xcorr(c, b, phaseContrast=phaseContrast)[0]
+        yx = xcorr.Xcorr(c, b, phaseContrast=phaseContrast, napo=napo)[0]
         yxs += yx
         #print('xcorr', i, yxs)
         if echofunc:
-            echofunc('xcorr %i: %s' % (i, yxs), skip_notify=True)
+            echofunc('%i: %s' % (i, yxs), skip_notify=True)
 
         if N.all(N.abs(yx) < maxErr):
             break
@@ -720,6 +721,8 @@ def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
         base = os.path.commonprefix(reffns)
         if not os.path.basename(base):
             base = os.path.splitext(reffns[0])[0] + '_etc'
+        if not ext.startswith(os.path.extsep):
+            ext = os.path.extsep + ext
         out = base + suffix + ext
 
     #rdr = ref_rdr
@@ -1359,7 +1362,7 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
         rgn = N.nonzero(region[0].ravel())[0]
         ccq = region[2].ravel()[rgn]
         if echofunc:
-            echofunc('(nplxs: %i) iteration %i: num_regions=%i, min_cc=%.4f, pxl_shift_mean=%.4f, max=%.4f' % (npxl, i, npxls, ccq.min(), mean_err, max_err))#N.sqrt(N.sum(N.power(yx,2), axis=-1)).max()))
+            echofunc('(nplxs: %i) Iteration %i: num_regions=%i, min_cc=%.4f, pxl_shift_mean=%.4f, max=%.4f' % (npxl, i+1, npxls, ccq.min(), mean_err, max_err))#N.sqrt(N.sum(N.power(yx,2), axis=-1)).max()))
 
         #-- smoothly zoom up the non-linear alignment parameter
         yxc += yx

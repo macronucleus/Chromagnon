@@ -18,7 +18,7 @@ except:
 #from numarray import numeric as Num
 #import numarray as na
 import numpy as N
-import traceback, sys
+import traceback, sys#, socket
 from . import PriConfig
 
 ###########################################from numarray import numeric as na
@@ -102,6 +102,7 @@ Menu_FitYToSeen   =  wx.NewId()
 Menu_EnterScale   =  wx.NewId()
 #20051117 Menu_Gamma   = 1004
 
+Call_Yield_Before_SetCurrent = False
 
 HistLogModeZeroOffset = .0001
 
@@ -640,7 +641,10 @@ class HistogramCanvas(MyCanvasBase):
         #glSeb      print "setHist3b ms: %.2f"% ((time.clock()-x)*1000.0)
         #
         #glSeb.glVertexPointer(self.m_histPlotArray) # AM 20130203
-	
+
+        if Call_Yield_Before_SetCurrent:
+            wx.Yield() # 20191029 this was very harmfull. Y.view does not work on most systems. But this was required for Dileptus particles_in_cells. Set Call_Yield_Before_SetCurrent before calling Y.view.
+
        	self.SetCurrent(self.context) # 20141124 Cocoa
         GL.glVertexPointerf(self.m_histPlotArray)
         

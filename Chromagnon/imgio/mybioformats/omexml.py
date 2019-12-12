@@ -23,6 +23,7 @@ from lxml import etree as ElementTree
 #    self.dom = ElementTree.ElementTree(ElementTree.fromstring(xml, parser))
 #    remove StringIO
 # 4. return split_qn returns ('','') if pattern not present
+# 5. 20191127 updated with bioformats1.5.2
 
 
 import datetime
@@ -322,7 +323,6 @@ class OMEXML(object):
     def __init__(self, xml=None):
         if xml is None:
             xml = default_xml
-
         if isinstance(xml, str):
             xml = xml.encode("utf-8")
         try:
@@ -458,8 +458,9 @@ class OMEXML(object):
             '''The OME/Image/Pixels element.
 
             Example:
-            >>> md = bioformats.omexml.OMEXML(xml)
-            >>> pixels = omemetadata.image(i).Pixels
+
+            >>> md = bioformats.OMEXML(bioformats.get_omexml_metadata(filename))
+            >>> pixels = md.image().Pixels
             >>> channel_count = pixels.SizeC
             >>> stack_count = pixels.SizeZ
             >>> timepoint_count = pixels.SizeT
@@ -620,19 +621,47 @@ class OMEXML(object):
             '''
             return self.node.get("Type")
 
+        def get_PhysicalSizeXUnit(self):
+            '''The unit of length of a pixel in X direction.'''
+            return self.node.get("PhysicalSizeXUnit")
+        def set_PhysicalSizeXUnit(self, value):
+            self.node.set("PhysicalSizeXUnit", str(value))
+        PhysicalSizeXUnit = property(get_PhysicalSizeXUnit, set_PhysicalSizeXUnit)
+
+        def get_PhysicalSizeYUnit(self):
+            '''The unit of length of a pixel in Y direction.'''
+            return self.node.get("PhysicalSizeYUnit")
+        def set_PhysicalSizeYUnit(self, value):
+            self.node.set("PhysicalSizeYUnit", str(value))
+        PhysicalSizeYUnit = property(get_PhysicalSizeYUnit, set_PhysicalSizeYUnit)
+
+        def get_PhysicalSizeZUnit(self):
+            '''The unit of length of a voxel in Z direction.'''
+            return self.node.get("PhysicalSizeZUnit")
+        def set_PhysicalSizeZUnit(self, value):
+            self.node.set("PhysicalSizeZUnit", str(value))
+        PhysicalSizeZUnit = property(get_PhysicalSizeZUnit, set_PhysicalSizeZUnit)
+
         def get_PhysicalSizeX(self):
-            '''The length of a single pixel in microns in X direction'''
+            '''The length of a single pixel in X direction.'''
             return get_float_attr(self.node, "PhysicalSizeX")
         def set_PhysicalSizeX(self, value):
             self.node.set("PhysicalSizeX", str(value))
         PhysicalSizeX = property(get_PhysicalSizeX, set_PhysicalSizeX)
 
         def get_PhysicalSizeY(self):
-            '''The length of a single pixel in microns in Y direction'''
+            '''The length of a single pixel in Y direction.'''
             return get_float_attr(self.node, "PhysicalSizeY")
         def set_PhysicalSizeY(self, value):
             self.node.set("PhysicalSizeY", str(value))
         PhysicalSizeY = property(get_PhysicalSizeY, set_PhysicalSizeY)
+
+        def get_PhysicalSizeZ(self):
+            '''The size of a voxel in Z direction or None for 2D images.'''
+            return get_float_attr(self.node, "PhysicalSizeZ")
+        def set_PhysicalSizeZ(self, value):
+            self.node.set("PhysicalSizeZ", str(value))
+        PhysicalSizeZ = property(get_PhysicalSizeZ, set_PhysicalSizeZ)
 
         def set_PixelType(self, value):
             self.node.set("Type", value)
@@ -1144,7 +1173,7 @@ class OMEXML(object):
             return get_text(description)
 
         def set_Description(self, text):
-            make_text_node(self.node, NS_SPW, "Description", test)
+            make_text_node(self.node, self.ns['spw'], "Description", text)
         Description = property(get_Description, set_Description)
 
         def get_Well(self):
