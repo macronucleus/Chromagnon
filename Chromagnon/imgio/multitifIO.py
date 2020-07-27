@@ -296,7 +296,7 @@ class MultiTiffWriter(generalIO.GeneralWriter):
     def __init__(self, fn, mode=None, style='imagej', software='multitifIO.py', extra_metadata={}):
         """
         mode is 'wb' whatever the value is...
-        style: 'imagej', 'ome'...
+        style: 'imagej', 'ome', ..., ('RGB' does not work yet)
         """
         self.style = style #imagej = imagej
         self.metadata = {}
@@ -307,6 +307,10 @@ class MultiTiffWriter(generalIO.GeneralWriter):
 
         generalIO.GeneralWriter.__init__(self, fn, mode)
 
+        if self.style == 'RGB':
+            self.axes += 'S'
+            #self.setDim(dtype=N.uint8, imgSequence=1)
+
 
     def openFile(self):
         """
@@ -314,9 +318,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         """
         imagej = self.style == 'imagej'
         if int(tifffile.__version__.split('.')[1]) <= 14:
-            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#bigtiff=not(imagej), imagej=imagej)
+            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, bigtiff=not(imagej))
         else:
-            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)
+            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)#, bigtiff=not(imagej))
 
         self.handle = self.fp._fh
         self.dataOffset = self.handle.tell()
@@ -325,17 +329,37 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         # ImageJ's dimension order is always TZCYXS
         if self.style == 'imagej': 
             self.imgSequence = 1
-            self.metadata.update(self._makeImageJMetadata())
+            self.metadata.update(self._makeMetadata())
         elif self.style == 'ome':
             self.metadata.update(self.makeOMEMetadata())
-        #else:
-        #    self.metadata.update(self.ex_metadata)
+        else:
+            self.metadata = self._makeMetadata() # remove the inherited metadata
 
         unit = 10**6
         self.res = [(int(p), unit) for p in 1/self.pxlsiz[-2:] * unit]
+        
+    def writeRGBArr(self, arr, waxis=0, t=0, z=0):
+        """
+        waxis: axis of channel in 3D array
+        """
+        if self.axes[-1] in ('S', 'C', 'W') and waxis not in (3, -1):
+            barr = N.empty((self.ny, self.nx, self.nw), dtype=arr.dtype)
+            for w in range(self.nw):
+                barr[...,w] = arr[w] # not sure how to do this?? usually waxis should be 0 (an index can only have as single ellipsis)
+            arr = barr
+        elif self.axes[0] in ('S', 'C', 'W') and waxis not in (0):
+            barr = N.empty((self.nw, self.ny, self.nx), dtype=arr.dtype)
+            for w in range(self.nw):
+                barr[w] = arr[...,w]
+            arr = barr
+
+        self.writeArr(N.ascontiguousarray(arr), t=t, z=z)
             
         
     def writeSec(self, arr, i=None):
+        if len(self.axes) == 3 and arr.ndim != 3:
+            raise ValueError('array has to be 3 dimensions of "YXS"')
+        
         if not self.init:
             self.doOnSetDim()
             test = N.zeros((self.ny, self.nx), self.dtype)
@@ -347,12 +371,16 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         if i is not None:
             self.seekSec(i)
 
-        if int(tifffile.__version__.split('.')[1]) <= 14:
-            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True)
+        if self.style == 'RGB':
+            photometric = 'RGB'
         else:
-            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software)
-
-    def _makeImageJMetadata(self):
+            photometric = None
+        if int(tifffile.__version__.split('.')[1]) <= 14:
+            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, photometric=photometric)
+        else:
+            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric)
+ 
+    def _makeMetadata(self):
         """
         "Info" field does not work...
         Somebody tell me why
@@ -361,25 +389,32 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         #for key, val in self.ex_metadata.items():
         #if 
         
-        metadata = {'ImageJ': '1.51h',
+        metadata = {
                     'images': self.nsec,
                     'channels': self.nw,
                     'slices': self.nz,
-                    'hyperstack': self.ndim > 3,
-                    'mode': 'grayscale',
+                    'hyperstack': (self.ndim > 3 and (len(self.axes)==2 or self.nw == 1)) or (self.ndim > 4 and (len(self.axes)==3 and self.nw > 1)),
                     'unit': 'micron',
-                    'spacing': self.pxlsiz[0],
                     'loop': False,
                     'frames': self.nt,
                     # my field goes to "description"
                     'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
                     }
+        if self.style == 'imagej':
+            metadata['ImageJ'] = '1.51h'
+            metadata['mode'] = 'grayscale'
+            metadata['spacing'] = self.pxlsiz[0]
+        elif self.style == 'RGB':
+            metadata['images'] = self.nz * self.nt
+
 
         if 'Ranges' in self.ex_metadata:
             nw_range = len(self.ex_metadata['Ranges']) // 2
             if nw_range != self.nw:
                 del self.ex_metadata['Ranges']
-        self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
+
+        if self.style == 'imagej':
+            self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
 
             
         return metadata
@@ -469,6 +504,57 @@ def ome_to_dtype(pixeltype):
 
 def imgSeq_to_ome(imgSequence):
     return imgOrders[imgSequence]'''
+
+def saveAs3DRGB(h, out=None, t=0, vcat5=True):
+    if not out:
+        import os
+        out = os.path.splitext(h.fn)[0] + '_RGB_t%i.tif' % t
+
+    nw = 3
+    arr = N.empty((h.nz, h.ny, h.nx, nw), h.dtype)
+    
+    for w in range(min(h.nw, nw)):
+        arr[...,w] = h.get3DArr(t=t, w=w)
+    if h.nw < nw:
+        arr[...,h.nw:] = 0
+
+    with tifffile.TiffWriter(out) as tif:
+        tif.vcat5 = vcat5
+        tif.save(arr)
+
+    #tifffile.imsave(out, data=arr)# )
+    # Below tags can be added but not necessary...
+    #, photometric='RGB', planarconfig='CONTIG', metadata={'images': h.nz, 'slices': h.nz, 'axes': 'ZYXS'})
+
+    return out
+
+def removeEmptyChannel(h, out=None):
+    """
+    return output filename, but if no channel was removed, the original filename is returned.
+    """
+    rmv = []
+    for w in range(h.nw):
+        a = h.get3DArr(w=w)
+        if a.min() == 0 and a.max() == 0:
+            rmv.append(w)
+
+    if rmv:
+        if not out:
+            import os
+            out = os.path.splitext(h.fn)[0] + 'rmv.tif'
+        o = MultiTiffWriter(out)
+        o.setFromReader(h)
+        o.setDim(nw=h.nw-len(rmv))
+
+        for t in range(h.nt):
+            for wo, wi in enumerate(range(h.nw)):
+                if wi not in rmv:
+                    a = h.get3DArr(w=wi, t=t)
+                    o.write3DArr(a, w=wo, t=t)
+        return out
+    else:
+        return h.fn
+        
     
 def xml2dict(xml, sanitize=True, prefix=None):
     """Return XML as dict.

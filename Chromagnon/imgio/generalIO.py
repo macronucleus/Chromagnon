@@ -323,7 +323,10 @@ class GeneralReader(object):
         We follows priithon coordinate...
         """
         if self.flip_required:
-            arr = arr[::-1]
+            if self.axes[0] in ('S', 'C', 'W'):
+                arr = arr[:,::-1]
+            else:
+                arr = arr[::-1]
         return arr
         
 
@@ -469,8 +472,8 @@ class GeneralWriter(GeneralReader):
         """
         write array according to the given dimensions
         """
-        if arr.ndim != 2:
-            raise ValueError('arr must be 2-dimensions')
+        if arr.ndim != len(self.axes):
+            raise ValueError('arr must be %i-dimensions' % len(self.axes))
 
         arr = self.flipY(arr)
         idx = self.findFileIdx(t=t, z=z, w=w)
@@ -481,8 +484,8 @@ class GeneralWriter(GeneralReader):
         """
         write a 3D stack according to the given dimensions
         """
-        if arr.ndim != 3:
-            raise ValueError('arr must be 3-dimensions')
+        if arr.ndim != (len(self.axes) + 1):
+            raise ValueError('arr must be %i-dimensions' % (len(self.axes)+1))
         
         for z, a in enumerate(arr):
             self.writeArr(a, t=t, w=w, z=z)

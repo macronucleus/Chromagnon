@@ -751,14 +751,17 @@ def _makeFourierSlices(oshape, tshape, dim):
     return tslices, oslices
 
     
-def paddingFourier(af, shape, value=0):
+def paddingFourier(af, shape, value=0, real=False, out=None):
     """
-    3D version broken...., use fft not rfft
+    padd in Fourier space like F.getPadded
+
+    value: value filled  in the output  array, not used when out is supplied
+    out: output array
     """
-    
-    if (af.ndim > 1 and ((af.shape[-1]-1)*2) == af.shape[-2]) or (af.ndim==1 and af.shape[0] % 2):
-        afp = N.empty(shape, dtype=af.dtype)
-        afp[:] = value
+    if (af.ndim > 1 and ((af.shape[-1]-1)*2) == af.shape[-2]) or (af.ndim==1 and af.shape[0] % 2) or real:
+        if out is None:
+            out = N.empty(shape, dtype=af.dtype)
+            out[:] = value
         dss = N.subtract(shape, af.shape) // 2
 
         dimslices = []
@@ -772,16 +775,19 @@ def paddingFourier(af, shape, value=0):
         oss = [slc[1] for slc in dimslices]
         if af.ndim == 2:
             for y, ts in enumerate(tss[0]):
-                afp[ts, tss[-1][0]] = af[oss[0][y], oss[-1][0]]
+                out[ts, tss[-1][0]] = af[oss[0][y], oss[-1][0]]
         elif af.ndim == 3:
             for z, tsz in enumerate(tss[0]):
                 for y, tsy in enumerate(tss[1]):
-                    afp[tsz, tsy, tss[-1][0]] = af[oss[0][z], oss[1][y], oss[-1][0]]
-        return afp
+                    out[tsz, tsy, tss[-1][0]] = af[oss[0][z], oss[1][y], oss[-1][0]]
+        return out
     else:
         afo = N.fft.fftshift(af)
-        afp = F.getPadded(afo, shape, pad=value)
-        return N.fft.ifftshift(afp)
+        if out is not None:
+            F.copyPadded(afo, out, pad=value)
+        else:
+            out = F.getPadded(afo, shape, pad=value)
+        return N.fft.ifftshift(out)
 
 
 
@@ -891,7 +897,7 @@ def findMaxWithGFit(img, sigma=0.5, win=11):
         sigma = ret[2+ndim:2+ndim*2]
         return [v,zyx,sigma]
 
-def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, win=11, mask_npxls=3):
+def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls=3):
     """
     find peaks until either
     1. any pxls becomes below thre
@@ -908,7 +914,10 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, win=11, mask_npxls=3):
 
     poses = []
     vzyx = U.findMax(img)
-    while vzyx[0] > thre:
+    for i in range(npts):
+    #while vzyx[0] > thre:
+        if vzyx[0] < thre:
+            break
         prev = vzyx
         try:
             ret, check = imgFit.fitGaussianND(img, vzyx[-ndim:], sigma_peak, win)

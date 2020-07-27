@@ -13,7 +13,16 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/ChromagnonDocumentV085.pdf)
+Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/ChromagnonDocumentV085.pdf).
+
+If you prefer, watch the
+[movie](https://www.jove.com/v/60800/high-accuracy-correction-3d-chromatic-shifts-age-super-resolution)
+by JoVE.
+
+[The full text article](https://www.jove.com/video/60800) describes
+in more detail about
+sample preparation, software usage, trouble shooting, etc...
+
 
 Downloads
 ---------
@@ -52,7 +61,8 @@ How to cite
 ----------
 Please cite our paper:
 
-[Matsuda, Schermelleh, Hirano, Haraguchi, Hiraoka, 2018 "Accurate and fiducial-marker-free correction for three-dimensional chromatic shift in biological fluorescence microscopy"  Sci Rep 8:7583](https://www.nature.com/articles/s41598-018-25922-7)
+1. [Matsuda, Schermelleh, Hirano, Haraguchi, Hiraoka, 2018 "Accurate and fiducial-marker-free correction for three-dimensional chromatic shift in biological fluorescence microscopy"  Sci Rep 8:7583](https://www.nature.com/articles/s41598-018-25922-7)
 
+2. [Matsuda, Kojin, Schermelleh, Haraguchi, Hiraoka, 2020 "High-Accuracy Correction of 3D Chromatic Shifts in the Age of Super-Resolution Biological Imaging Using Chromagnon." J. Vis. Exp. (160), e60800](https://www.jove.com/video/60800)
 
 Authored and maintained by Atsushi Matsuda.

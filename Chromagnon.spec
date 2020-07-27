@@ -23,7 +23,7 @@
 import sys, os
 pyversion = sys.version_info.major
 
-PLUGIN='' # 'vcat5'
+PLUGIN= '' #vcat5'
 if PLUGIN == '':
     console=False
     ex_suffix = ''

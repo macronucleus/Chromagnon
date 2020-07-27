@@ -687,7 +687,8 @@ def yCos(parm, r=0):
     a, b, c, d = parm
     r = U.deg2rad(r)
     c = U.deg2rad(c)
-    return  a * N.cos(b*r + c) + d
+    #return  a * N.cos(b*r + c) + d
+    return a * N.cos(b*(r - c)) + d
 
 def rot2D(img2D, yx, sigma, rlist, mean_max=None, win=11):
     y, x = yx

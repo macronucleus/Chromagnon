@@ -186,7 +186,7 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
                 v = n + v
                 ret.append((dim, v))
             elif v >= n:
-                raise ValueError('number of %s is only %i but you specified %i' % (upper(dim), n, v))
+                raise ValueError('number of %s is only %i but you specified %i' % (dim.upper(), n, v))
             else:
                 ret.append((dim, v))
         return ret
@@ -201,6 +201,8 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
             whats = '_'.join((what0, what1))
             base, ext = os.path.splitext(fn)
             out = base + whats + ext
+            if os.path.isfile(out):
+                raise ValueError('The output file name %s exists, please specify another output file name.' % os.path.basename(out))
             
         twzyx0s = formatTWZYX(twzyx0s, h, start=True)
         twzyx1s = formatTWZYX(twzyx1s, h, start=False)

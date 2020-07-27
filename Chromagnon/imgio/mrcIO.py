@@ -47,6 +47,10 @@ class MrcReader(generalIO.GeneralReader):
 
         self.fp._secByteSize = self._secByteSize
 
+        # excitation wavelength
+        if hasattr(self.fp, 'extFloats') and self.fp.extFloats.ndim >= 2 and self.fp.extFloats.shape[-1] >= 32:
+            self.exc = self.fp.extFloats[:nw,10]
+
     def makeHdr(self):
         """
         make a Mrc header using the available dimension information to export
@@ -279,6 +283,10 @@ def makeHdrFromRdr(rdr):
             hdr.LensNum = eval(rdr.metadata['Instrument']['Objective']['ID'].split(':')[1])
 
     return hdr
+
+def setTitle(hdr, title):
+    if hdr.NumTitles < 9:
+        Mrc.setTitle(hdr, title)
 
 def makeHdrFromDim(nx, ny, nz, nt, nw, dtype, wave=[], imgSequence=0):
     hdr = Mrc.makeHdrArray()

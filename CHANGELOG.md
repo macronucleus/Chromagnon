@@ -105,7 +105,15 @@ view` in ND viewer.
 execution.
 63. (v0.85, 20191211) Warning is disabled if run from a binary file in
 the absence of bioformats.
-64. (v0.85, 20191212) A broken code in ImageSequence reader was fixed `imgio.imgSeqIO.py`
+64. (v0.85, 20191212) A broken code in ImageSequence reader was fixed
+`imgio.imgSeqIO.py`
+65. (v0.85, 20191220) An RGB tif save function was added to
+`multitifIO.py`.
+66. (v0.86, 20200227) A bug in ND viewer that fails to use pixelsize
+    in orthogonal viewer was fixed. Also, failure to display Z pixel
+    size was fixed.
+67. (v0.86, 20200330) Microscope map filename label was split into
+    direname and filename in extraparameter dialog.
 
 v0.7(Feb. 2019)
 ----

@@ -215,7 +215,7 @@ class ImagePanel(wx.Panel):
         # \n
         box = G.newSpaceV(sizer)
 
-        bb, box = G.newStaticBox(self.sliderPanel, box, title='Image info', size=wx.DefaultSize)
+        bb, box = G.newStaticBox(self.sliderPanel, box, title='Image info', size=(150,-1))#wx.DefaultSize)
 
         if sys.platform.startswith(('win', 'linux')):
             fsize = 9
@@ -226,24 +226,28 @@ class ImagePanel(wx.Panel):
         # pixel size
         pxsiz = tuple(self.doc.pxlsiz[::-1])
         dimstr = ('X', 'Y', 'Z')
-        line = 'Pixel size (um):\n'
+        line = 'Pixel size (nm):\n'
         pxstr = '  '
         for i, d in enumerate(pxsiz):
             if d:
-                pxstr += '%s %.3f: ' % (dimstr[i], d)
+                pxstr += '%s %i: ' % (dimstr[i], int(d*1000))
         if pxstr:
             line += pxstr[:-2]
         else:
             line = ''
         if line:
-            label = G.makeTxt(self.sliderPanel, box, line)
+            label = G.makeTxt(self.sliderPanel, box, line, flag=wx.EXPAND)
             label.SetFont(font)
+            label.SetLabel(line)
+            #label.Wrap(self.GetSize().width)
         # data type
         pxtype = imgio.bioformatsIO.pixeltype_to_bioformats(self.doc.dtype)
         line = 'Data type: %s' % pxtype
         label = G.makeTxt(self.sliderPanel, box, line)
         label.SetFont(font)
 
+        #bb.Layout()
+        #box.Layout()
         
         # z slider
         if self.doc.nz > 1:
@@ -372,9 +376,11 @@ class ImagePanel(wx.Panel):
         if (self.doc.nz > 1 or self.doc.nt > 1) and self.loadImgButton.IsEnabled() and issubclass(type(self.doc), imgio.generalIO.GeneralReader):
             zlast = self.doc.zlast
             z = self.doc.z
+            pxlsiz = self.doc.pxlsiz
             self.doc = imgio.arrayIO.ArrayReader(self.doc)
             self.doc.zlast = zlast
             self.doc.z = z
+            self.doc.pxlsiz = pxlsiz
             #self.loaded = True
             self.viewers[-1].setMyDoc(self.doc, self)
             #print('loadImage2Memory called')

@@ -145,7 +145,8 @@ def getOffset(shape, invmat, ty, tx, start=0):
 
 def affine_transform(arr, invmat, offset=0.0, order=ORDER):
     return U.nd.affine_transform(arr, invmat, offset,
-                               output=N.float32, cval=arr.min(), order=order)
+                               #output=N.float32, cval=arr.min(), order=order)
+                               output=N.float32, cval=0, order=order)
 
 
 # 
@@ -669,13 +670,15 @@ def cart2polar2D(y, x):
     theta = N.arctan2(y, x)
     return r, theta
 
-def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360, return_idx=False):
+def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_width = 360, start_phase=0, end_phase=360, return_idx=False):
     """
     img: array
     center: coordinate y, x
-    final_radius: ending radius
-    initial_radius: starting radius
-    phase_width: npixles / circle
+    final_radius: ending radius, int
+    initial_radius: starting radius, int
+    phase_width: npixles / circle in degrees, int
+    start_phase: in degrees
+    end_phase: in degrees
     return_idx: return transformation coordinates (y,x)
     """
     if img.ndim > 2 or len(center) > 2:
@@ -691,7 +694,7 @@ def img2polar2D(img, center, final_radius=None, initial_radius = None, phase_wid
     if phase_width is None:
         phase_width = N.sum(img.shape[-2:]) * 2
 
-    theta , R = np.meshgrid(np.linspace(0, 2*np.pi, phase_width), 
+    theta , R = np.meshgrid(np.linspace(N.radians(start_phase), N.radians(end_phase), phase_width), 
                             np.arange(initial_radius, final_radius))
 
     Ycart, Xcart = polar2cart2D(R, theta, center)

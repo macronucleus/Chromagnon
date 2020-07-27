@@ -217,7 +217,7 @@ def getHistEqualizedF(arr, histYX=None, nBins=None):
     else:
         h,x = histYX
 
-    hcs = N.cumsum(h, dtype=N.float32)
+    hcs = N.cumsum(h, dtype='float32')
     hcs /= hcs[-1]
 
     xMin = float(x[0])
@@ -232,7 +232,7 @@ def getHistEqualizedF(arr, histYX=None, nBins=None):
 ###################################################################
 
 
-def radialPhiArr(shape, func, orig=None, dtype=N.float32):
+def radialPhiArr(shape, func, orig=None, dtype='float32'):
     """generates and returns radially symmetric function sampled in volume(image) of shape shape
     if orig is None the origin defaults to the center
     func is a 1D function with 2 paramaters: r,phi
@@ -268,7 +268,7 @@ def radialPhiArr(shape, func, orig=None, dtype=N.float32):
         raise ValueError("only defined for 1< dim <= 3")
 
 
-def radialArr(shape, func, orig=None, wrap=False, dtype=N.float32):
+def radialArr(shape, func, orig=None, wrap=False, dtype='float32'):
     """generates and returns radially symmetric function sampled in volume(image) of shape shape
     if orig is None the origin defaults to the center
     func is a 1D function with 1 paramater: r
@@ -348,7 +348,7 @@ def radialArr(shape, func, orig=None, wrap=False, dtype=N.float32):
     else:
         raise ValueError("only defined for dim < 3 (TODO)")
 
-def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype=N.float32):
+def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype='float32'):
     """like radialArr but instead of using euclidian distance to determine r
        (r = (dx**2 + dy**2) **.5)
        this using the a maximum funtion:
@@ -435,7 +435,7 @@ def LoG(r,sigma=None, dim=1, r0=None, peakVal=None):
 
 ###### Mexican Hat ###########
 
-def LoGArr(shape=defshape, r0=None, sigma=None, peakVal=None, orig=None, wrap=0, dtype=N.float32):
+def LoGArr(shape=defshape, r0=None, sigma=None, peakVal=None, orig=None, wrap=0, dtype='float32'):
     """returns n-dim Laplacian-of-Gaussian (aka. mexican hat)
     if peakVal   is not None
          result max is peakVal
@@ -452,7 +452,7 @@ def cone(r, dim=1, Yscale=1.):
     return N.where(a<0,0,a * Yscale )
 
 
-def coneArr(shape=defshape, radius=30, integralScale=1.0, orig=None, wrap=0, dtype=N.float32):
+def coneArr(shape=defshape, radius=30, integralScale=1.0, orig=None, wrap=0, dtype='float32'):
     shape = _normalize_shape(shape)
     d= len(shape)
     if d ==1:
@@ -464,12 +464,12 @@ def coneArr(shape=defshape, radius=30, integralScale=1.0, orig=None, wrap=0, dty
                      lambda r: cone(r/float(radius), d, 1./V * integralScale),
                      orig, wrap, dtype)
 
-def discArr(shape=defshape, radius=30, orig=None, valIn=1, valOut=0, wrap=0, dtype=N.float32):
+def discArr(shape=defshape, radius=30, orig=None, valIn=1, valOut=0, wrap=0, dtype='float32'):
     return radialArr(shape,
                      lambda r: N.where(r<=radius, valIn, valOut),
                      orig, wrap, dtype)
 
-def ringArr(shape=defshape, radius1=20, radius2=40, orig=None, wrap=0, dtype=N.float32):
+def ringArr(shape=defshape, radius1=20, radius2=40, orig=None, wrap=0, dtype='float32'):
     a = radialArr(shape,
                      lambda r: N.where(r<=radius1, 0, r),
                      orig, wrap, dtype)
@@ -478,12 +478,12 @@ def ringArr(shape=defshape, radius1=20, radius2=40, orig=None, wrap=0, dtype=N.f
     return a
 
 
-def squareArr(shape=defshape, radius=30, orig=None, valIn=1, valOut=0, wrap=0, dtype=N.float32):
+def squareArr(shape=defshape, radius=30, orig=None, valIn=1, valOut=0, wrap=0, dtype='float32'):
     return maxNormRadialArr(shape,
                             lambda r: N.where(r<=radius, valIn, valOut),
                             orig, wrap, dtype)
 
-def mexhatArr(shape=defshape, scaleHalfMax=30, orig=None, wrap=0, dtype=N.float32):
+def mexhatArr(shape=defshape, scaleHalfMax=30, orig=None, wrap=0, dtype='float32'):
     scaleHalfMax = float(scaleHalfMax)
     """deprecated !! use LoGArr instead for proper scaling and normalization in dim>1"""
 
@@ -493,7 +493,7 @@ def mexhatArr(shape=defshape, scaleHalfMax=30, orig=None, wrap=0, dtype=N.float3
                      lambda r: mexhat(r/float(scaleHalfMax), d),
                      orig, wrap, dtype)
 
-def cosSqDiscArr(shape=defshape, radius=30, orig=None, wrap=0,crop=0, dtype=N.float32):
+def cosSqDiscArr(shape=defshape, radius=30, orig=None, wrap=0,crop=0, dtype='float32'):
     """ radius is r-distance where functions == 0
         if crop is True forces all values at r > radius to 0
     """
@@ -511,7 +511,7 @@ def sinc(r):
     #numoy as opposed to numarray ignores 'divide' error by default !
     a = N.where(r, N.divide(N.sin(r),r), 1)
     return a
-def sincArr(shape=defshape, radius=30, orig=None, wrap=0,crop=0, dtype=N.float32):
+def sincArr(shape=defshape, radius=30, orig=None, wrap=0,crop=0, dtype='float32'):
     """ radius is r-distance where functions == 0
         if crop is True forces all values at r > radius to 0
     """
@@ -549,7 +549,7 @@ def gaussian(r, dim=1, sigma=1., integralScale=None, peakVal=None):
     return f*N.exp(-r**2/f2)
 
 def gaussianArr(shape=defshape, sigma=30, integralScale=None, peakVal=None,
-                orig=None, wrap=0, dtype=N.float32):
+                orig=None, wrap=0, dtype='float32'):
     """returns n-dim Gaussian
     if integralScale is not None
          result.sum() == integralScale
@@ -587,7 +587,7 @@ def lorentzian(r, dim=1, sigma=1., integralScale=None, peakVal=None):
     return f*(1+r**2/S)**-n1_2
     
 def lorentzianArr(shape=defshape, sigma=30, integralScale=None, peakVal=None,
-                orig=None, wrap=0, dtype=N.float32):
+                orig=None, wrap=0, dtype='float32'):
     """returns n-dim Lorentzian (Cauchy) function
     if integralScale is not None
          result.sum() == integralScale
@@ -602,7 +602,7 @@ def lorentzianArr(shape=defshape, sigma=30, integralScale=None, peakVal=None,
                      orig, wrap, dtype)
 
 
-def sigmoid(x, x0=0, b=1): #, dtype=N.float32):
+def sigmoid(x, x0=0, b=1): #, dtype='float32'):
     """
     returns the sigmoid function at x.
     parameters:
@@ -616,7 +616,7 @@ def sigmoid(x, x0=0, b=1): #, dtype=N.float32):
     b = float(b)
     return 1. / (1. + N.exp(-(x-x0)/b))
 
-def noiseArr(shape=defshape, stddev=1., mean=0.0, dtype=N.float32):
+def noiseArr(shape=defshape, stddev=1., mean=0.0, dtype='float32'):
     return N.random.normal(mean, stddev,shape).astype(dtype)
 def poissonArr(shape=defshape, mean=1, dtype=N.uint16):
     if mean == 0:
@@ -632,7 +632,7 @@ def poissonize(arr, dtype=N.uint16):
 
 # what was this for ????
 #   oh yeah - to test my "roating and flipping" CCD cameras
-def testImgR(shape=defshape, dtype=N.float32):
+def testImgR(shape=defshape, dtype='float32'):
     """
     some  non symmetric test image (weird "R shape")
     """
@@ -743,7 +743,7 @@ def shuffle4irfft(arr):
 
     return a
 
-def shift(arr, delta=None): #20081113 , dtype=N.float32):
+def shift(arr, delta=None): #20081113 , dtype='float32'):
     """
     returns new array: arr shifted by delta (tuple)
        it uses rfft, multiplying with "shift array", irfft
@@ -769,10 +769,10 @@ def shift(arr, delta=None): #20081113 , dtype=N.float32):
 
 
     
-def fourierRealShiftArr(shape=defshape, delta=None, dtype=N.float32):
+def fourierRealShiftArr(shape=defshape, delta=None, dtype='float32'):
     return fourierShiftArr(shape, delta, 1, dtype)
 
-def fourierShiftArr(shape=defshape, delta=None, meantForRealFFT=False, dtype=N.float32):
+def fourierShiftArr(shape=defshape, delta=None, meantForRealFFT=False, dtype='float32'):
     if delta is None:
         delta = N.array(shape) / 2.
     
@@ -907,14 +907,22 @@ def sfft(a):
     """
     center shifted full fft
     """
-    return N.fft.ifftshift(fft(N.fft.fftshift(a)))
+    return N.fft.fftshift(fft(N.fft.ifftshift(a)))
 
 def isfft(af):
     """
     center shifted full ifft
     """
     return N.fft.fftshift(ifft(N.fft.ifftshift(af)))
-        
+
+def sfft2d(a):
+    func = sfft
+    return _process2d(func, a)
+
+def isfft2d(a):
+    func = isfft
+    return _process2d(func, a)
+
 def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
     calculate nd fourier transform
@@ -1003,7 +1011,7 @@ def irfft2d(af, preserve=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normal
     shape = af.shape[:-1] + ((af.shape[-1]-1)*2,)
 
     if   afDtype == N.complex64:
-        a = N.empty(shape=shape, dtype=N.float32)
+        a = N.empty(shape=shape, dtype='float32')
     elif afDtype == N.complex128:
         a = N.empty(shape=shape, dtype=N.float64)
     else:
@@ -1211,7 +1219,7 @@ def irfft(a, s=None, axes=None):
 
 
 
-def convolve(a,b, conj=0, killDC=0, minFdtype=N.float32):
+def convolve(a,b, conj=0, killDC=0, minFdtype='float32'):
     """
     calculate convolution of `a` and `b`
        (using rfft, multiplication, then irfft)
@@ -1303,7 +1311,7 @@ def zzern_rsin(n,m,r, phi):
     return zzern_r(n,m,r) * N.sin(m*phi)
 
 
-def zzernikeNMCosArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dtype=N.float32):
+def zzernikeNMCosArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dtype='float32'):
     if radius is None:
         radius = reduce(min, shape) / 2.0
     if crop:
@@ -1314,7 +1322,7 @@ def zzernikeNMCosArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dt
         return radialPhiArr(shape,
                             lambda r,p: zzern_rcos(n,m, r/radius,p), orig)
 
-def zzernikeNMSinArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dtype=N.float32):
+def zzernikeNMSinArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dtype='float32'):
     if radius is None:
         radius = reduce(min, shape) / 2.0
     if crop:
@@ -1325,7 +1333,7 @@ def zzernikeNMSinArr(shape=defshape, n=3,m=3, crop=1, radius=None, orig=None, dt
         return radialPhiArr(shape,
                             lambda r,p: zzern_rsin(n,m, r/radius,p), orig)
 
-def zzernikeN0Arr(shape=defshape, n=3, crop=1, radius=None, orig=None, dtype=N.float32):
+def zzernikeN0Arr(shape=defshape, n=3, crop=1, radius=None, orig=None, dtype='float32'):
     if radius is None:
         radius = reduce(min, shape) / 2.
     if crop:
@@ -1337,7 +1345,7 @@ def zzernikeN0Arr(shape=defshape, n=3, crop=1, radius=None, orig=None, dtype=N.f
                          lambda r:    zzern_r(n,0, r/radius), orig)
     
 
-def zzernikeArr(shape=defshape, no=9, crop=1, radius=None, orig=None, dtype=N.float32):
+def zzernikeArr(shape=defshape, no=9, crop=1, radius=None, orig=None, dtype='float32'):
 
     n = int( N.sqrt(no) )
     

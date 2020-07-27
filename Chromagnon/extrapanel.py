@@ -112,7 +112,8 @@ class ExtraDialog(wx.Dialog):
 
         self.calibfn = self.parent.extra_parms.get('calibfn', '')
         self.makeCalibChoice(box)
-        self.calibfn_label = G.makeTxt(self, box, self.calibfn)
+        self.calibfn_dirlabel = G.makeTxt(self, box, os.path.dirname(self.calibfn))
+        self.calibfn_baselabel = G.makeTxt(self, box, os.path.basename(self.calibfn))
 
         calibClearButton = G.makeButton(self, box, self.OnClearCalib, title='Erace selected', tip='')
         
@@ -163,7 +164,8 @@ class ExtraDialog(wx.Dialog):
         if dlg.ShowModal() == wx.ID_OK:
             self.calibfn = dlg.GetPath()
         dlg.Destroy()
-        self.calibfn_label.SetLabel(self.calibfn)
+        self.calibfn_dirlabel.SetLabel(os.path.dirname(self.calibfn))
+        self.calibfn_baselabel.SetLabel(os.path.basename(self.calibfn))
 
     def OnUseCalib(self, evt=None):
         self.calibfn_label.Enable(self.usecalib_cb.GetValue())
@@ -246,7 +248,8 @@ class ExtraDialog(wx.Dialog):
     def setCalib(self, name='', fn=''):
         self.calib_choice.SetStringSelection(name)
         self.calibfn = fn
-        self.calibfn_label.SetLabel(fn)
+        self.calibfn_dirlabel.SetLabel(os.path.dirname(fn))
+        self.calibfn_baselabel.SetLabel(os.path.basename(fn))
 
 class CalibrationDialog(wx.Dialog):
     def __init__(self, parent, calibfn=''):

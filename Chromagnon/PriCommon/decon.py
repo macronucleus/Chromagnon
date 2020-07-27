@@ -28,6 +28,9 @@ def parallel(fns, out=None, otf=None, limit=ppro.NCPU, **kwds):
         return ppro.pmap(main, fns, limit, out, otf, **kwds)
 
 def main(fn, out=None, otf=None, **kwds):
+    """
+    makelog: True or False
+    """
     # setup
     priismCommands.PriismSetup()
 
@@ -256,7 +259,8 @@ elif os.path.exists('/Applications'): # mac
 elif os.path.exists('/opt/otf'): # others
     CTFDIR = r"/opt/otf"
 else:
-    raise ValueError('otf directory not found')
+    CTFDIR = '' # 20200424 Error in py2 Win
+    #raise ValueError('otf directory not found')
     #CTFDIR=r"/opt/otf"
 
     
