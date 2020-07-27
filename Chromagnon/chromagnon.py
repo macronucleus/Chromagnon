@@ -217,7 +217,7 @@ class BatchPanel(wx.Panel):
         self.averageCb = G.makeCheck(self, box, "average references  ", tip='Multiple reference images are maximum intensity projected to make a single high SNR image for shift calculation.', defChecked=bool(confdic.get('average', False)))
 
         self.localChoice = LOCAL_CHOICE
-        self.local_label, self.localListChoice = G.makeListChoice(self, box, 'Local align', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
+        self.local_label, self.localListChoice = G.makeListChoice(self, box, 'Local align ', self.localChoice, defValue=confdic.get('local', 'None'), targetFunc=self.OnLocalListChose)
 
         self.min_pxls_label, self.min_pxls_choice = G.makeListChoice(self, box, 'minimum window size', af.MIN_PXLS_YXS, defValue=confdic.get('min_pxls_yx', af.MIN_PXLS_YXS[1]), tip='Minimum number of pixel to divide as elements of local alignment')
 
