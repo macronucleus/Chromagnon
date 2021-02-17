@@ -44,6 +44,9 @@ _rgbList_menuIDs = [wx.NewId() for i in range(len(_rgbList))]
 
 def initglut():
     global GLUTINITED
+    #if sys.platform.startswith(('linux')):
+    #    GL.USEGLUT=False
+    #    return
     if not GLUTINITED and sys.platform.startswith(('linux', 'win')):
         from OpenGL import GLUT
         try:
@@ -56,11 +59,12 @@ def initglut():
 
 class ImagePanel(wx.Panel):
     viewCut   = False
-    def __init__(self, parent, imFile=None, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize):
+    def __init__(self, parent, imFile=None, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, useCropbox=viewer2.CROPBOX):
         wx.Panel.__init__(self, parent, id, pos, size, name='')
 
         # to make consistent with the older viewers
         self.parent = self
+        self.useCropbox = useCropbox
         
         self._mgr = aui.AuiManager()
         self._mgr.SetManagedWindow(self)
@@ -100,7 +104,8 @@ class ImagePanel(wx.Panel):
         self.viewers = [] # XY, XZ, ZY
         self.viewers.append(viewer2.GLViewer(self, dims=(1,2),
                                              style=wx.BORDER_SUNKEN,
-                                             size=wx.Size(self.doc.nx, self.doc.ny)
+                                             size=wx.Size(self.doc.nx, self.doc.ny),
+                                             useCropbox=self.useCropbox
                                              ))
 
         self._mgr.AddPane(self.viewers[0], aui.AuiPaneInfo().Floatable(False).Name('XY').Caption("XY").BestSize((self.doc.nx, self.doc.ny)).CenterPane().Position(0))
@@ -174,6 +179,7 @@ class ImagePanel(wx.Panel):
                 v.viewGpx.append(GL.graphix_cropbox(lowerBound, upperBound))
 
         pps = self._mgr.GetAllPanes()
+
         if not any([pp.name == 'ZY' for pp in pps]) or not self.orthogonal_toggle.GetValue():
             for v in self.viewers:
                 if v.viewGpx:
@@ -242,7 +248,7 @@ class ImagePanel(wx.Panel):
             #label.Wrap(self.GetSize().width)
         # data type
         pxtype = imgio.bioformatsIO.pixeltype_to_bioformats(self.doc.dtype)
-        line = 'Data type: %s' % pxtype
+        line = 'Data type: %s ' % pxtype
         label = G.makeTxt(self.sliderPanel, box, line)
         label.SetFont(font)
 
@@ -423,7 +429,8 @@ class ImagePanel(wx.Panel):
         if not any([pp.name == 'ZY' for pp in pps]):
             self.viewers.append(viewer2.GLViewer(self, dims=(1,0),
                                                  style=wx.BORDER_SUNKEN,
-                                                 size=wx.Size(self.doc.nz, self.doc.ny)
+                                                 size=wx.Size(self.doc.nz, self.doc.ny),
+                                                 useCropbox=self.useCropbox
                                                  ))
             self._mgr.AddPane(self.viewers[-1], aui.AuiPaneInfo().Floatable(False).Name('ZY').Caption("ZY").Left().Position(0).BestSize((self.doc.nz, self.doc.ny)))#.Dockable(False).Top())
             self.viewers[-1].setMyDoc(self.doc, self)
@@ -440,7 +447,8 @@ class ImagePanel(wx.Panel):
         if not any([pp.name == 'XZ' for pp in pps]):
             self.viewers.append(viewer2.GLViewer(self, dims=(0,2),
                                                  style=wx.BORDER_SUNKEN,
-                                                 size=wx.Size(self.doc.nx, self.doc.nz)
+                                                 size=wx.Size(self.doc.nx, self.doc.nz),
+                                                 useCropbox=self.useCropbox
                                                  ))
             self._mgr.AddPane(self.viewers[-1], aui.AuiPaneInfo().Floatable(False).Name('XZ').Caption("XZ").BestSize((self.doc.nz, self.doc.ny)).CenterPane().Position(1))
             self.viewers[-1].setMyDoc(self.doc, self)
@@ -557,7 +565,7 @@ class ImagePanel(wx.Panel):
                                            lambda ev: self.OnHistToggleButton(ev, i=i, mode="r"))
             self.hist_toggleButton[i].SetValue( self.hist_show[i] )
 
-            self.intensity_label[i] = G.makeTxt(self.histsPanel, box, ' ')
+            self.intensity_label[i] = G.makeTxt(self.histsPanel, box, ' '*32)
 
             box = G.newSpaceV(sizer)
             
@@ -578,7 +586,7 @@ class ImagePanel(wx.Panel):
             
             #/n
             box = G.newSpaceV(sizer)
-            self.hist_label[i] = G.makeTxt(self.histsPanel, box, ' ')
+            self.hist_label[i] = G.makeTxt(self.histsPanel, box, ' '*45)
             
             def fff(s, ii=i):
                 l, r = s.leftBrace, s.rightBrace
@@ -606,7 +614,7 @@ class ImagePanel(wx.Panel):
         box = G.newSpaceV(sizer)
         G.makeTxt(self.histsPanel, box, ' ') # dummy
         box = G.newSpaceV(sizer)
-        self.xy_label = G.makeTxt(self.histsPanel, box, ' ')
+        self.xy_label = G.makeTxt(self.histsPanel, box, ' '*32)
 
         self.histsPanel.SetAutoLayout(1)
         self.histsPanel.SetupScrolling()
@@ -1005,6 +1013,12 @@ class ImagePanel(wx.Panel):
 
         return retSlice
 
+    def getROI(self):
+        start = self.doc.roi_start
+        stop = self.doc.roi_start + self.doc.roi_size
+        return tuple(start), tuple(stop)
+        #return [slice(*ss) for ss in zip(start, stop)]
+
 class MyFrame(wx.Frame):
 
     def __init__(self, title='ND viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):
@@ -1069,7 +1083,7 @@ class ImEditWindow(aui.AuiNotebook):
             
         self.AddPage(*args, **kwds)
             
-def main(fns, parent=None):
+def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
     """
     fn: a filename
     """
@@ -1086,7 +1100,7 @@ def main(fns, parent=None):
     #    raise ValueError
 
     for fn in fns:
-        panel = ImagePanel(frame, fn)
+        panel = ImagePanel(frame, fn, useCropbox=useCropbox)
         name = os.path.basename(fn)
         frame.imEditWindows.addPage(panel, name, select=True)
     return frame

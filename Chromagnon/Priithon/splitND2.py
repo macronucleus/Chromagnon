@@ -629,7 +629,7 @@ class spv(spvCommon):
             boxSizer.Add(label, 0, wx.GROW|wx.ALL, 2)
 
             
-        self.label = wx.StaticText(parent, -1, "----move mouse over image----") # HACK find better way to reserve space to have "val: 1234" always visible 
+        self.label = wx.StaticText(parent, -1, "----move mouse over image----", style=wx.ST_NO_AUTORESIZE) # HACK find better way to reserve space to have "val: 1234" always visible # wx.ST_NO_AUTORESIZE added after python 3.7
     
         boxSizer.Add(self.label, 0, wx.GROW|wx.ALL, 2)
         boxSizer.Layout()

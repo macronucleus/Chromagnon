@@ -113,7 +113,22 @@ the absence of bioformats.
     in orthogonal viewer was fixed. Also, failure to display Z pixel
     size was fixed.
 67. (v0.86, 20200330) Microscope map filename label was split into
-    direname and filename in extraparameter dialog.
+direname and filename in extraparameter dialog.
+68. (v0.87, 20200806) wx.StaticText was not displayed correctly on
+    Mac. The problem was fixed (`chromagnon.py`, `chromeditor.py`,
+    `ndviewer.main.py`, `Priithon.splitND.py`).
+69. (v0.87, 20201122) Updated a wxpython problem in MacOS Big Sur ( `priithon.histogram.py`, `priithon.viewer.py`,
+`priithon.viewer2.py`, `ndviewer.viewer2.py`). This also requires a
+fix in the `OpenGL.platform.ctypesloader.py`.
+70. (v0.87, 20201122) Updated part of `imgio.multitiffIO.py` for newer
+tifffile (not yet finishied).
+71. (v0.87, 20201224) csv made by excel is now readable.
+72. (v0.87, 20201224) Tiff file with a series can be read by
+MultitifIO.py.
+73. (v0.87, 20210216) Tiff file with a lot of micron charactors
+(probably created by micromanager) can be now saved in tif. (`imgio.multitifIO.py`)
+74. (v0.87, 20210216) A broken code to Save in the dv format from a
+    tiff file was fixed (`aligner.py`).
 
 v0.7(Feb. 2019)
 ----

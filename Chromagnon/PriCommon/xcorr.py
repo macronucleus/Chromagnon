@@ -383,7 +383,7 @@ def iteration(a, b, niter=5, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, wi
 
     if ret is None:
         return zyx
-    elif ret is 1:
+    elif ret == 1:
         return zyx, N.array((a0, b0))
     elif ret is True:
         return zyx, c

@@ -366,13 +366,16 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             # instead of using low-correlation results, such images are sent to alternative calculation.
             if len(checks):
                 regions = [(QUADRATIC_AREA[idx], round(cq, 5)) for idx, cq in checks]
-                msg = '%s quadratic regions had too-low correlation (threshold=%.5f, using alternative algorithm' % (regions, cqthre)
+                msg = '%s quadratic regions had too-low correlation (threshold=%.5f), using alternative algorithm' % (regions, cqthre)
                 if echofunc:
                     echofunc(msg)
                 switch = True
 
             if max_shift_pxl is not None:
                 if abs(N.linalg.norm(ret[:2])) > abs(N.linalg.norm(max_shift_pxl)):
+                    msg = 'WARNING: shift %.2f was more than the max shift %.2f' % (abs(N.linalg.norm(ret[:2])), abs(N.linalg.norm(max_shift_pxl)))
+                    if echofunc:
+                        echofunc(msg)
                     switch = True
                         
                 #print msg

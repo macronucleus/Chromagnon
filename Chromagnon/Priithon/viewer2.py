@@ -572,6 +572,8 @@ class GLViewer(GLViewerCommon):
     def OnPaint(self, event):
         try:
             dc = wx.PaintDC(self)
+        except wx._core.wxAssertionError:# 20201122 MacOS Big Sur
+            pass
         except:
             # this windows is dead !?
             return

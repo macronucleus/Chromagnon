@@ -996,7 +996,7 @@ def view3(fns):
     except ImportError:
         raise NotImplementedError('Please install ndviewer')
 
-    return ndviewer.main.main(fns)
+    return ndviewer.main.main(fns, useCropbox=True)
         
 def DIR(verbose=1):
     """use mouse to get directory name

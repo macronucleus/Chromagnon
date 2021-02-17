@@ -437,7 +437,7 @@ class Chromagnon(object):
         self.refyz = refyz
         self.refyx = refyx
         
-    def findAlignParamWave(self, t=0, doWave=True, init_t=None, useQuadri4YX=True):
+    def findAlignParamWave(self, t=0, doWave=True, init_t=None, useQuadri4YX=True, takeout_obj=False):
         """
         do findBestChannel() before calling this function
 
@@ -506,6 +506,46 @@ class Chromagnon(object):
                     ret[w,0] = yz[1]
                     self.echo('Z shift rough estimate tz:%.3f' % yz[1])
                     #print(yz, ret[w])
+
+
+                # obtain only the required region (the center of rotation and magnification is no meaning for the Z axis, therefore, it is possible to obtain the region where significant structures are contained)
+                if takeout_obj:
+                    p1um = int(round(1 / self.pxlsiz[0]))
+                    if p1um < 2:
+                        p1um = 2
+                    zshift = int(N.ceil(N.abs(ret[w,0]))) * int(N.sign(ret[w,0]))
+                    refzs = N.array(self.refzs)
+                    refzs = N.where(refzs > 0, refzs - 1, 0)
+                    refzs = N.where(refzs >= self.refyz.shape[1], self.refyz.shape[1]-1, refzs)
+                    zminr = int(min(refzs) - p1um)
+                    zmaxr = int(max(refzs) + p1um)
+                    if zminr < 0:
+                        zminr = 0
+                    if zmaxr > self.refyz.shape[1]:
+                        zmaxr = self.refyz.shape[1]
+                    zmint = zminr - zshift
+                    zmaxt = zmaxr - zshift
+                    print(zminr, zmaxr, zmint, zmaxt)
+                    if zmint < 0:
+                        edge = abs(zmint)
+                        zminr += edge
+                        zmaxr -= edge
+                        zmint = 0
+                        zmaxt -= edge
+                    if zmaxt > self.refyz.shape[1]:
+                        edge = zmaxt - self.refyz.shape[1]
+                        zminr += edge
+                        zmaxr -= edge
+                        zmint += edge
+                        zmaxt = self.refyz.shape[1]
+                    print(zminr, zmaxr, zmint, zmaxt)
+
+                    refyz = self.refyz[...,zminr:zmaxr]
+                    imgyz = imgyz[...,zmint:zmaxt]
+                    ret[w,0] = ret[w,0] % N.sign(ret[w,0])
+                else:
+                    refyz = self.refyz
+                    zshift = 0
                     
                 # zoom up Z if necessary
                 zdif = max(self.refzs) - min(self.refzs)
@@ -515,11 +555,15 @@ class Chromagnon(object):
                     zzoom = imgyz.shape[0] / imgyz.shape[1]
                     self.echo('Z complexity low, Z axis is zoomed up %.2f times' % zzoom)
                     imgyz = nd.zoom(imgyz, (1, zzoom))
-                    refyz = nd.zoom(self.refyz, (1, zzoom))
+                    refyz = nd.zoom(refyz, (1, zzoom))
                     maxErrZ = self.maxErrZ * zzoom
+                    max_shift_pxl = self.max_shift_pxl * zzoom / 4
+                    ### 20200929
+                    ret[w,0] *= zzoom
                 else:
-                    refyz = self.refyz
+                    #refyz = self.refyz
                     maxErrZ = self.maxErrZ
+                    max_shift_pxl = self.max_shift_pxl
 
                 # try quadratic cross correlation
                 if self.zmagSwitch != ZMAG_CHOICE[2] and not ((zdif <= 7 or self.img.nz <= 10) and self.zmagSwitch == ZMAG_CHOICE[0]):
@@ -534,21 +578,24 @@ class Chromagnon(object):
                         if_failed = af.IF_FAILED[-1] # 'terminate' -> xcorr
                         
                     #return imgyz, refyz
-                    val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=self.max_shift_pxl, if_failed=if_failed)
+                    self._imgyz = imgyz
+                    self._refyz = refyz
+                    self.guess = initguess
+                    val, check = af.iteration(imgyz, refyz, maxErr=(self.maxErrYX, maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, max_shift_pxl=max_shift_pxl, if_failed=if_failed)#, xs=self.refzs * zzoom)
 
                     ty2,tz,_,_,mz = val
-                    ret[w,0] = tz / zzoom
+                    ret[w,0] = tz / zzoom + zshift
                     ret[w,4] = mz
                     if not check: # chage to normal cross correlation
                         self.echo('method changed to ZY phase correlation [ty,tz]')
                         initguess = ret[w,:2][::-1]
                         yz = af.iterationXcor(imgyz, refyz, maxErr=(self.maxErrYX,maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc)
-                        ret[w,0] = yz[1]
+                        ret[w,0] = yz[1] / zzoom + zshift
                 else:
                     self.echo('Measuring ZY phase correlation [ty,tz]')
                     initguess = ret[w,:2][::-1]
                     yz = af.iterationXcor(imgyz, refyz, maxErr=(self.maxErrYX,maxErrZ), niter=self.niter, phaseContrast=self.phaseContrast, initguess=initguess, echofunc=self.echofunc, napo=0)
-                    ret[w,0] = yz[1]
+                    ret[w,0] = yz[1] / zzoom + zshift
 
 
                 zs = N.round_(self.refzs-ret[w,0]).astype(N.int)
@@ -1129,7 +1176,7 @@ class Chromagnon(object):
 
         ##   --- extended header ----
         if type(des) == imgio.mrcIO.MrcWriter:
-            nsecs = self.img.hdr.Num[-1]
+            nsecs = self.img.nsec#hdr.Num[-1]
             if hasattr(des.fp, 'extFloats') and des.fp.extFloats.shape[0] >= nsecs:
                 if self.cropSlice[-3].start is not None and self.cropSlice[-3].stop is not None:
                     zrange = range(self.cropSlice[-3].start, self.cropSlice[-3].stop)

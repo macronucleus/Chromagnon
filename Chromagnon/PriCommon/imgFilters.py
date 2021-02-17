@@ -5,7 +5,10 @@ try:
 except ValueError:
     from Priithon.all import N, U, Y, F, Mrc
 from scipy import optimize
-from . import imgFit
+try:
+    from . import imgFit
+except ImportError: # python2
+    import imgFit
 import os
 #try:
 #    from packages import Eext
@@ -192,7 +195,7 @@ forceSecondPeak=None, acceptOrigin=True, maskSigmaFact=1., removeY=None, removeX
 
     if not gFit:
         yx = centerOfMass(c, vzyx[-2:]) - center
-    if lap is not 'nothing':
+    if lap != 'nothing':
         c = paddingValue(c, shapeM+2)
 
     if ret == 2:
@@ -868,7 +871,7 @@ def gaussianArr2D(shape=(256,256), sigma=[2.,2.], peakVal=None, orig=None, rot=0
 
 # finding points
 
-def findMaxWithGFit(img, sigma=0.5, win=11):
+def findMaxWithGFit(img, sigma=0.5, win=11, init_pos=None):
     '''
     find sub-pixel peaks from input img using n-dimensional Guassian fitting
 
@@ -878,7 +881,11 @@ def findMaxWithGFit(img, sigma=0.5, win=11):
     return [v, zyx, sigma]
     '''
     imgFit.fitFailedClear()
-    vzyx = U.findMax(img)
+    if init_pos is None:
+        vzyx = U.findMax(img)
+    else:
+        v = img[init_pos]
+        vzyx = [v] + list(init_pos)
     ndim = img.ndim
     try:
         ret, check = imgFit.fitGaussianND(img, vzyx[-ndim:], sigma, win)
@@ -897,7 +904,7 @@ def findMaxWithGFit(img, sigma=0.5, win=11):
         sigma = ret[2+ndim:2+ndim*2]
         return [v,zyx,sigma]
 
-def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls=3):
+def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls=3, init_poses=[]):
     """
     find peaks until either
     1. any pxls becomes below thre
@@ -913,7 +920,13 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
     sigma_peak = imgFit._scalerToSeq(sigma_peak, ndim)
 
     poses = []
-    vzyx = U.findMax(img)
+    if init_poses is not None and len(init_poses):
+        zyx = [int(round(p))  for p in init_poses[0]]
+        v = img[tuple(zyx)]
+        vzyx = [v] + zyx
+        npts = len(init_poses)
+    else:
+        vzyx = U.findMax(img)
     for i in range(npts):
     #while vzyx[0] > thre:
         if vzyx[0] < thre:
@@ -926,7 +939,7 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
             mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
             poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [list(sigma_peak)])
 
-        if check == 5:
+        if check == 5  or ret[1] < thre:
             imgFit.fitFailedAppend("at %s, %s, check=%i" % (str(vzyx[-ndim:]), str(ret), check))
             mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
             poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [sigma_peak])
@@ -941,11 +954,191 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
                 mask_gaussianND(img, zyx, v, sigma)
                 poses.append([v,zyx,sigma])
 
-        vzyx = U.findMax(img)
+        if init_poses is not None and len(init_poses) and i != (npts-1):
+            zyx = [int(round(p))  for p in init_poses[i+1]]
+            v = img[tuple(zyx)]
+            vzyx = [v] + zyx
+        else:
+            vzyx = U.findMax(img)
         if N.all(vzyx == prev):
             break
         
     return poses#, img
+
+# ------ GUI
+def statPeaks(ret, pxlsiz=(0.25,0.08,0.08)):
+    """
+    return intensity_mean, intensity_std, fwhm_mean, fwhm_std, n
+    """
+    vs = N.array([v for v, p, s in ret if N.all(s[0] != N.array(s[1:]))])
+    vme = N.mean(vs)
+    vst = N.std(vs)
+
+    ndim = len(ret[0][-1])
+    pxlsiz = N.array(pxlsiz[-ndim:])
+    fw = N.array([U.FWHM_s(s * pxlsiz) for v, p, s in ret if N.all(s[0] != N.array(s[1:]))])
+    sme = N.mean(fw, axis=0)
+    sst = N.std(fw, axis=0)
+
+    return vme, vst, sme, sst, len(fw)
+
+
+def viewPeaks(ret, vid=-1, color=(1,0,0), label_size=2, kind='Circle', show_intensity=False):
+    """
+    ret: returned answer from findMaxWithGFitAll
+    """
+    poss = [p for v, p, s in ret]
+    if show_intensity:
+        vs = [v for v, p, s in ret]
+
+    gids = []
+    for j, zyx in enumerate(poss):
+        if show_intensity:
+            if abs(vs[j]) > 10:
+                label = str(j) + '(%i)' % vs[j]
+            else:
+                label = str(j) + '(%.2f)' % vs[j]
+        else:
+            label = str(j)
+        gids += vgLabelIn3D(vid, zyx=zyx, kind=kind, s=label_size, label=label, zPlusMinus=0, colAtZ=color, refreshNow=False)
+
+    viewer = Y.viewers[vid].viewer
+    viewer.Refresh()
+    
+    return gids
+
+
+def vgLabelIn3D(v_id=-1, zyx = (None,200,200), kind='Cross', 
+               s=4, label='',
+               zPlusMinus=9999,
+               colAtZ   = (1,1,1),
+               colLessZ = (1,0,0),
+               colMoreZ = (0,1,0),
+               widthAtZ   = 2,
+               widthLessZ = 1,
+               widthMoreZ = 1,
+               name="mark3D",
+               refreshNow=True
+               ): # , zAxis = 0):
+    """
+    kind is one of 'Cross', 'Circle', 'Box'
+
+    zyx is 3-tuple: if z is None use current
+
+    col: color
+    AtZ    - in Z section at z
+    LessZ  - in Z section smaller than z
+    MoreZ  - in Z section larger than z
+
+    zPlusMinus - how many sections above/below z should be marked (at most)
+    """
+    from Priithon.all import Y
+
+    if type(v_id)  is int or hasattr(v_id, 'zshape'):
+        if type(v_id)  is int:
+            v = Y.viewers[v_id]
+        else:
+            v = v_id
+        nz = v.zshape[0]
+        zShown = v.zsec[0]
+        viewers = [v.viewer]
+    elif hasattr(v_id, 'doc') or hasattr(v_id, 'imEditWindows'):
+        if hasattr(v_id, 'imEditWindows'):
+            v = v_id.imEditWindows.GetPage(0) # FIXME: the current page is more intuitive
+        else:
+            v = v_id
+        nz = v.doc.nz # FIXME: allow nt or nw for more dimension
+        zShown = v.doc.z
+        viewers = v.viewers
+    else:
+        raise ValueError('v_id is not the valid viewer')
+        
+    z,y,x = zyx
+    yx=y,x
+
+    st = s / 30.#2 / 30.
+
+    if kind.lower().startswith('ci'): 
+        fffff=Y.vgAddCircles
+    if kind.lower().startswith('cr'): 
+        fffff=Y.vgAddCrosses
+    if kind.lower().startswith('b'): 
+        fffff=Y.vgAddBoxes
+        s *=.5
+
+    z0 = z-zPlusMinus
+    if z0<0:
+        z0 = 0
+    z1 = z+zPlusMinus
+    if z1>nz:
+        z1 = nz
+
+    idxs = []
+
+    for vi, viewer in enumerate(viewers):
+        ids = []
+
+        if vi == 0: # XY (zyx)
+            yx = y,x
+        if vi == 1: # XZ (yzx)
+            zyx = list(zyx[:2][::-1]) + list(pos[-1:])
+            yx = z,x
+            z = y
+            zShown = v.doc.y
+            nz = v.doc.ny
+        elif vi == 2: # ZY (xyz)
+            zyx = zyx[::-1]
+            yx = y,z
+            z = x
+            zShown = v.doc.x
+            nz = v.doc.nx
+
+        yxt = yx + (label,)
+
+        z = int(z+.5)
+
+        z0 = z-zPlusMinus
+        if z0<0:
+            z0 = 0
+        z1 = z+zPlusMinus
+        if z1>nz:
+            z1 = nz
+
+        for i in range(z0,z):
+            q=fffff(viewer, [yx], s, color=colLessZ, width=widthLessZ, 
+                    name=["markedIn3D", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+            ids.append(q)
+            q = Y.vgAddTexts(viewer, [yxt], size=st, color=colLessZ, width=widthLessZ, name=["markedIn3DLabel", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+            ids.append(q)
+
+        for i in range(z+1,z1):
+            q=fffff(viewer, [yx], s, color=colMoreZ, width=widthMoreZ, 
+                    name=["markedIn3D", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+            ids.append(q)
+            q = Y.vgAddTexts(viewer, [yxt], size=st, color=colMoreZ, width=widthMoreZ, name=["markedIn3DLabel", name,(i,)], idx=None, enable=i==zShown, refreshNow=False)
+            ids.append(q)
+
+        q=fffff(viewer, [yx], s, color=colAtZ, width=widthAtZ, 
+                name=["markedIn3D", name,(z,)], idx=None, enable=z==zShown, refreshNow=False)
+        ids.append(q)
+        q = Y.vgAddTexts(viewer, [yxt], size=st, color=colAtZ, width=widthAtZ, name=["markedIn3DLabel", name,(z,)], idx=None, enable=z==zShown, refreshNow=refreshNow)
+        ids.append(q)
+
+        idxs.append(ids)
+
+    return idxs
+
+
+def viewerAtZ(v, z, zoom=1):
+    v.setSlider(z, zaxis=-1)
+    v.helpNewData()
+    try:
+        if zoom != 1:
+            v.viewer.zoom(zoom)
+    except TypeError: # probably the viewer does not have self.m_scale yet
+        pass
+    return v
+## --- 
     
 def centerOfMass(img, yx, window=5):
     """

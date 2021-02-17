@@ -220,7 +220,7 @@ class ChromagnonReader(object):
             self.nz = 1
             self.nt = int(next(self.reader)[1])#self.reader.next()[1])
             self.nw = int(next(self.reader)[1])#self.reader.next()[1])
-            self.pxlsiz = N.array([self.eval(p) for p in next(self.reader)[1:]])#self.reader.next()[1:]])
+            self.pxlsiz = N.array([self.eval(p) for p in next(self.reader)[1:] if p])#self.reader.next()[1:]])
             self.imgSequence = 2
             refwave = self.eval(next(self.reader)[1])#self.reader.next()[1])
             self.num_entry = len(next(self.reader)[2:])#self.reader.next()[2:])

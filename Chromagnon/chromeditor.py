@@ -72,8 +72,9 @@ class ChromagnonPanel(wx.Panel):
         # \n
         box = G.newSpaceV(sizer)
         if self.clist.map_str != 'None':
-            G.makeTxt(self, box, 'Local: ')
-            self.local_label = G.makeTxt(self, box, self.clist.map_str)
+            #G.makeTxt(self, box, 'Local: ')
+            self.local_label = G.makeTxt(self, box, 'Local: ' + self.clist.map_str)
+            print(self.clist.map_str)
             
             # \n
             box = G.newSpaceV(sizer)

@@ -147,7 +147,7 @@ class BatchPanel(wx.Panel):
 
         self.refClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Clear selected', tip='', enable=False)
 
-        self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
+        self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix ', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
 
         self.extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Extra parameters')
         
@@ -162,7 +162,7 @@ class BatchPanel(wx.Panel):
 
         self.cutoutCb = G.makeCheck(self, box, "crop margins", tip='', defChecked=bool(confdic.get('cutout', True)))
 
-        self.img_suffix_label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
+        self.img_suffix_label, self.img_suffix_txt = G.makeTxtBox(self, box, 'Suffix ', defValue=confdic.get('img_suffix_txt', aligner.IMG_SUFFIX), tip='A suffix for the file name', sizeX=100)
 
         self.outext_choices = [os.path.extsep + form for form in aligner.WRITABLE_FORMATS]
         label, self.outextch = G.makeListChoice(self, box, '', self.outext_choices, defValue=confdic.get('format', aligner.WRITABLE_FORMATS[0]), tip='tif: ImageJ format, dv: DeltaVision format, ome.tif: OME-tif format (slow)', targetFunc=self.OnOutFormatChosen)
@@ -226,7 +226,7 @@ class BatchPanel(wx.Panel):
         self.progress = wx.Gauge(self, -1, 100, size=(100,-1))
         box.Add(self.progress)
         
-        self.label = G.makeTxt(self, box, ' ')
+        self.label = G.makeTxt(self, box, ' ', style=wx.ALIGN_LEFT)
 
         _col_sizes=[(key, val) for key, val in listbox.__dict__.items() if key.startswith('SIZE_COL')]
         _col_sizes.sort()
@@ -600,6 +600,8 @@ class BatchPanel(wx.Panel):
         """
         view with viewer
         """
+        #if sys.platform in ('linux2'):
+        #    return# 20210105 Ubuntu18.04LTS may not have the right videocard driver
         # prepare viewer
         if not self.aui:
             self.aui = aui.MyFrame(parent=self)
@@ -609,12 +611,14 @@ class BatchPanel(wx.Panel):
         if isinstance(target, six.string_types) and chromformat.is_chromagnon(target):
             newpanel = chromeditor.ChromagnonEditor(self.aui, target)
         else:
+            # linux problem is here...-> viewer2.py OnPaint()
             newpanel = aui.ImagePanel(self.aui, target)
 
         if isinstance(target, six.string_types):
             name = os.path.basename(target)
         else:
             name = target.file
+
 
         if sys.platform in ('linux2', 'win32'):
             wx.CallAfter(self.aui.imEditWindows.addPage, newpanel, name, select=True)

@@ -19,12 +19,11 @@ CROPBOX = False
 
 
 class GLViewer(GLViewerCommon):
-    def __init__(self, parent, dims=(1,2), size=wx.DefaultSize, style=0, originLeftBottom=None):
+    def __init__(self, parent, dims=(1,2), size=wx.DefaultSize, style=0, originLeftBottom=None, useCropbox=CROPBOX):
         '''
         dims tells which 2 of the three dimensions this viewer is showing; 0--z, 1--y, 2--x
         '''
         GLViewerCommon.__init__(self, parent, size, style, originLeftBottom)
-        
         self.imgsGlListChanged = False
         self.originLeftBottom = 1
         self.gllist = None
@@ -32,7 +31,7 @@ class GLViewer(GLViewerCommon):
         self.vclose = False
         self.hclose = False
         self.myViewManager = weakref.proxy(parent.parent)
-
+        
         self.imgList = [] # each elem.:
         # 0       1        2       3            4     5   6 7 8   9, 10,11, 12,13,14
         #[gllist, enabled, imgArr, textureID, smin, smax, r,g,b,  tx,ty,rot,magX,magY,magZ]
@@ -50,7 +49,7 @@ class GLViewer(GLViewerCommon):
         self.cropboxDragging = False
         self.dragSide = 0
         self.useHair = True
-        self.useCropbox = CROPBOX
+        self.useCropbox = useCropbox #CROPBOX
         self.viewGpx = [] # an container for cropbox drawing
 
         self.Bind(wx.EVT_PAINT, self.OnPaint)
@@ -199,7 +198,7 @@ class GLViewer(GLViewerCommon):
         self.picTexRatio_x = float(pic_nx) / tex_nx
         self.picTexRatio_y = float(pic_ny) / tex_ny
 
-        if sys.platform.startswith('linux') and wx.version().startswith('3'):
+        if sys.platform.startswith('linux'):# and wx.version().startswith('3'): # wxversion removed 20210107
             wx.Yield() # added 20180312
         self.SetCurrent(self.context) ## makes the implicit rendering context of this canvas current with this canvas
         textureID = glGenTextures(1)  ## create one name for a texture object
@@ -448,6 +447,8 @@ class GLViewer(GLViewerCommon):
 
         try:
             dc = wx.PaintDC(self)
+        except wx._core.wxAssertionError:# 20201122 MacOS Big Sur
+            pass
         except:
             return
 
@@ -715,7 +716,7 @@ class GLViewer(GLViewerCommon):
                 glCallLists( enabledGLlists )
         
         glFlush()
-        self.SwapBuffers()
+        self.SwapBuffers() ### <- memory leak on ubuntu18.04LTS?? use GetDC??
 
     def setImageL(self, imgArrL, refreshNow=1):
         for i in range(len(imgArrL)):

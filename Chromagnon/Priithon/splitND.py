@@ -663,11 +663,12 @@ class spv(spvCommon):
                                wx.DefaultPosition, wx.DefaultSize,
                                #wx.SL_VERTICAL
                                wx.SL_HORIZONTAL
-                               | wx.SL_AUTOTICKS | wx.SL_LABELS )
+                               | wx.SL_AUTOTICKS | wx.SL_LABELS)
+
             if self.zshape[i] > 1:
                 self.zzslider[i].SetTickFreq(5)#, 1)
-                ##boxSizer.Add(vslider, 1, wx.EXPAND)
-                boxSizer.Insert(0, self.zzslider[i], 1, wx.EXPAND)
+                #boxSizer.Add(self.zzslider[i], 1, wx.EXPAND)
+                boxSizer.Insert(0, self.zzslider[i], proportion=1, flag=wx.EXPAND)
                 #wx.EVT_SLIDER(parent, self.zzslider[i].GetId(), self.OnZZSlider)
                 parent.Bind(wx.EVT_SLIDER, self.OnZZSlider, id=self.zzslider[i].GetId())
             else: # still good to create the slider - just to no have special handling
@@ -679,7 +680,7 @@ class spv(spvCommon):
             boxSizer.Add(label, 0, wx.GROW|wx.ALL, 2)
 
             
-        self.label = wx.StaticText(parent, -1, "----move mouse over image----xxxx") # HACK find better way to reserve space to have "val: 1234" always visible 
+        self.label = wx.StaticText(parent, -1, "------move mouse over image----xxxx", style=wx.ST_NO_AUTORESIZE) # HACK find better way to reserve space to have "val: 1234" always visible # wx.ST_NO_AUTORESIZE added after python 3.7
     
         boxSizer.Insert(0, self.label, 0, wx.GROW|wx.ALL, 2)#Add(self.label, 0, wx.GROW|wx.ALL, 2)
         boxSizer.Layout()

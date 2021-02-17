@@ -10,12 +10,12 @@ except ImportError:
     from Chromagnon.Priithon import fftmanager
 
 if sys.version_info.major == 2:
-    import alignfuncs, chromformat, aligner, alignfuncs as af
+    import alignfuncs, chromformat, aligner, alignfuncs as af, version
 elif sys.version_info.major >= 3:
     try:
-        from . import alignfuncs as af, chromformat, aligner
+        from . import alignfuncs as af, chromformat, aligner, version
     except (ValueError, ImportError):
-        from Chromagnon import alignfuncs as af, chromformat, aligner
+        from Chromagnon import alignfuncs as af, chromformat, aligner, version
 
 # cross platform
 if not getattr(__builtins__, "WindowsError", None):
@@ -163,7 +163,7 @@ class ThreadWithExc(threading.Thread):
                 # calculation
                 if not chromformat.is_chromagnon(fn):
                     tstf = time.strftime('%Y %b %d %H:%M:%S', time.localtime())
-                    self.log('\n**Measuring shifts in %s at %s' % (os.path.basename(fn), tstf))
+                    self.log('\n**Measuring shifts in %s at %s using Chromagnon V%s' % (os.path.basename(fn), tstf, version.version))
                     if self.notify_obj:
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 

@@ -282,14 +282,21 @@ class MultiTiffReader(generalIO.GeneralReader):
         #if 0:#self.fp.is_imagej or hasattr(self, 'arr'):
         #    return self.arr[int(i)]
         #else:
-        
-        arr = self.fp.pages[int(i)].asarray()
-        if arr.ndim == 3 and self.axes[0] in ('S', 'C', 'W'):# == 'SYX'
-            arr = arr[self.axes_w]
-        elif arr.ndim == 3 and self.axes[-1] in ('S', 'C', 'W'):# == 'SYX'
-            arr = arr[...,self.axes_w]
+        if len(self.fp.pages) >= self.nsec:
+            arr = self.fp.pages[int(i)].asarray()
+            if arr.ndim == 3 and self.axes[0] in ('S', 'C', 'W'):# == 'SYX'
+                arr = arr[self.axes_w]
+            elif arr.ndim == 3 and self.axes[-1] in ('S', 'C', 'W'):# == 'SYX'
+                arr = arr[...,self.axes_w]
+        else: # only series 0 is used
+            series = self.fp.series[0]
+            byteorder = self.fp.byteorder + series.dtype.char
+            ndata = tifffile.product(series.shape[-2:])
+            dtype = N.dtype(byteorder)
+            self.handle.seek(series.offset + (ndata * dtype.itemsize * i))
+            img = self.handle.read_array(byteorder, count=ndata, out=None, native=True)
+            arr = img.reshape(self.shape)
         return arr
-
 
 
 class MultiTiffWriter(generalIO.GeneralWriter):
@@ -317,8 +324,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         open a file for reading
         """
         imagej = self.style == 'imagej'
-        if int(tifffile.__version__.split('.')[1]) <= 14:
-            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, bigtiff=not(imagej))
+        tifversion = tifffile.__version__.split('.')
+        if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
+            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, bigtiff=not(imagej)) 
         else:
             self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)#, bigtiff=not(imagej))
 
@@ -327,6 +335,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         
     def doOnSetDim(self):
         # ImageJ's dimension order is always TZCYXS
+        # since tifffile only accepts ascii, micron characters often used in ImageJ should be removed...20210216
+        self.metadata = walk(self.metadata, replace)
+        
         if self.style == 'imagej': 
             self.imgSequence = 1
             self.metadata.update(self._makeMetadata())
@@ -337,6 +348,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
 
         unit = 10**6
         self.res = [(int(p), unit) for p in 1/self.pxlsiz[-2:] * unit]
+
+
+                    
         
     def writeRGBArr(self, arr, waxis=0, t=0, z=0):
         """
@@ -375,8 +389,12 @@ class MultiTiffWriter(generalIO.GeneralWriter):
             photometric = 'RGB'
         else:
             photometric = None
-        if int(tifffile.__version__.split('.')[1]) <= 14:
+
+        tifversion = tifffile.__version__.split('.')
+        if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, photometric=photometric)
+        elif int(tifversion[0]) >= 2020:
+            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric, contiguous=True)
         else:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric)
  
@@ -686,3 +704,42 @@ def imagej_metadata_tags(metadata, byteorder):
     bytecounts = struct.pack(byteorder+('I' * len(bytecounts)), *bytecounts)
     return ((50839, 'B', len(data), data, True),
             (50838, 'I', len(bytecounts)//4, bytecounts, True))
+
+def walk(node, func):
+    """
+    walk through a dictionary or list and do something by func
+    return an updated dictionary or list
+    """
+    if isinstance(node, dict):
+        node2 = {}
+        for key, item in node.items():
+            if isinstance(item, (list, dict)):
+                item = walk(item, func)
+            elif isinstance(key, six.string_types) and u'\xb5' in key:
+                key = func(key)
+            elif isinstance(item, six.string_types) and u'\xb5' in item:
+                item = func(item)
+                #print(key, item)
+            node2[key] = item
+    elif isinstance(node, list):
+        node2 = []
+        for item in node:
+            if isinstance(item, (list, dict)):
+                item = walk(item, func)
+            elif isinstance(item, six.string_types) and u'\xb5' in item:
+                item = func(item)
+                #print(key, item)
+            node2.append(item)
+        
+    return node2
+    #self.metadata = walk(self.metadata)
+
+def replace(st):
+    """
+    replace micron character to u
+    and remove other possible inpurity for ascii
+    """
+    import unicodedata
+    st = st.replace(u'\xb5', u'u')
+    st = unicodedata.normalize('NFKD', st)
+    return st

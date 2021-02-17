@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from __future__ import print_function
-import os, sys
+import os, sys, subprocess
 
 PRII='priism-4.2.7'
 
@@ -15,6 +15,8 @@ elif sys.platform.startswith('linux'):
         PRI_DIR='/usr/local'
     elif os.path.exists('/opt/%s' % PRII):
         PRI_DIR='opt'
+    elif os.path.exists('/Public/programs/%s' % PRII):
+        PRI_DIR='/Public/programs'
 
 EXT_POL='pol'
 
@@ -163,11 +165,17 @@ def _execCom(com, log=None):
             os.remove(log)
             com += ' >> %s' % log
 
-    err = os.system(com)
+    #err = os.system(com)
+    pp = os.path.join(PRI_DIR, PRII, 'Linux', 'x86_64')
+    if sys.platform == 'linux':
+        LIBPATH = 'LD_LIBRARY_PATH'
+    else:
+        LIBPATH = 'DYLD_LIBRARY_PATH'
+    err = subprocess.run(com.split(), stderr=subprocess.PIPE, env={'PATH': os.path.join(pp, 'BIN'), LIBPATH: os.path.join(pp, 'LIB')})
     #print com
-    if err:
+    if err.returncode:
         program = com.split()[0]
-        raise RuntimeError('%s had exit status %s\ncommand is: %s' % (program, err, com))
+        raise RuntimeError('%s had exit status %s, %s \ncommand is: %s' % (program, err.returncode, err.stderr, com))
 
     if log:
         h = open(log, 'a')

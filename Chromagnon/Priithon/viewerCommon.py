@@ -758,7 +758,11 @@ class GLViewerCommon(wxgl.GLCanvas):
             except:
                 pass
 
-        Y.assignNdArrToVarname(self.m_imgArr, ss)
+        if hasattr(self, 'm_imgArr'):
+            arr = self.m_imgArr
+        elif hasattr(self, 'm_imgList'):
+            arr = N.array([img[2] for img in self.m_imgList])
+        Y.assignNdArrToVarname(arr, ss) #self.m_imgArr, ss)
 
     def OnSave(self, event=None):
         from Priithon.all import Mrc, U, Y

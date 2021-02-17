@@ -73,11 +73,11 @@ def makeToggleButton(panel, horizontalSizer, targetFunc, title, tip='', enable=T
     toggle.Enable(enable)
     return toggle
 
-def makeTxt(panel, horizontalSizer, labelTxt, **sizerKwds):
+def makeTxt(panel, horizontalSizer, labelTxt, style=wx.ST_NO_AUTORESIZE, **sizerKwds):
     """
     return label
     """
-    label = wx.StaticText(panel, -1, str(labelTxt))    
+    label = wx.StaticText(panel, -1, str(labelTxt), style=style)
     horizontalSizer.Add(label, **sizerKwds)
     #if dynamicFunc:
     #    def changeLabel(txt):

@@ -238,7 +238,10 @@ class PriShell(Shell):
             command = self.GetTextRange(stoppos, currpos).strip() + chr(key)
             self.write(chr(key))
             if self.autoComplete:
+                #try:
                 self.autoCompleteShow(command)
+                #except ValueError: # numpy version imcompatibility # am 20210125
+                #    pass
         elif key == ord('('):
             # The left paren activates a call tip and cancels an
             # active auto completion.

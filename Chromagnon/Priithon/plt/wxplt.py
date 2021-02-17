@@ -462,17 +462,17 @@ class plot_canvas(wx.Window,property_object):
         self.image_list.draw(dc)
         dc.DestroyClippingRegion()        
         # draw axes lines and tick marks               
-        t1 = time.clock()    
+        #t1 = time.clock()    
         for axis in self.axes:
             axis.draw_lines(dc)
         #for axis in self.axes:
         #    axis.draw_grid_lines(dc)
         #for axis in self.axes:
         #    axis.draw_ticks(dc)    
-        t2 = time.clock()
+        #t2 = time.clock()
         #print 'lines:', t2 - t1
         #draw border
-        t1 = time.clock(); self.border.draw(dc); t2 = time.clock()
+        #t1 = time.clock(); self.border.draw(dc); t2 = time.clock()
         #print 'border:', t2 - t1                    
         # slightly larger clipping area so that marks
         # aren't clipped on edges
@@ -491,19 +491,20 @@ class plot_canvas(wx.Window,property_object):
         # resize if necessary
         #print 'draw'
         #print 'dc:',dc
-        t1 = time.clock();self.reset_size(dc);t2 = time.clock()
+        #t1 = time.clock();;t2 = time.clock()
+        self.reset_size(dc)
         #print 'resize:',t2 - t1        
         if not dc: dc = wx.ClientDC(self)
         dc.SetBackground( self.backgroundBrush ) #seb  added: no flickering
         dc.Clear()                               #seb  added: no flickering
 
         # draw titles and axes labels
-        t1 = time.clock()    
+        #t1 = time.clock()    
         for text in self.all_titles:
             text.draw(dc)        
         for axis in self.axes:
             axis.draw_labels(dc)
-        t2 = time.clock()
+        #t2 = time.clock()
         #print 'text:',t2 - t1
         self.draw_graph_area(dc)
             

@@ -156,7 +156,12 @@ class MyCanvasBase(glcanvas.GLCanvas):
         event.Skip()
         
     def OnPaint(self, event):
-        dc = wx.PaintDC(self)
+        try: # 20201122 MacOS BigSur
+            dc = wx.PaintDC(self)
+        except wx._core.wxAssertionError:
+            pass
+        except:
+            return 
         if self.m_w <=0 or self.m_h <=0:
             #THIS IS AFTER wx.PaintDC -- OTHERWISE 100% CPU usage
             return 
@@ -602,7 +607,7 @@ class HistogramCanvas(MyCanvasBase):
 
     def setHist(self, yArray, xMin, xMax):
         import time
-        x = time.clock()
+        #x = time.clock()
 
         n = yArray.shape[0]
         #glSeb      print "setHist00     ms: %.2f"% ((time.clock()-x)*1000.0)
@@ -646,7 +651,8 @@ class HistogramCanvas(MyCanvasBase):
             wx.Yield() # 20191029 this was very harmfull. Y.view does not work on most systems. But this was required for Dileptus particles_in_cells. Set Call_Yield_Before_SetCurrent before calling Y.view.
 
        	self.SetCurrent(self.context) # 20141124 Cocoa
-        GL.glVertexPointerf(self.m_histPlotArray)
+        if sys.platform != 'linux':
+            GL.glVertexPointerf(self.m_histPlotArray) # 20201224
         
         #glSeb       print "setHist4 ms: %.2f"% ((time.clock()-x)*1000.0)
 
