@@ -129,6 +129,7 @@ MultitifIO.py.
 (probably created by micromanager) can be now saved in tif. (`imgio.multitifIO.py`)
 74. (v0.87, 20210216) A broken code to Save in the dv format from a
     tiff file was fixed (`aligner.py`).
+75. (v0.88, 20210218) time.clock was replaced with time.perf_counter() (`threads.py`)
 
 v0.7(Feb. 2019)
 ----
