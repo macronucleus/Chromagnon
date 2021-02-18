@@ -104,7 +104,7 @@ class ThreadWithExc(threading.Thread):
         # memory
         #import tracemalloc
         #tracemalloc.start()
-        clk0 = time.clock()
+        clk0 = time.perf_counter()
         
         OLD_SCIK = fftmanager.SCIK
         OLD_REIK = fftmanager.REIK
@@ -237,7 +237,7 @@ class ThreadWithExc(threading.Thread):
                     an.close()
                     del an
                     #imgFit.INDS_DIC = {}
-                    clk1 = time.clock()
+                    clk1 = time.perf_counter()
                     self.echo('time taken=%.2f sec' % (clk1-clk0))
                     clk0 = clk1
                 
@@ -276,7 +276,7 @@ class ThreadWithExc(threading.Thread):
                     donetgt.append(index)
 
                     an.close()
-                    clk1 = time.clock()
+                    clk1 = time.perf_counter()
                     self.echo('time taken=%.2f sec' % (clk1-clk0))
                     clk0 = clk1
 
