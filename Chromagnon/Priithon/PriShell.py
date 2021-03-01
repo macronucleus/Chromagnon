@@ -36,10 +36,11 @@ def main():
 
         def OnInit(self):
             import wx,sys
-            #from wx.py import shell
+            from wx.py import shell
             from Priithon import shell
             introText=' !!! Welcome to Priithon !!! \n'
-            self.frame = shell.PriShellFrame(introText=introText,#ShellFrame(
+            #self.frame = shell.ShellFrame(
+            self.frame = shell.PriShellFrame(introText=introText,
                 title="priithon on %s" % wx.GetHostName())#, 20141127
 
             intro = 'Priithon: %s' % sys.argv

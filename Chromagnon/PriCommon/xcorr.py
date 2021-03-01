@@ -240,19 +240,23 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
         a = apodize(a, napo)
         b = apodize(b, napo)
 
+    if not phaseContrast:
+        a -= N.mean(a)
+        b -= N.mean(b)
     # fourier transform
     af = F.rfft(a.astype(N.float32))
     bf = F.rfft(b.astype(N.float32))
-    del a, b
 
     # phase contrast filter (removing any intensity information)
     if phaseContrast:
         afa = phaseContrastFilter(af, True, nyquist=nyquist)
         bfa = phaseContrastFilter(bf, True, nyquist=nyquist)
+        fact = 1
     else:
         afa = af
         bfa = bf
-    del af, bf
+        fact = N.std(a) * N.std(b) * a.size
+    del a, b, af, bf
 
     targetShape = shape #+ (npad * 2)
 
@@ -265,6 +269,7 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
     bfa = bfa.conjugate()
     #c = cc = F.irfft(afa * bfa)
     c = F.irfft(afa * bfa)
+    c /= fact
 
     # 20180214 the padded region was cutout before finding the peak.
     #c = cc = imgFilters.cutOutCenter(c, N.array(c.shape) - (npad * 2), interpolate=False)

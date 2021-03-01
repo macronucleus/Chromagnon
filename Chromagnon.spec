@@ -79,8 +79,8 @@ else: # mac + linux
     # linux
     else:
         suffix = ''
-        import platform
-        dist = platform.dist()[0]
+        #import platform
+        #dist = platform.dist()[0] # newer platform does not have dist attribute
         ldpath = os.getenv('LD_LIBRARY_PATH', '').split(':')
 
         pylibpath = os.path.join(conda, 'lib')

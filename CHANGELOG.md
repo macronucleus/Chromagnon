@@ -129,8 +129,14 @@ MultitifIO.py.
 (probably created by micromanager) can be now saved in tif. (`imgio.multitifIO.py`)
 74. (v0.87, 20210216) A broken code to Save in the dv format from a
     tiff file was fixed (`aligner.py`).
-75. (v0.88, 20210218) time.clock was replaced with time.perf_counter() (`threads.py`)
-
+	75. (v0.88 20210218) time.clock was replaced with time.perf_counter()
+	76. (v0.89 20210224) Fixed ComplexWarning when using
+	Priithon.fftfuncs.__fromfunction (`Priithon.fftfuncs.py`)
+	77. (v0.89 20210225) Flipping Y direction after reading bioformats
+    is fixed (`imgio.bioformatsIO.py`)
+	78. (v0.89 20210226) Cross correlation function uses zero-normalized
+        cross correlation when phase contrast is not used (`PriCommon.xcorr.py`)
+	
 v0.7(Feb. 2019)
 ----
 1. `PriCommon.xcorr.py` padded region was removed before finding peak.

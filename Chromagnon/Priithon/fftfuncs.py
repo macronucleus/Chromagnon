@@ -8,11 +8,24 @@ import numpy as N
 
 from . import fftmanager as fftw #fftwam as fftw
 from functools import reduce
+import six
 
 defshape = (256,256)  #use this default shape to make testing easy
 
 def __fromfunction(f, s, t):
-    return N.fromfunction(f,s).astype(t)
+    a = N.fromfunction(f,s)
+    if isinstance(t, six.string_types):
+        tname = t
+    elif hasintance(t, 'name'):
+        tname = t.name
+    else:
+        raise ValueError('data type %s not understood' % t)
+    if a.dtype.name.startswith('complex') and not tname.startswith('complex'):
+        a = a.real
+    else:
+        a = a.astype(t)
+    return a
+    #return N.fromfunction(f,s).astype(t)
 
 def _normalize_shape(shape):
     """

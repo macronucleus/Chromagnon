@@ -721,7 +721,7 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
         if self.file.endswith('oib') and self.imgSequence == 2 and self.nw > 4:
             t, z, w = self.convertFileIdx(t, z, w)
         arr = self.fp.read(c=w, z=z, t=t, series=self.series, rescale=False, XYWH=xywh)[::-1]
-        return self.flipY(arr)
+        return arr#self.flipY(arr)
 
     # reading file
     def convertFileIdx(self, t=0, z=0, w=0, targetSeq=1):
