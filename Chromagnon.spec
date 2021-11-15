@@ -119,7 +119,7 @@ a = Analysis([prog],
 
              hookspath=[],
              runtime_hooks=[],
-             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'opencv', 'reikna', 'pycuda', 'skcuda', 'distutils', 'setuptools'],#'wx.py', 'distutils', 'setuptools'],
+             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'opencv', 'reikna', 'pycuda', 'skcuda', 'wx.py', 'distutils', 'setuptools'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher)

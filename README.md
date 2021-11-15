@@ -13,7 +13,7 @@ Acceptable image file formats
 
 How it works
 ------------
-Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/ChromagnonDocumentV085.pdf).
+Read the [document](https://github.com/macronucleus/Chromagnon/releases/download/Doc-v0.5/ChromagnonDocumentV090.pdf).
 
 If you prefer, watch the
 [movie](https://www.jove.com/v/60800/high-accuracy-correction-3d-chromatic-shifts-age-super-resolution)
