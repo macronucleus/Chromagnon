@@ -1,7 +1,10 @@
 
 import multiprocessing as mp, sys
-
-#from Priithon.all import Y
+try:
+    # check if fourier module is available
+    from Priithon.all import F
+except ImportError:
+    F = None
 
 if hasattr(sys,'app'): # runnging on Priithon
     NCPU = 1
@@ -28,7 +31,10 @@ def pmap(callable, sequence, limit=NCPU, *args, **kwds):
     return list of results
     """
     if limit > 1:
-
+        if F:
+            # turn parallel FFT off
+            ncpu = F.fftw.ncpu
+            F.fftw.ncpu = 1
         pool = mp.Pool(processes=limit)
         args0 = []
         for i, item in enumerate(sequence):
@@ -36,6 +42,10 @@ def pmap(callable, sequence, limit=NCPU, *args, **kwds):
 
         results = pool.map(funcWrap, args0)
         pool.terminate()
+
+        if F:
+            # turn parallel FFT back on
+            F.fftw.ncpu = ncpu
         # re-ordering
         # result contains sequential number
         results.sort()

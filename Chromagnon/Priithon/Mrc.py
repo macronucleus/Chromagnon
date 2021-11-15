@@ -729,7 +729,7 @@ def dtype2MrcMode(dtype):
         return 6
     if dtype == N.int32:
         return 7
-    raise TypeError("MRC does not support %s (%s)"% (dtype.name, dtype))
+    raise TypeError("MRC does not support %s (%s)"% (dtype.__name__, dtype))
 
 
 def shapeFromHdr(hdr, verbose=0):
@@ -806,6 +806,8 @@ def implement_hdr(hdrArray):
                 return hdrArray   # 20060818
             #20070131 return hdrArray.field(n)[0]
             return hdrArray[n][0]
+        def __dir__(self): # added to work on Priithon 20210716
+            return self.__slots__
 
         ## depricated !!
         #def __call__(s, n):

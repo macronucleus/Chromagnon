@@ -10,7 +10,7 @@ try:
     from ..Priithon import histogram, useful as U
     from ..PriCommon import guiFuncs as G ,microscope, imgResample
     from .. import imgio
-except ValueError:
+except (ValueError, ImportError):
     from Priithon import histogram, useful as U
     from PriCommon import guiFuncs as G ,microscope, imgResample
     import imgio
@@ -1105,6 +1105,6 @@ def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
         frame.imEditWindows.addPage(panel, name, select=True)
     return frame
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     from Priithon import PriApp
     PriApp._maybeExecMain()

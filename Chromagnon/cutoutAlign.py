@@ -15,7 +15,7 @@ import os
 
 EXT_CUTOUT='cut'
 
-def getShift(shift, ZYX, erosionZYX=0):
+def getShift(shift, ZYX, erosionZYX=0, dyx=(0,0)):
     """
     shift: zyxrmm
     return [zmin,zmax,ymin,ymax,xmin,xmax]
@@ -42,7 +42,8 @@ def getShift(shift, ZYX, erosionZYX=0):
         magZYX[1] = shift[4]
         
     # rotation
-    r = shift[3]
+    # 20210831 modified for the large rotation
+    r = N.sign(shift[3]) * (N.abs(shift[3]) % 45)
     # target shape
     ZYX = N.asarray(ZYX, N.float32)
     ZYXm = ZYX * magZYX
@@ -76,11 +77,16 @@ def getShift(shift, ZYX, erosionZYX=0):
     
     # rotate the magnified center
     xyzm = N.ceil(ZYXm[::-1]) / 2.
-    xyr = imgGeo.RotateXY(xyzm[:-1], r)
+    xyr = imgGeo.RotateXY(xyzm[:-1], r, center=dyx)
     xyr -= xyzm[:-1]
     yx = xyr[::-1]
     leftYX = N.ceil(N.abs(yx))
     rightYX = -N.ceil(N.abs(yx))
+    #left = N.min(N.array((leftYX, rightYX)), axis=0)
+    #print(leftYX, N.array((leftYX, rightYX)), left)
+    #right = N.max(N.array((leftYX, rightYX)), axis=0)
+    #leftYX = left
+    #rightYX = right
 
     # then translate
     leftYXShift = (leftYX + yxShift) + zyx0[1:]

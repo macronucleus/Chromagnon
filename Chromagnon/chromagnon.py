@@ -504,6 +504,29 @@ class BatchPanel(wx.Panel):
             waves1 = [list(map(int, self.listRef.getFile(index)[2].split(','))) for index in self.listRef.columnkeys]
             waves2 = [list(map(int, self.listTgt.getFile(index)[2].split(','))) for index in self.listTgt.columnkeys]
             nts = all([t == 1 for t in self.listRef.nts])
+
+            # combine wavelengths
+            ref_is_temp = False
+            if len(fns) > 1 and nts and all([len(waves) == 1 for waves in waves1]):
+                print('combine refs')
+                fns = af.combineWavelength(fns)
+                self.listRef.clearAll()
+                self.listRef.addFile(fns[0])
+                waves1 = [list(map(int, self.listRef.getFile(index)[2].split(','))) for index in self.listRef.columnkeys]
+                self.averageCb.SetValue(0)
+                ref_is_temp = True
+                
+
+            fns_is_temp = False
+            if len(targets) > 1 and nts and all([len(waves) == 1 for waves in waves2]):
+                print('combine targets')
+                targets = af.combineWavelength(targets)
+                self.listTgt.clearAll()
+                self.listTgt.addFile(fns[0])
+                waves2 = [list(map(int, self.listTgt.getFile(index)[2].split(','))) for index in self.listTgt.columnkeys]
+                fns_is_temp = True
+
+            # check wavelength consistency
             ids = af.checkWaves(waves1, waves2)
             if ids is not None and nts:
                 for i, listbox in zip(ids, (self.listRef, self.listTgt)):
@@ -512,6 +535,7 @@ class BatchPanel(wx.Panel):
                 msg = 'Less than two Common wavelengths were found at least in %s and %s\n\nThe program will not run.' % (self.listRef.getFile(ids[0])[1], self.listTgt.getFile(ids[1])[1])
                 self.quit(msg, title='Error in input files')
                 return
+
             
             # averaging
             if self.averageCb.GetValue() and len(fns) > 1:
@@ -569,7 +593,8 @@ class BatchPanel(wx.Panel):
                          self.extra_parms.get('max_shift', af.MAX_SHIFT),
                          self.extra_parms.get('calibfn', ''),
                          self.extra_parms.get('dorot4time', True),
-                         self.extra_parms.get('doZ', True)
+                         self.extra_parms.get('doZ', True),
+                         (ref_is_temp, fns_is_temp)
                          ] 
                         
             if not parms[6]:
@@ -633,6 +658,7 @@ class BatchPanel(wx.Panel):
 def command_line():
     if len(sys.argv) == 1:
         main()
+            
 
     else:
         import argparse, glob
@@ -686,22 +712,49 @@ def command_line():
         
         options = p.parse_args(sys.argv[1:])
 
+        # references
         refs = []
         for ref in options.reference:
             refs += glob.glob(os.path.expandvars(os.path.expanduser(ref)))
-        
+
+        nts = []
+        nws = []
+        for fn in refs:
+            h = imgio.Reader(fn)
+            nts.append(h.nt)
+            nws.append(h.nw)
+            h.close()
+
+        ref_is_temp = False
+        if len(refs) > 1 and all([nt == 1 for nt in nts]) and all([nw == 1 for nw in nws]):
+            print('combine refs')
+            refs = af.combineWavelength(refs)
+            ref_is_temp = True
+
+        # average refs
+        if options.average_references:
+            refs = [af.averageImage(refs, ext=options.img_format)]
+            print('averaged image was saved as %s' % refs)
+            
+        # target fns
         fns = []
         for fn in options.targets:
             fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
         nts = []
+        nws = []
         for fn in fns:
             h = imgio.Reader(fn)
             nts.append(h.nt)
+            nws.append(h.nw)
             h.close()
 
-        if options.average_references:
-            refs = [af.averageImage(refs, ext=options.img_format)]
-            print('averaged image was saved as %s' % refs)
+        fns_is_temp = False
+        if len(fns) > 1 and all([nt == 1 for nt in nts]) and all([nw == 1 for nw in nws]):
+            print('combine targets')
+            fns = af.combineWavelength(fns)
+            fns_is_temp = True
+
+
 
         if options.reference_wavelength:
             options.reference_wavelength = eval(options.reference_wavelength)
@@ -722,12 +775,21 @@ def command_line():
                 options.maxShift,
                 options.microscope_calib,
                 not(options.donotRot4Time), # dorot4time
-                not(options.donotZ)] # doZ
+                not(options.donotZ),# doZ
+                      (ref_is_temp, fns_is_temp)] 
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()
         th.join()
         print('done')
+
+        #if ref_is_temp:
+            #print('removing file %s' % refs[0])
+        #    os.remove(fns[0])
+        
+        #if fns_is_temp:
+            #print('removing file %s' % fns[0])
+        #    os.remove(fns[0])
 
         
 if __name__ == '__main__':

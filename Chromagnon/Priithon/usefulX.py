@@ -1459,7 +1459,7 @@ def vClose(id='all'):
     close viewer with given id
     id can be a number, a sequence of numbers, or 'all'
     """
-    if id is 'all':
+    if id == 'all':
         id  = list(range(len(viewers)))
     elif type(id) == int:
         id = [id]

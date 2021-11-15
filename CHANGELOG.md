@@ -1,3 +1,17 @@
+v0.9(May. 2021)
+----
+1. (v0.90 20210301) Replaced `is` to avoid SyntaxWarning.
+2. (v0.90 20210426) Imgio.imgIO was added to remove PIL
+3. (v0.90 20210618) Compatible with newer tifffie==2021.4.8. Still
+offset is too large for page 0.
+4. (v0.90 20211017) Multiple files with a single wavelength are
+combined.
+5. (v0.90 20211105) `PriCommon.commonfuncs.py` uses any encodings and
+also makes a folder for config.
+6. (v0.90 20211114) `Mrc.py` is copied to `imgio` to avoid circular
+import.
+7. (v0.90 20211114) `setup.py` was cleaned up, removing `py2app`.
+
 v0.8(May. 2019)
 ----
 1. ndviewer save screen, show error message when the file
@@ -129,13 +143,16 @@ MultitifIO.py.
 (probably created by micromanager) can be now saved in tif. (`imgio.multitifIO.py`)
 74. (v0.87, 20210216) A broken code to Save in the dv format from a
     tiff file was fixed (`aligner.py`).
-	75. (v0.88 20210218) time.clock was replaced with time.perf_counter()
-	76. (v0.89 20210224) Fixed ComplexWarning when using
+75. (v0.88 20210218) time.clock was replaced with time.perf_counter()
+76. (v0.89 20210224) Fixed ComplexWarning when using
 	Priithon.fftfuncs.__fromfunction (`Priithon.fftfuncs.py`)
-	77. (v0.89 20210225) Flipping Y direction after reading bioformats
+77. (v0.89 20210225) Flipping Y direction after reading bioformats
     is fixed (`imgio.bioformatsIO.py`)
-	78. (v0.89 20210226) Cross correlation function uses zero-normalized
-        cross correlation when phase contrast is not used (`PriCommon.xcorr.py`)
+78. (v0.89 20210226) Cross correlation function uses zero-normalized
+        cross correlation when phase contrast is not used
+        (`PriCommon.xcorr.py`)
+
+80. WISH Chromagnon.csv to micron
 	
 v0.7(Feb. 2019)
 ----

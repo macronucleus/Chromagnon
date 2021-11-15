@@ -911,10 +911,15 @@ def _process2d(func, a, minCdtype=fftw.CTYPE):
 
     s2 = a.shape
     af = N.empty(shape=s2, dtype=aDtype)
-    
+
+    # using parallel 4.5 sec
+    # fftw 2.63 sec
     for tup in N.ndindex(a.shape[:-2]):
         af[tup] = func(N.asarray(a[tup], aDtype))#, nthreads=nthreads)
     return af
+
+def _process2d_parallel(a, aDtype, func):
+    return func(N.asarray(a, aDtype))
 
 def sfft(a):
     """

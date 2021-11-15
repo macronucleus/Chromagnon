@@ -6,19 +6,19 @@ import six
 import numpy as N
 
 if sys.version_info.major == 2:
-    import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
+    import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
 elif sys.version_info.major >= 3:
     try:
-        from . import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
+        from . import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
     except ImportError:
-        from imgio import generalIO, mrcIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
+        from imgio import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
         
 from .bioformatsIO import uninit_javabridge
 
 READABLE_FORMATS = []
 WRITABLE_FORMATS = []
 _names = ['seq', 'tif', 'mrc', 'bio']
-for module in [generalIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO, arrayIO]:
+for module in [generalIO, imgIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO, arrayIO]:
     reload(module)
     READABLE_FORMATS += module.READABLE_FORMATS
     WRITABLE_FORMATS += module.WRITABLE_FORMATS
@@ -104,6 +104,8 @@ def _switch(fn, read=True, *args, **kwds):
                 return klasses['bio'](fn, *args, **kwds)
             except:
                 raise ValueError('The input file %s was not readable' % fn)
+    elif read and ext in imgIO.READABLE_FORMATS:
+        return imgIO.load(fn)
     elif ext in formats['mrc']:
         return klasses['mrc'](fn, *args, **kwds)
     elif ext in formats['bio']:
@@ -120,9 +122,14 @@ def load(fn):
     """
     return numpy array
     """
+    if fn.endswith('.npy'):
+        return N.load(fn)
     h = Reader(fn)
-    a = N.squeeze(h.asarray())
-    h.close()
+    if type(h) == N.ndarray:
+        a = h
+    else:
+        a = N.squeeze(h.asarray())
+        h.close()
     return a
 
 def copy(fn, out='test.dv'):
@@ -145,52 +152,74 @@ def merge(fns, out=None, along='t'):
     if not out:
         out = os.path.commonprefix(fns) + '_merge.dv'
     nsecs = 0
+    waves = []
     for fn in fns:
         h = Reader(fn)
         if along == 't':
             nsecs += h.nt
+        elif along == 'w':
+            nsecs += h.nw
+            waves += list(h.wave)
+        elif along == 'z':
+            nsecs += h.nz
         #h.close()
-
+        
     o = Writer(out, h)
-    o.setDim(nt=nsecs)
+    if along == 't':
+        o.setDim(nt=nsecs)
+    elif along == 'w':
+        o.setDim(nw=nsecs,wave=waves)
+    elif along == 'z':
+        o.setDim(nz=nsecs)
 
-    t2 = 0
+    d2 = 0
     for fn in fns:
         h = Reader(fn)
         for t in range(h.nt):
             for w in range(h.nw):
                 a = h.get3DArr(t=t, w=w)
-                o.write3DArr(a, t=t2+t, w=w)
-        t2 += h.nt
+                if along == 't':
+                    o.write3DArr(a, t=d2+t, w=w)
+                elif along == 'w':
+                    o.write3DArr(a, t=t, w=w+d2)
+                elif along == 'z':
+                    for z in range(h.nz):
+                        o.write3DArr(a, t=t, w=w, z=z+d2)
+        if along == 't':
+            d2 += h.nt
+        elif along == 'w':
+            d2 += h.nw
+        elif along == 'z':
+            d2 += h.nz
         h.close()
     o.close()
 
     return out
 
-def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,None)):
+def formatTWZYX(twzyxs, h, start=True):
+    ret = []
+    for dim, v in twzyxs:
+        n = h.__getattribute__('n%s' % dim)
+        if v is None and start:
+            ret.append((dim, 0))
+        if v is None and not start:
+            ret.append((dim, n))
+        elif v < 0:
+            v = n + v
+            ret.append((dim, v))
+        elif v >= n:
+            raise ValueError('number of %s is only %i but you specified %i' % (dim.upper(), n, v))
+        else:
+            ret.append((dim, v))
+    return ret
+
+def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,None), ifExists='overwrite'):
     """
     twzyx0: starting index (minus values accepcted)
     twzyx1: ending index (minus values accepcted)
 
     return output filename
     """
-    def formatTWZYX(twzyxs, h, start=True):
-        ret = []
-        for dim, v in twzyxs:
-            n = h.__getattribute__('n%s' % dim)
-            if v is None and start:
-                ret.append((dim, 0))
-            if v is None and not start:
-                ret.append((dim, n))
-            elif v < 0:
-                v = n + v
-                ret.append((dim, v))
-            elif v >= n:
-                raise ValueError('number of %s is only %i but you specified %i' % (dim.upper(), n, v))
-            else:
-                ret.append((dim, v))
-        return ret
-    
     dimstr = 'twzyx'
     twzyx0s = list(zip(dimstr, twzyx0))
     twzyx1s = list(zip(dimstr, twzyx1))
@@ -201,7 +230,7 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
             whats = '_'.join((what0, what1))
             base, ext = os.path.splitext(fn)
             out = base + whats + ext
-            if os.path.isfile(out):
+            if os.path.isfile(out) and ifExists != 'overwrite':
                 raise ValueError('The output file name %s exists, please specify another output file name.' % os.path.basename(out))
             
         twzyx0s = formatTWZYX(twzyx0s, h, start=True)
@@ -219,6 +248,9 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
             hdr.Num[2] = len(zs) * hdr.NumTimes * hdr.NumWaves
             hdr.Num[1] = ys.stop - ys.start
             hdr.Num[0] = xs.stop - xs.start
+            waves = hdr.wave[ws]
+            #print(ws, waves, hdr.wave)
+            hdr.wave[:len(waves)] = waves
             o = Writer(out, hdr=hdr)
         else:
             o = Writer(out, h)
@@ -232,3 +264,20 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
         o.close()
 
     return out
+
+def swapZtoT(fn, out=None):
+    if not out:
+        base, ext = os.path.splitext(fn)
+        out = base + '_swapZtoT' + ext
+
+    with Reader(fn) as h:
+        with Writer(out, h) as o:
+            o.setDim(nz=h.nt, nt=h.nz)
+
+            for w in range(h.nw):
+                for t in range(h.nt):
+                    for z in range(h.nz):
+                        a = h.getArr(w=w, t=t, z=z)
+                        o.writeArr(a, t=z, z=t)
+    return out
+        

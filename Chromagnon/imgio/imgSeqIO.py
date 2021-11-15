@@ -1,17 +1,15 @@
 
-import os, sys, re
+import os, re
 import six
 import numpy as N
-from PIL import Image
 try:
-    from . import generalIO
+    from . import generalIO, imgIO
 except ImportError:
-    import generalIO
+    import generalIO, imgIO
 
-WRITABLE_FORMATS = ['bmp', 'eps', 'gif', 'icns', 'ico', 'im', 'jpeg', 'jpeg2000', 'msp', 'pcx', 'png', 'ppm', 'sgi', 'spider', 'tif', 'webp', 'xbm']
-READABLE_FORMATS = WRITABLE_FORMATS + ['cur', 'dcx', 'dds', 'fli', 'flc', 'fpx', 'ftex', 'gbr', 'gd', 'imt', 'iptc', 'naa', 'mcidas', 'mic', 'mpo', 'pcd', 'pixar', 'psd', 'tga', 'wal', 'xpm']
-WRITABLE_FORMATS += ['palm', 'pdf', 'xv']
-###---------- sequence of images -----------###
+WRITABLE_FORMATS = imgIO.WRITABLE_FORMATS
+READABLE_FORMATS = imgIO.READABLE_FORMATS
+
 
 class ImgSeqReader(generalIO.GeneralReader):
     def __init__(self, fns, mode='r'):
@@ -42,11 +40,12 @@ class ImgSeqReader(generalIO.GeneralReader):
             self.readHeader()
 
     def readHeader(self):
-        self.fp = Image.open(self.fn)
-        dtype,nc, ny,nx, isSwapped = _getImgMode(self.fp)
+        self.fp = imgIO.getHandle(self.fn)
+        dtype,nc, ny,nx, isSwapped = imgIO._getImgMode(self.fp)
 
         nztw, imgSeq = self.determineDimFromName()
         nw = nztw[2] or 1
+        self.nc = nc
         wrange = range(nw)
         waves = generalIO.makeWaves(nw)
 
@@ -64,7 +63,10 @@ class ImgSeqReader(generalIO.GeneralReader):
             if ndim:
                 nn = len(set([pat.findall(fn)[-1][2:] for fn in fns]))
                 nztw.append(nn)
-                name.append(ds)
+                dn = ndim[-1][1:2].lower()
+                if dn == 'c':
+                    dn = 'w'
+                name.append(dn)
             else:
                 nztw.append(None)
 
@@ -85,7 +87,6 @@ class ImgSeqReader(generalIO.GeneralReader):
                         break
         elif len(name) == 3:
             patstr = '_%s[0-9]+_%s[0-9]+_%s[0-9]+'
-            #pats = [seq.lower() for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]#IMGSEQ]#['ztw', 'wzt', 'zwt']
             pats = [seq for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]
             for imgseq, st in enumerate(pats):
                 pat = re.compile(patstr % tuple(st))
@@ -104,61 +105,62 @@ class ImgSeqReader(generalIO.GeneralReader):
 
             imgseq = 2
 
+        # reorder the fn list
+        name2 = []
+        if imgseq == 0:
+            dname = 'wtz'
+        elif imgseq == 1:
+            dname = 'tzw'
+        elif imgseq == 2:
+            dname = 'twz'
+        elif dname == 3:
+            dname = 'tzw'
+        name = [s for s in dname if s in name]
+
+        num = []
+        for fn in self.fns:
+            ndims = []
+            for n in name:
+                pat = re.compile('_%s[0-9]+' % n)
+                nd = int(pat.findall(fn)[-1][2:])
+                ndims.append(nd)
+            num.append((ndims, fn))
+        num.sort()
+        self.fns = [fn for ndims, fn in num]
+        
+
         return nztw, imgseq
 
 
     # getting array
 
     def readSec(self, i=0):
-        if self.fp.filename != self.fns[i]:
-            self.fp = Image.open(self.fns[i])
-        
-        self.fp.seek(0)
-
-        a = N.fromstring(self.fp.tobytes(), self.dtype)
-        a.shape = (self.ny, self.nx)
-
-        if self.isSwapped:
-            a.byteswap(True)
-            
+        a = imgIO.load(self.fns[i])
+        self.i = i
         return a
+    old='''
+    def readSec_old(self, i=0):
+        if backend == 'PIL':
+            if self.fp.filename != self.fns[i]:
+                self.fp = Image.open(self.fns[i])
 
-def _getImgMode(im):
-    """
-    This function is from Priithon.Useful.py
-    """
-    cols = 1
-    BigEndian = False
-    if im.mode   == "1":
-        t = N.uint8
-        cols = -1
-    elif im.mode == "L" or \
-         im.mode == "P": #(8-bit pixels, mapped to any other mode using a colour palette)
-        t = N.uint8
-    elif im.mode == "I;16":
-        t = N.uint16
-    elif im.mode == "I":
-        t = N.uint32
-    elif im.mode == "F":
-        t = N.float32
-    elif im.mode == "RGB":
-        t = N.uint8
-        cols = 3
-    elif im.mode in ("RGBA", "CMYK", "RGBX"):
-        t = N.uint8
-        cols = 4
-    elif im.mode == "I;16B":  ## big endian
-        t = N.uint16
-        BigEndian = True
-    else:
-        raise ValueError("can only convert single-layer images (mode: %s)" % (im.mode,))
+            self.fp.seek(0)
 
-    nx,ny = im.size
+            a = N.fromstring(self.fp.tobytes(), self.dtype)
+            a.shape = (self.ny, self.nx)
 
-    isSwapped = (BigEndian and sys.byteorder=='little' or not BigEndian and sys.byteorder == 'big')
-        
-    return t,cols, ny,nx, isSwapped
+            if self.isSwapped:
+                a.byteswap(True)
+        elif backend == 'wx':
+            if self.i != i:
+                self.fp = wx.Image(self.fns[i])
+            buf = self.fp.GetBuffer()
+            a = N.frombuffer(buf, dtype=self.dtype, count=-1, offset=0)
+            a.shape = (self.ny, self.nx,self.nc)
+            a = a[...,0][::-1]
 
+        self.i = i
+        return a'''
 
 #------ Below, not yet done -----#
 
@@ -171,8 +173,8 @@ class ImgSeqWriter(generalIO.GeneralWriter):
         generalIO.GeneralWriter.__init__(self, basefn, mode)
         
         base, self.format = os.path.splitext(basefn)
-        
-        if self.format.lower() not in Image.EXTENSION:
+
+        if self.format.replace(os.path.extsep, '').lower() not in READABLE_FORMATS:#Image.EXTENSION:
             raise ValueError('Please supply file extension')
 
         self.rgbOrder = 'rgb'
@@ -269,19 +271,18 @@ class ImgSeqWriter(generalIO.GeneralWriter):
 
     # writing
     def writeSec(self, arr, i=0, singleOutFn=None):
-        if self._rescaleTo8bit:
-            if self._rescaleTo8bit is True:
-                self.rescaleTo8bit(arr)
-            arr = (arr-self._rescaleTo8bit[0])*255./self._rescaleTo8bit[1]
-
-        # astype changes byteorder as well
-        arr = arr.astype(self.dtype)
-        
-        img = U.array2image(arr, rgbOrder=self.rgbOrder)
-
         if not singleOutFn:
             singleOutFn = self.outfn
-        img.save(singleOutFn, **self.saveOptions)
+        
+        # astype changes byteorder as well
+        arr = arr.astype(self.dtype)
+        if has(self._rescaleTo8bit, '__iter__'):
+            arr = (arr-self._rescaleTo8bit[0])*255./self._rescaleTo8bit[1]
+            rescaleTo8bit = False
+        else:
+            rescaleTo8bit = self._rescaleTo8bit
+        
+        return imgIO.save(arr, singleOutFn, rescaleTo8bit, self.rgbOrder.lower())
 
     def writeArrSingle(self, arr):
         self.writeSec(arr)

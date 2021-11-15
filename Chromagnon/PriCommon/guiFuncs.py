@@ -3,7 +3,7 @@ import six
 import wx
 try:
     from ..Priithon import viewerRubberbandMode
-except ValueError: # interactive mode
+except (ValueError, ImportError): # interactive mode
     from Priithon import viewerRubberbandMode
 
 SIZER_KWDS={'flag': wx.ALIGN_CENTRE|wx.ALL|wx.GROW, 'border': 0}
@@ -52,7 +52,7 @@ def makeButton(panel, horizontalSizer, targetFunc, title='', tip='', enable=True
     returns button
     """
     button = wx.Button(panel, -1, str(title))
-    if tip is not '':
+    if tip != '':
         button.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(button, **sizerKwds)
     frame = panel.GetTopLevelParent()
@@ -93,7 +93,7 @@ def makeTxtBox(panel, horizontalSizer, labelTxt, defValue='', tip='', sizeX=40, 
     """
     label = makeTxt(panel, horizontalSizer, labelTxt, **sizerKwds)
     txt = wx.TextCtrl(panel, -1, str(defValue), size=(sizeX,sizeY), style=style)
-    if tip is not '':
+    if tip != '':
         txt.SetToolTip(wx.ToolTip(str(tip)))
     horizontalSizer.Add(txt, **sizerKwds)
     return label, txt
@@ -107,13 +107,13 @@ def makeListChoice(panel, horizontalSizer, labelTxt, choicelist, defValue='', ti
     else:
         label = None
     choice = wx.Choice(panel, -1, choices = choicelist, size=size)
-    if tip is not '':
+    if tip != '':
         choice.SetToolTip(wx.ToolTip(tip))
     horizontalSizer.Add(choice, **sizerKwds)
     if targetFunc:
         frame = panel.GetTopLevelParent()
         frame.Bind(wx.EVT_CHOICE, targetFunc, choice)
-    if defValue is not '':
+    if defValue != '':
         choice.SetStringSelection(str(defValue))
     return label, choice
 
@@ -202,6 +202,11 @@ def openMsg(parent=None, msg='', title="You are not ready"):
         return
 
 def askMsg(parent=None, msg='', title=''):
+    """
+    if askMsg() == wx.ID_YES: Okay
+    else aksMsg() == wx.ID_NO: Cancel
+    Note both YES and NO has id number
+    """
     dlg = wx.MessageDialog(parent, msg, title, wx.YES_NO)
     return dlg.ShowModal()
 

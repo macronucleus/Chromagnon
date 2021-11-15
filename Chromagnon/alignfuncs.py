@@ -299,7 +299,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
     return [ty,tx,r,my,mx] if_failed is 'terminate' and failed, return None
     """
-    print('max_shift_pxl', max_shift_pxl)
+    #print('max_shift_pxl', max_shift_pxl)
     shape = N.array(a2d.shape)
     if center is None:
         center = shape // 2
@@ -749,7 +749,23 @@ def averageImage(reffns, out='', suffix='_averaged', ext='.tif'):
     wtr.close()
     [rdr.close() for rdr in rdrs]
     return out
-                
+
+###  ------ combine wavelength ------
+
+def combineWavelength(fns):
+    """
+    assuming fns with nt==1, nw==1
+    """
+    dname = os.path.dirname(fns[0])
+    suffix = os.path.splitext(fns[0])[-1]
+    common = os.path.commonprefix([os.path.basename(fn) for fn in fns])
+    if not common:
+        common = 'Chromagnon_'
+    out = os.path.join(dname, common + '_wmerge' + suffix)
+    #out = tempfile.maketmp(suffix=suffix, prefix=common, dir=dname)
+
+    out = imgio.merge(fns, out=out, along='w')
+    return [out]
 
 # ------ check wavelengths --------
 

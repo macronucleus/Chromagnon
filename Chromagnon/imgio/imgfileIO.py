@@ -1,4 +1,7 @@
 
+# This module is not used anymore...
+
+
 from . import generalIO, microscope
 import six
 
@@ -19,10 +22,10 @@ except ImportError:
 import numpy as N
 import re
 from . import fntools
-try:
-    from ..Priithon.all import U
-except ValueError:
-    from Priithon.all import U
+#try:
+#    from ..Priithon.all import U
+#except ValueError:
+#    from Priithon.all import U
 
 try: # dimension reader
     import wx
@@ -423,7 +426,10 @@ class ImgSeqWriter(generalIO.GeneralWriter):
         self._setSuffix()
 
     def setDimFromMrcHdr(self, hdr):
-        from .Priithon.all import Mrc
+        try:
+            from . import Mrc
+        except ImportError:
+            import Mrc
         self.wave = hdr.wave
         self.nw = hdr.NumWaves
         self.nt = hdr.NumTimes

@@ -940,6 +940,9 @@ class Chromagnon(object):
         self.niter = niter
         self.zmagSwitch = oldzmagSwitch
 
+
+            
+        
     ### save and load align parameters
 
     def saveParm(self, fn=None):
@@ -978,7 +981,10 @@ class Chromagnon(object):
         return shift at the specified wavelength and time frame
         """
         if refwave is None:
-            refwave = self.refwave
+            if self.refwave is None:
+                refwave = 0
+            else:
+                refwave = self.refwave
 
         ret = self.alignParms[t,w].copy()
         ref = self.alignParms[reftime,refwave]

@@ -1,6 +1,6 @@
 try:
     from ..Priithon.all import U, N
-except ValueError:
+except (ValueError, ImportError):
     from Priithon.all import U, N
 
 from . import ppro26 as ppro

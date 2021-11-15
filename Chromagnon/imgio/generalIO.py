@@ -40,10 +40,16 @@ class GeneralReader(object):
         self.openFile()
 
     def __str__(self):
-        return self.__class__.__name__ + '(' + self.filename + ' nt=%i, nw=%i, nz=%i)' % (self.nt, self.nw, self.nz)
+        if hasattr(self, 'nt'):
+            return self.__class__.__name__ + '(' + self.filename + ' nt=%i, nw=%i, nz=%i)' % (self.nt, self.nw, self.nz)
+        else:
+            return self.__class__.__name__ + '(' + self.filename + ')'
 
     def __repr__(self):
-        return self.__class__.__name__ + '(' + self.filename + ' nt=%i, nw=%i, nz=%i)' % (self.nt, self.nw, self.nz)
+        if hasattr(self, 'nt'):
+            return self.__class__.__name__ + '(' + self.filename + ' nt=%i, nw=%i, nz=%i)' % (self.nt, self.nw, self.nz)
+        else:
+            return self.__class__.__name__ + '(' + self.filename + ')'
 
     def __enter__(self):
         return self

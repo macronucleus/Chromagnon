@@ -70,6 +70,7 @@ else: # mac + linux
     src = os.path.join(home, 'codes', 'src', 'Chromagnon', 'Chromagnon')
 
     site=os.path.join(conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
+    print('site is', site)
 
     pylib = 'so'
     # mac
@@ -104,6 +105,8 @@ else:
 # ------- pyinstaller
 
 datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
+if sys.platform.startswith('linux'):
+    datas += [(os.path.join(pylibpath, 'libglut.*'), 'lib')]
     
 if not PLUGIN:
     datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
@@ -112,11 +115,11 @@ a = Analysis([prog],
              pathex=[code],
              binaries=binaries,
              datas=datas,
-             hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs'],
+             hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs', 'scipy.spatial.transform._rotation_groups'],
 
              hookspath=[],
              runtime_hooks=[],
-             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'opencv', 'reikna', 'pycuda', 'skcuda', 'wx.py', 'distutils', 'setuptools'],
+             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'opencv', 'reikna', 'pycuda', 'skcuda', 'distutils', 'setuptools'],#'wx.py', 'distutils', 'setuptools'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher)

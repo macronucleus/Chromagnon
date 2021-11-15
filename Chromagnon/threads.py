@@ -73,6 +73,8 @@ class ThreadWithExc(threading.Thread):
         self.parms = parms
         self.img_suffix = aligner.IMG_SUFFIX
         #self.logh = open(os.path.join(os.path.dirname(fns[0]), 'Chromagnon.log'), 'a')
+        if hasattr(self, 'is_alive') and not hasattr(self, 'isAlive'):
+            self.isAlive = self.is_alive
         
     def _get_my_tid(self):
         """determines this (self's) thread id
@@ -104,7 +106,12 @@ class ThreadWithExc(threading.Thread):
         # memory
         #import tracemalloc
         #tracemalloc.start()
-        clk0 = time.perf_counter()
+        import sys # for CentOS in some reason
+        if sys.version_info.major >= 3 and sys.version_info.minor >= 3:
+            clk0 = time.perf_counter()
+        else:
+            clk0 = time.clock()
+        #clk0 = time.perf_counter()
         
         OLD_SCIK = fftmanager.SCIK
         OLD_REIK = fftmanager.REIK
@@ -141,6 +148,7 @@ class ThreadWithExc(threading.Thread):
         microscopemap = parms[11]
         dorot4time = parms[12]
         doZ = parms[13]
+        rmv_ref, rmv_tgt = parms[14]
         
         saveAlignParam = True
         alignChannels = True
@@ -237,7 +245,11 @@ class ThreadWithExc(threading.Thread):
                     an.close()
                     del an
                     #imgFit.INDS_DIC = {}
-                    clk1 = time.perf_counter()
+                    if sys.version_info.major >= 3 and sys.version_info.minor >= 3:
+                        clk1 = time.perf_counter()
+                    else:
+                        clk1 = time.clock()
+                    #clk1 = time.perf_counter()
                     self.echo('time taken=%.2f sec' % (clk1-clk0))
                     clk0 = clk1
                 
@@ -273,10 +285,14 @@ class ThreadWithExc(threading.Thread):
                     an.setRegionCutOut(cutout)
 
                     out = an.saveAlignedImage()
+                    print('saved %s' % out)
                     donetgt.append(index)
 
                     an.close()
-                    clk1 = time.perf_counter()
+                    if sys.version_info.major >= 3 and sys.version_info.minor >= 3:
+                        clk1 = time.perf_counter()
+                    else:
+                        clk1 = time.clock()
                     self.echo('time taken=%.2f sec' % (clk1-clk0))
                     clk0 = clk1
 
@@ -321,6 +337,7 @@ class ThreadWithExc(threading.Thread):
                 an.setRegionCutOut(cutout)
 
                 out = an.saveAlignedImage()
+                print('saved %s' % out)
 
                 donetgt.append(index)
 
@@ -336,6 +353,13 @@ class ThreadWithExc(threading.Thread):
                 if self.notify_obj:
                     print('event view', out)
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+
+            if rmv_ref:
+                #print('remove ref %s' % fns[0])
+                os.remove(fns[0])
+            if rmv_tgt and fns[0] != targets[0]:
+                #print('remove target %s' % targets[0])
+                os.remove(targets[0])
 
         except MyError:
             if self.notify_obj:
@@ -543,9 +567,8 @@ if _wx:
             self.panel.OnItemSelected()
 
         def OnCancel(self, evt):
-            if self.currlist:
-                self.item.SetTextColour(wx.BLACK)
-                self.currlist.SetItem(self.item)
+            self.item.SetTextColour(wx.BLACK)
+            self.panel.list.SetItem(self.item)
 
                 #self.panel.label.SetLabel('Cancelled')
                 #self.panel.label.SetForegroundColour('black')

@@ -7,6 +7,8 @@ except ImportError:
 import six
 import tifffile
 from tifffile import tifffile as tifff
+## MEMO: "ImageJ does  not support non-contiguous data" means shape does not match
+
 import struct, copy
     
 import numpy as N
@@ -104,22 +106,26 @@ class MultiTiffReader(generalIO.GeneralReader):
         
         p = self.fp.pages[0]
 
-        # byte_count, offsets = _byte_counts_offsets
-        self.dataOffset = p.offsets_bytecounts[0][0]
+        if int(tifffile.__version__.split('.')[0]) == 0:
+            self.dataOffset = p.offsets_bytecounts[0][0]
+            if len(self.fp.pages) > 1:
+                page1_offset     = self.fp.pages[1].offsets_bytecounts[0][0]
+                page0_offset     = self.fp.pages[0].offsets_bytecounts[0][0]
+                page0_byte_count = self.fp.pages[0].offsets_bytecounts[1][0]
+        else: # recent versions of tifffile 20210618
+            self.dataOffset = p.dataoffsets[0]
+            if len(self.fp.pages) > 1:
+                page1_offset     = self.fp.pages[1].dataoffsets[0]
+                page0_offset     = self.fp.pages[0].dataoffsets[0]
+                page0_byte_count = self.fp.pages[0].databytecounts[0]
+
         if len(self.fp.pages) > 1:
-            page1_offset     = self.fp.pages[1].offsets_bytecounts[0][0]
-            page0_offset     = self.fp.pages[0].offsets_bytecounts[0][0]
-            page0_byte_count = self.fp.pages[0].offsets_bytecounts[1][0]
-            
             self._secExtraByteSize = page1_offset - page0_offset - page0_byte_count
         else:
             self._secExtraByteSize = 0
 
         dtype = s.dtype or p.dtype
-        if type(dtype) != N.dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
-            #p.asarray(validate=None)
-            #dtype = p.keyframe.dtype
-            #if type(dtype) != N.dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
+        if not issubclass(type(dtype), N.dtype): # 20210618
             raise generalIO.ImageIOError('data type not found')
             
         waves = self.readChannelInfo(nw, waves)
@@ -267,7 +273,11 @@ class MultiTiffReader(generalIO.GeneralReader):
     def seekSec(self, i=0):
         p = self.fp.pages[i]
         #byte_counts, offsets = p._byte_counts_offsets
-        offsets, byte_counts = p.offsets_bytecounts#_byte_counts_offsets
+        tifversion = tifffile.__version__.split('.')
+        if int(tifversion[0]) == 0:
+            offsets, byte_counts = p.offsets_bytecounts#_byte_counts_offsets
+        else:
+            offsets = p.dataoffsets
 
         self.handle.seek(offsets[0])
         
@@ -393,10 +403,10 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         tifversion = tifffile.__version__.split('.')
         if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, photometric=photometric)
-        elif int(tifversion[0]) >= 2020:
+        elif hasattr(self.fp, 'save'):#int(tifversion[0]) >= 2020:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric, contiguous=True)
         else:
-            offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric)
+            offset, sec = self.fp.write(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric)
  
     def _makeMetadata(self):
         """
@@ -432,7 +442,11 @@ class MultiTiffWriter(generalIO.GeneralWriter):
                 del self.ex_metadata['Ranges']
 
         if self.style == 'imagej':
-            self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
+            # 20210618
+            if int(tifffile.__version__.split('.')[0]) == 0:
+                self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
+            else:
+                self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp.tiff.byteorder)
 
             
         return metadata

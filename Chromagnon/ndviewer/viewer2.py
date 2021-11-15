@@ -3,7 +3,7 @@ import weakref, sys
 from .viewerCommon import *
 try:
     from ..PriCommon import imgGeo #PriCommon import imgGeo
-except ValueError: # interactive mode
+except (ValueError, ImportError): # interactive mode
     from PriCommon import imgGeo
     
 

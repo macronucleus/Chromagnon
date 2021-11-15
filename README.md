@@ -43,11 +43,12 @@ Platforms successfully tested:
 * Linux Ubuntu(16-18), CentOS(6)
 
 Dependencies:
-* `python` (v2.7 or v3.6)
+* `python` (v2.7 or >v3.6)
 * `numpy`
 * `scipy`
-* `tifffile` (v0.14.0-v0.15.1) 
-* `wxPython` (v3 or v4, optional for GUI)
+* `tifffile <= 2021.7.2` 
+* `chardet`
+* `wxPython` (optional for GUI)
 * `PyOpenGL` (optional for GUI)
 * `pyFFTW` (optional for fast Fourier transform)
 * `javabridge` (optional for reading more image file formats)
@@ -55,7 +56,6 @@ Dependencies:
 * `lxml` (optional for reading more image file formats)
 * `Java Development Kit` (optional for reading more image file
 formats)
-* `PyPubSub` (optional for source code installation)
 
 How to cite
 ----------

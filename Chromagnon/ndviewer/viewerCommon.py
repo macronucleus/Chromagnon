@@ -700,6 +700,9 @@ set image aspect ratio (y/x factor for display)
             if copy == 0 returns non-contiguous array!!!
 
         '''
+        self.zoomChanged = True
+        self.Refresh(0)
+        
         self.SetCurrent(self.context)
         glPixelStorei(GL_PACK_ALIGNMENT, 1)
         

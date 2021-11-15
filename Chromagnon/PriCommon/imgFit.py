@@ -2,7 +2,7 @@
 from __future__ import print_function
 try:
     from ..Priithon.all import N, U
-except ValueError:
+except (ValueError, ImportError):
     from Priithon.all import N, U
 try:
     from . import imgFilters, imgGeo

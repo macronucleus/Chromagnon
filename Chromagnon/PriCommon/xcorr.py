@@ -5,7 +5,7 @@ import os
 #exec('import %s as O' % os.path.basename(D.WORKDIR))
 try:
     from ..Priithon.all import N, U, F
-except ValueError:
+except (ValueError, ImportError):
     from Priithon.all import N, U, F
 from . import imgFilters, imgFit, imgGeo, imgResample
 

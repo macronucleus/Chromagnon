@@ -2,7 +2,7 @@
 from __future__ import print_function
 try:
     from ..Priithon.all import N, U, Y, F, Mrc
-except ValueError:
+except (ValueError, ImportError):
     from Priithon.all import N, U, Y, F, Mrc
 from scipy import optimize
 try:
@@ -915,6 +915,7 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
     return poslist
     """
     img = img.copy()
+    maxind = N.subtract(img.shape, 1)
     imgFit.fitFailedClear()
     ndim = img.ndim
     sigma_peak = imgFit._scalerToSeq(sigma_peak, ndim)
@@ -928,13 +929,20 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
     else:
         vzyx = U.findMax(img)
     for i in range(npts):
-    #while vzyx[0] > thre:
-        if vzyx[0] < thre:
+        if vzyx[0] == 'skip' and i < (npts-1): # assuming init_poses
+            zyx = [int(round(p))  for p in init_poses[i+1]]
+            if N.any(N.array(zyx) > maxind) or N.any(N.array(zyx) < 0):
+                v = 'skip'
+            else:
+                v = img[tuple(zyx)]
+            vzyx = [v] + zyx
+            continue
+        elif vzyx[0] == 'skip' or vzyx[0] < thre:
             break
         prev = vzyx
         try:
             ret, check = imgFit.fitGaussianND(img, vzyx[-ndim:], sigma_peak, win)
-        except IndexError: # too close to the edge
+        except (IndexError): # too close to the edge
             imgFit.fitFailedAppend("at %s" % str(vzyx[-ndim:]))
             mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
             poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [list(sigma_peak)])
@@ -956,7 +964,10 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
 
         if init_poses is not None and len(init_poses) and i != (npts-1):
             zyx = [int(round(p))  for p in init_poses[i+1]]
-            v = img[tuple(zyx)]
+            if N.any(N.array(zyx) > maxind) or N.any(N.array(zyx) < 0):
+                v = 'skip'
+            else:
+                v = img[tuple(zyx)]
             vzyx = [v] + zyx
         else:
             vzyx = U.findMax(img)

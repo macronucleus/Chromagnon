@@ -10,7 +10,7 @@ except ImportError:
 
 try:
     from ..PriCommon import microscope, fntools, commonfuncs
-except ValueError:    
+except (ValueError, ImportError):    
     from PriCommon import microscope, fntools, commonfuncs
     
 import numpy as N

@@ -1,13 +1,13 @@
-try:
-    from ..Priithon import Mrc
-except ValueError: # interactive mode
-    from Priithon import Mrc
+#try:
+#    from . import Mrc
+#except (ValueError, ImportError): # interactive mode
+#    import Mrc
 import numpy as N
 import six
 try:
-    from . import generalIO
+    from . import generalIO, Mrc
 except ImportError:
-    import generalIO
+    import generalIO, Mrc
 
 READABLE_FORMATS = WRITABLE_FORMATS = ('mrc', 'dv')
 # 'Image sequence. 0=ZTW, 1=WZT, 2=ZWT (idx = [2,1,0])
