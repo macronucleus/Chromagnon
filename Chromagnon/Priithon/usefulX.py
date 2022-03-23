@@ -483,14 +483,17 @@ class _listFilesViewer:
         self.lb = wx.ListBox(self.frame, wx.ID_ANY, size=(300,400)) #, choices=cl) #, wx.LB_SINGLE)
         sizer.Add(self.lb, 1, wx.EXPAND | wx.ALL, 5)
         #wx.EVT_LISTBOX(f, 60, self.EvtListBox)
-        wx.EVT_MOTION(self.lb, self.onStartDrag)
+        #wx.EVT_MOTION(self.lb, self.onStartDrag)
+        self.lb.Bind(wx.EVT_MOTION, self.onStartDrag)
 
 
         # wx.EVT_LISTBOX_DCLICK(self.frame, 1001, onDClick)
         # 20080423ProblemSeeWx-Dev2008Jan("wxlistbox enter") wx.EVT_LISTBOX_DCLICK(self.frame, self.lb.GetId(), lambda ev:onDClick(ev, chdir=True))
         # 20080423ProblemSeeWx-Dev2008Jan("wxlistbox enter") wx.EVT_LISTBOX(self.frame, self.lb.GetId(), lambda ev:onDClick(ev, chdir=False))
-        wx.EVT_LISTBOX(self.frame, self.lb.GetId(), lambda ev:self.onDClick(ev, chdir=False))
-        wx.EVT_LISTBOX_DCLICK(self.frame, self.lb.GetId(), lambda ev:self.onDClick(ev, chdir=True))
+        #wx.EVT_LISTBOX(self.frame, self.lb.GetId(), lambda ev:self.onDClick(ev, chdir=False))
+        self.frame.Bind(wx.EVT_LISTBOX, lambda ev:self.onDClick(ev, chdir=False), id=self.lb.GetId())
+        #wx.EVT_LISTBOX_DCLICK(self.frame, self.lb.GetId(), lambda ev:self.onDClick(ev, chdir=True))
+        self.frame.Bind(wx.EVT_LISTBOX_DCLICK, lambda ev:self.onDClick(ev, chdir=True), id=self.lb.GetId())
         # wx.EVT_RIGHT_UP(self.lb1, self.EvtRightButton)
 
         hsz = wx.BoxSizer(wx.HORIZONTAL)
@@ -498,7 +501,8 @@ class _listFilesViewer:
 
         self.txt = wx.TextCtrl(self.frame, wx.ID_ANY, self.getPath())
         hsz.Add(self.txt, 1, wx.EXPAND|wx.ALL, 2)
-        wx.EVT_TEXT(self.frame, self.txt.GetId(), self.refreshList)
+        #wx.EVT_TEXT(self.frame, self.txt.GetId(), self.refreshList)
+        self.frame.Bind(wx.EVT_TEXT, self.refreshList, id=self.txt.GetId())
     
         self.autoscale = wx.CheckBox(self.frame, wx.ID_ANY, "autoscale")
         hsz.Add(self.autoscale, 0, wx.EXPAND|wx.ALL, 2)

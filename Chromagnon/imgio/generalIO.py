@@ -198,7 +198,14 @@ class GeneralReader(object):
     def setRoi(self, zyx_start, zyx_size):
         self.roi_start[:] = zyx_start
         self.roi_size[:] = zyx_size
-        
+
+    def isRoiSet(self):
+        """
+        return True if roi is different from the whole image size
+        """
+        maxshape = N.array((self.nz, self.ny, self.nx), N.int16)
+        if N.any(self.roi_size < maxshape) or N.any(self.roi_start > 0):
+            return True
  
 
     def getWaveIdx(self, wave):

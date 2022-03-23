@@ -7,11 +7,13 @@ import wx, wx.lib.scrolledpanel as scrolled
 import wx.lib.agw.aui as aui # from wxpython4.0, wx.aui does not work well, use this instead
 
 try:
-    from ..Priithon import histogram, useful as U
+    from ..Priithon import histogram#, useful as U
+    from ..Priithon.all import Y, U, F
     from ..PriCommon import guiFuncs as G ,microscope, imgResample
     from .. import imgio
 except (ValueError, ImportError):
-    from Priithon import histogram, useful as U
+    from Priithon import histogram#, useful as U
+    from Priithon.all import Y, U, F
     from PriCommon import guiFuncs as G ,microscope, imgResample
     import imgio
 
@@ -41,6 +43,7 @@ _rgbList = [
 _rgbList_names = ['red','green','blue', 'yellow', 'cyan', 'magenta', 'grey']
 _rgbList_menuIDs = [wx.NewId() for i in range(len(_rgbList))]
 
+viewers = []
 
 def initglut():
     global GLUTINITED
@@ -357,8 +360,11 @@ class ImagePanel(wx.Panel):
         except AttributeError: # no parent?
             pass
 
-        # Frequency-based caluculation starts 
-        from Priithon.all import F
+        # Frequency-based caluculation starts
+        #try:
+        #    from ..Priithon.all import F
+        #except (ValueError, ImportError):
+        #    from Priithon.all import F
         
         ring = F.ringArr(self.doc.shape[-2:], radius1=self.doc.shape[-1]//10, radius2=self.doc.shape[-2]//4, orig=(0,0), wrap=1)
 
@@ -383,10 +389,15 @@ class ImagePanel(wx.Panel):
             zlast = self.doc.zlast
             z = self.doc.z
             pxlsiz = self.doc.pxlsiz
+            roi_start = self.doc.roi_start
+            roi_size = self.doc.roi_size
+            
             self.doc = imgio.arrayIO.ArrayReader(self.doc)
             self.doc.zlast = zlast
             self.doc.z = z
             self.doc.pxlsiz = pxlsiz
+            self.doc.roi_start = roi_start
+            self.doc.roi_size = roi_size
             #self.loaded = True
             self.viewers[-1].setMyDoc(self.doc, self)
             #print('loadImage2Memory called')
@@ -397,11 +408,7 @@ class ImagePanel(wx.Panel):
         transform to the orthogonal viewer
         """
         if self.orthogonal_toggle.GetValue() and len(self.viewers) == 1:
-            
-            #if issubclass(type(self.doc), imgio.generalIO.GeneralReader):#type(self.doc) == imgio.bioformatsIO.BioformatsReader:
             self.loadImage2Memory()
-                #self.viewers[-1].setMyDoc(self.doc, self)
-                
             self._mgr.GetPane('Image').Left().Position(1)
             self.OnAddX()
             self.OnAddY()
@@ -501,7 +508,7 @@ class ImagePanel(wx.Panel):
         self._mgr.Update()
 
     def onSaveScr(self, evt=None):
-        from Priithon.all import Y
+        #from Priithon.all import Y
         from PIL import Image
 
         fn = Y.FN(save=1)#, verbose=0)
@@ -1022,6 +1029,7 @@ class ImagePanel(wx.Panel):
 class MyFrame(wx.Frame):
 
     def __init__(self, title='ND viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):
+        global viewers
         #frame = wx.Frame()
         #wx.Panel.__init__(self, frame, -1)
         
@@ -1045,6 +1053,22 @@ class MyFrame(wx.Frame):
 
         self.auiManager.Update()
 
+        self.vid = len(viewers)
+        viewers.append(self)
+
+        #wx.GetTopLevelParent(parent).Bind(wx.EVT_CLOSE, self.onClose)
+        self.Bind(wx.EVT_CLOSE, self.onclose)
+
+    def __del__(self):
+        self.onclose()
+
+    def onclose(self, evt=None):
+        global viewers
+        viewers[self.vid] = None
+
+        if evt:
+            evt.GetEventObject().Destroy()
+        
     def CreateNotebook(self):
         
         #self.imEditWindows = aui.AuiNotebook(self, wx.ID_ANY, style=aui.AUI_NB_DEFAULT_STYLE | aui.AUI_NB_WINDOWLIST_BUTTON | aui.AUI_NB_TAB_FIXED_WIDTH)
@@ -1092,7 +1116,7 @@ def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
     frame = MyFrame(size=FRAMESIZE, parent=parent)
     frame.Show()
 
-    if isinstance(fns, six.string_types):#str):
+    if isinstance(fns, six.string_types) or not hasattr(fns, '__iter__'):
         fns = [fns]
     #elif type(fns) == tuple:
     #    fns = fn
@@ -1101,7 +1125,13 @@ def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
 
     for fn in fns:
         panel = ImagePanel(frame, fn, useCropbox=useCropbox)
-        name = os.path.basename(fn)
+        if isinstance(fn, six.string_types):
+            name = os.path.basename(fn)
+        elif hasattr(fn, 'fn'):
+            name = os.path.basename(fn.fn)
+        else:
+            raise ValueError('file name is not found')
+            
         frame.imEditWindows.addPage(panel, name, select=True)
     return frame
 

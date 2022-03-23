@@ -7,6 +7,7 @@ __license__ = "BSD license - see LICENSE file"
 from .viewerCommon import *
 
 
+    
 
 class GammaPopup(wx.Frame):
     def __init__(self, viewer):
@@ -88,7 +89,11 @@ class GammaPopup(wx.Frame):
 
     def updateGamma(self):
         self._lastGamma_set = self.gamma
-        self.v.cmgray(self.gamma)
+        #self.v.cmgray(self.gamma)
+        self.v.gamma = self.gamma
+        self.v.setGamma()
+        self.v.changeHistogramScaling()
+        self.v.updateHistColMap()
         
 
 
@@ -108,6 +113,7 @@ class GLViewer(GLViewerCommon):
         else:
             self.m_originLeftBottom = originLeftBottom
 
+        self.gamma = 1
         self.m_imgArr = imgArr
         self.pic_nx = 0  # size as used in current texture
         self.pic_ny = 0
@@ -162,10 +168,12 @@ class GLViewer(GLViewerCommon):
         self.m_menu_colmap.AppendRadioItem(Menu_ColMap[1],    "gray (logathmic)")
         self.m_menu_colmap.AppendRadioItem(Menu_ColMap[2],    "rainbow")
         self.m_menu_colmap.AppendRadioItem(Menu_ColMap[3],    "blackbody")
-        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[4],    "rainbow-cycle")
-        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[5],    "rainbow-fastCycle")
-        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[6],    "gray-Min-Max")
-        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[7],    "gamma...")
+        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[4],    "magma")
+        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[5],    "viridis")
+        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[6],    "rainbow-cycle")
+        #self.m_menu_colmap.AppendRadioItem(Menu_ColMap[5],    "rainbow-fastCycle")
+        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[7],    "gray-Min-Max")
+        self.m_menu_colmap.AppendRadioItem(Menu_ColMap[8],    "gamma...")
         #self.m_menu_save.Append(Menu_SaveND,  "save nd stack into file")
         for i in range(len(Menu_ColMap)):
             # 20171225-PY2to3 deprecation warning 
@@ -824,12 +832,16 @@ class GLViewer(GLViewerCommon):
         elif self.colMap_menuIdx == 2:
             self.cmblackbody()
         elif self.colMap_menuIdx == 3:
-            self.cmwheel()
+            self.cmmagma()
         elif self.colMap_menuIdx == 4:
-            self.cmwheel(10)
+            self.cmviridis()
         elif self.colMap_menuIdx == 5:
-            self.cmGrayMinMax()
+            self.cmwheel()
+        #elif self.colMap_menuIdx == (4+1):
+        #    self.cmwheel(10)
         elif self.colMap_menuIdx == 6:
+            self.cmGrayMinMax()
+        elif self.colMap_menuIdx == 7:
             self.cmnone()
 #         if self.colMap != None:
 #             self.cmnone()
@@ -837,7 +849,7 @@ class GLViewer(GLViewerCommon):
 #             self.cmcol()
 
         self.colMap_menuIdx += 1
-        self.colMap_menuIdx %= 7
+        self.colMap_menuIdx %= (7+1)
         # 20040713 now in cmWheel,cmLog,...   self.updateHistColMap()
 
         
@@ -853,10 +865,10 @@ class GLViewer(GLViewerCommon):
 
     def OnMenuColMap(self, ev):
         menuIdx = Menu_ColMap.index(ev.GetId())
-        if menuIdx == 7:
+        if menuIdx == 8:#7:
             self.gammawin = GammaPopup(self)
             self.gammawin.Show()
-            self.colMap_menuIdx = 7-1
+            #self.colMap_menuIdx = 8-1#7-1
             return
         elif menuIdx == 0:
             self.cmnone()
@@ -867,13 +879,17 @@ class GLViewer(GLViewerCommon):
         elif menuIdx == 3:
             self.cmblackbody()
         elif menuIdx == 4:
-            self.cmwheel()
+            self.cmmagma()
         elif menuIdx == 5:
-            self.cmwheel(10)
+            self.cmviridis()
         elif menuIdx == 6:
+            self.cmwheel()
+        #elif menuIdx == 5+1:
+            #self.cmwheel(10)
+        elif menuIdx == 7:
             self.cmGrayMinMax()
 
-        self.colMap_menuIdx = (menuIdx+1)%7
+        self.colMap_menuIdx = (menuIdx+1)%8#7
         
 
     
@@ -903,6 +919,9 @@ class GLViewer(GLViewerCommon):
     spectrum = ["darkred", "red", "orange", "yellow", "green", "blue",
                 "darkblue", "violet"]
     blackbody = ["black", "darkred", "orange", "yellow", "white"]
+        
+    magma = ["black","violet", "orange", "white"]#"magenta", "orange", "white"] # rather it is plasma
+    viridis = ["violet", 'darkblue', 'green', 'yellow']
     redgreen = ["red", "darkred", "black", "darkgreen", "green"]
     greenred = ["green", "darkgreen", "black", "darkred", "red"]
     twocolorarray = ["green", "yellow", "red"]
@@ -1008,8 +1027,37 @@ class GLViewer(GLViewerCommon):
             self.colMap[:, c] = acc
             #      else:
             #          print "** debug ** c == self.cm_size ..."
-    
+        self.original_colMap = self.colMap.copy()
+        self.setGamma()
+
+    def setGamma(self):
+        if not hasattr(self, 'original_colMap') or self.colMap is None:
+            self.cmgray(self.gamma)
+            return
+        #else:
+        #    self.original_colMap = self.colMap.copy()
+        if self.gamma != 1:
+            if self.original_colMap.min() > 0:
+                self.colMap[:] = self.original_colMap ** self.gamma
+            else:
+                self.colMap[:] = N.clip(self.original_colMap, 0, None) ** self.gamma
+
         ##########3viewerRedraw(cam)
+    def loadColMap(self, name='magma'):
+        try:
+            raise ImportError
+            from matplotlib import pyplot as P
+            self.colMap = N.array(P.cm.get_cmap(name).colors).T
+        except ImportError:
+            try:
+                import os
+                self.colMap = N.load(os.path.join(os.path.dirname(__file__), '%s.npy' % name))
+            except:
+                pass
+        self.original_colMap = self.colMap.copy()
+        self.setGamma()
+        self.changeHistogramScaling()
+        self.updateHistColMap()
     
     def cmgrey(self, reverse=0):
         self.cms(self.grey, reverse)
@@ -1023,6 +1071,12 @@ class GLViewer(GLViewerCommon):
         self.cms(self.blackbody, reverse)
         self.changeHistogramScaling()
         self.updateHistColMap()
+    def cmmagma(self, reverse=0):
+        self.loadColMap(name='magma')
+        
+    def cmviridis(self, reverse=0):
+        self.loadColMap(name='viridis')
+        
     def cmwheel(self, cycles=1):
         self.cm_size = 256 ###### non omx
         self.colMap = N.empty(shape=(3, self.cm_size), dtype=N.float32)

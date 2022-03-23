@@ -54,7 +54,8 @@ def _switch(fn, read=True, *args, **kwds):
         klasses = {'seq': imgSeqIO.ImgSeqReader,
                    'tif': multitifIO.MultiTiffReader,
                    'mrc': mrcIO.MrcReader,
-                   'bio': bioformatsIO.BioformatsReader}
+                   'bio': bioformatsIO.BioformatsReader,
+                   'arr': arrayIO.ArrayReader}
     else: # write
         formats = {'seq': imgSeqIO.WRITABLE_FORMATS,
                    'tif': multitifIO.WRITABLE_FORMATS,
@@ -65,7 +66,13 @@ def _switch(fn, read=True, *args, **kwds):
                    'mrc': mrcIO.MrcWriter,
                    'bio': bioformatsIO.BioformatsWriter}
 
-    ext = os.path.splitext(fn)[1].replace(os.path.extsep, '')
+    if isinstance(fn, six.string_types):
+        ext = os.path.splitext(fn)[1].replace(os.path.extsep, '')
+    elif hasattr(fn, 'shape'): # array
+        return klasses['arr'](fn, *args, **kwds)
+    else:
+        raise ValueError('The input type %s is not understood' % type(fn))
+        
 
     ## --- JDK check----
     if ext in bioformatsIO.bioformats.READABLE_FORMATS and ext not in formats['bio'] and ext not in formats['seq']:
@@ -207,7 +214,7 @@ def formatTWZYX(twzyxs, h, start=True):
         elif v < 0:
             v = n + v
             ret.append((dim, v))
-        elif v >= n:
+        elif v > n:
             raise ValueError('number of %s is only %i but you specified %i' % (dim.upper(), n, v))
         else:
             ret.append((dim, v))
@@ -240,6 +247,9 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
         zs = range(twzyx0s[2][1], twzyx1s[2][1])
         ys = slice(twzyx0s[3][1], twzyx1s[3][1])
         xs = slice(twzyx0s[4][1], twzyx1s[4][1])
+
+        if (ys.stop - ys.start) <= 0 or (xs.stop - xs.start) <= 0 or not (len(zs)) or not (len(ts)) or not (len(ws)):
+            raise ValueError('The target dimension cannot be less than or equal to 0')
 
         if type(h) == mrcIO.MrcReader:
             hdr = mrcIO.makeHdrFromRdr(h)

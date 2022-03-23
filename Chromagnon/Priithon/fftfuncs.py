@@ -194,6 +194,35 @@ def bin2d(inArr, outArr, binX=2, binY=2):
     import Priithon_bin.seb as S
     S.bin2d(inArr, outArr, binX, binY)
 
+def binning(arr, bins):
+    """
+    arr: n-dimensional
+    bins: scaler or iterable of the same lenght as arr.ndim
+
+    return binned array
+    """
+    if hasattr(bins, '__iter__'):
+        assert(arr.ndim == len(bins))
+    else:
+        bins = [bins for d in range(arr.ndim)]
+
+    shape = N.array(arr.shape)
+    newshape = shape // bins
+    slc = []
+    for d in range(arr.ndim):
+        s = shape[d] - (newshape[d] * bins[d])
+        if s:
+            slc.append(slice(0,-s))
+        else:
+            slc.append(slice(None,None))
+    #slc = tuple([slice(0, -s) for s in shape - newshape])
+    newshape2 = N.empty((arr.ndim*2,), N.int)
+    newshape2[::2] = newshape
+    newshape2[1::2] = bins
+    arr = arr[slc].reshape(newshape2)
+    for i in range(len(bins)):
+        arr = arr.mean(axis=-(i+1))
+    return arr
 
 def getXZview(arr, zaxis=-3):
     s = list(range(arr.ndim))
@@ -973,6 +1002,41 @@ def irfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdty
         af = N.asarray(af, minCdtype)
 
     return fftw.irfft(af, nthreads=nthreads)
+
+def rsfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
+    """
+    calculate nd fourier transform
+    performs real- fft, i.e. the return array has shape with last dim halfed+1
+    does ifftshift before rfft
+
+    `a` should be a real array,
+      otherwise it gets converted to
+      minFdtype
+    """
+    if a.dtype.type not in fftw.RTYPES:
+        a = N.asarray(a, minFdtype)
+
+    return fftw.rfft(N.fft.ifftshift(a), nthreads=nthreads)
+def irsfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
+    """
+    calculate nd inverse fourier transform
+    performs real- ifft, i.e. the input array has shape with last dim halfed+1
+    does ifftshift after irfft
+
+    fftw does NOT normalize (divide by product of shape)
+    they argue that the normalization can often be combined with other
+    operation and thus save a loop through the data
+
+    if normalize is True: the division is done -- and normilized data is returned
+
+    `af` should be a complex array,
+      otherwise it gets converted to
+      minCdtype
+    """
+    if af.dtype.type not in fftw.CTYPES:
+        af = N.asarray(af, minCdtype)
+
+    return N.fft.fftshift(fftw.irfft(af, nthreads=nthreads))
 
 def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """

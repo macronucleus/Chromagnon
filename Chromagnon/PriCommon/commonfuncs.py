@@ -1,4 +1,4 @@
-
+from __future__ import unicode_literals
 import sys, os, imp, io
 import chardet
 
@@ -27,6 +27,18 @@ def getConfigPath(fn=None, appname='Priithon'):
     else:
         ofn = os.path.join(os.path.expanduser('~'), '.' + appname, fn)
     return ofn
+
+def checkAndPrepDirectory(fn):
+    """
+    check if the directory is present and if not, prepare it.
+    return 1 if the directory is newly made, and 0 if the directory is already there.
+    """
+    dirname = os.path.dirname(fn)
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+        return 1
+    else:
+        return 0
 
 def readConfig(fn=None):
     """

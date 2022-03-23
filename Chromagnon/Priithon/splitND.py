@@ -769,14 +769,16 @@ class spv(spvCommon):
         from . import fftfuncs as F
         if self.data.dtype.type in (N.complex64, N.complex128):
             print("TODO: cplx ")
-        run(F.getXZview(self.data, zaxis=0), title='X-Z of %d'%self.id, _scoopLevel=2)
+        #run(F.getXZview(self.data, zaxis=0), title='X-Z of %d'%self.id, _scoopLevel=2)
+        run(F.getXZview(self.data, zaxis=-3), title='X-Z of %d'%self.id, _scoopLevel=2)
         from .usefulX import vHistSettings
         vHistSettings(self.id,-1)
     def OnViewFlipYZ(self, event=77777):
         from . import fftfuncs as F
         if self.data.dtype.type in (N.complex64, N.complex128):
             print("TODO: cplx ")
-        run(F.getYZview(self.data, zaxis=0), title='Y-Z of %d'%self.id, _scoopLevel=2)
+        #run(F.getYZview(self.data, zaxis=0), title='Y-Z of %d'%self.id, _scoopLevel=2)
+        run(F.getYZview(self.data, zaxis=-3), title='Y-Z of %d'%self.id, _scoopLevel=2)
         from .usefulX import vHistSettings
         vHistSettings(self.id,-1)
 

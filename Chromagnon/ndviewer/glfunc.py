@@ -88,7 +88,6 @@ class graphix_slicelines(graphix):
         GL.glVertex2f(self.upperbounds[1], self.horzline_pos+0.5)
         GL.glEnd()
 
-        from Priithon import usefulX as Y
         if self.dims == (1,2):
             coord_strY = str(int(self.vertline_pos + self.y0))
             coord_strX = str(int(self.horzline_pos + self.x0))
@@ -100,9 +99,9 @@ class graphix_slicelines(graphix):
             coord_strX = str(int(self.horzline_pos))
 
         if USEGLUT:
+            try:
+                from ..Priithon.all import Y
+            except (ValueError, ImportError):
+                from Priithon.all import Y
             Y.glutText(coord_strY, (float(self.vertline_pos), float(self.cropbox_upperside)), color=(1,0,1), size=(0.1/self.scale,0.1/(self.scale*self.aspectRatio)), mono=GLUT.GLUT_STROKE_MONO_ROMAN)
             Y.glutText(coord_strX, (float(self.cropbox_rightside), float(self.horzline_pos)), color=(1,0,1), size=(0.1/self.scale,0.1/(self.scale*self.aspectRatio)), mono=GLUT.GLUT_STROKE_MONO_ROMAN) # float for sizes is required for older? or linux? OpenGL
-        
-
-                                 
-

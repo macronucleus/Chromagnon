@@ -1610,7 +1610,7 @@ def histogram(a, nBins=None, amin=None,amax=None, histArr=None, norm=False, cums
     else:
         if nBins is None:
             nBins = int(amax-amin+1)
-            if N.issubdtype(float, a.dtype) and nBins < 100:
+            if (N.issubdtype(float, a.dtype) and nBins < 100) or nBins > 100000:
                 nBins = 100
 
         histArr = N.empty( shape=(nBins,), dtype=N.int32 )
@@ -2300,7 +2300,10 @@ def load(fn):
         from . import Mrc
         a = Mrc.bindFile(fn)
     elif os.path.isdir(fn):
-        import imgio
+        try:
+            from .. import imgio
+        except (ValueError, ImportError):
+            import imgio
         h = imgio.imgSeqIO(fn)
         a = N.squeeze(h.asarray())
         h.close()
@@ -2315,7 +2318,10 @@ def load(fn):
             #20060824 CHECK  a._originLeftBottom=0
         except (IOError, SystemError, ImportError, OSError): # ImportError for Image"""
         try:
-            import imgio
+            try:
+                from .. import imgio
+            except (ValueError, ImportError):
+                import imgio
             old="""
             h = imgio.Reader(fn)
             a = N.squeeze(h.asarray())
@@ -2455,8 +2461,21 @@ def loadImg_seq(fns, channels=None, verbose=0): #### #, i0=0, iDelta=1, squeezeG
 
 
 def saveImg(arr, fn, rescaleTo8bit=True, rgbOrder='rgba'):
-    import imgio
+    try:
+        from .. import imgio
+    except (ValueError, ImportError):
+        import imgio
     return imgio.imgIO.save(arr, fn, rescaleTo8bit, rgbOrder)
+
+def uninit_javabridge():
+    """
+    necessary to turn off the java connection after loading with bioformats
+    """
+    try:
+        from .. import imgio
+    except (ValueError, ImportError):
+        import imgio
+    imgio.uninit_javabridge()
 
 old='''
 def saveImg(arr, fn, forceMultipage=False, rgbOrder="rgba"):

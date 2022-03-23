@@ -31,12 +31,12 @@ class MrcReader(generalIO.GeneralReader):
         
         nx = self.fp.hdr.Num[0]
         ny = self.fp.hdr.Num[1]
-        nt = int(self.fp.hdr.NumTimes) # change data type
-        nw = int(self.fp.hdr.NumWaves)
+        nt = int(self.fp.hdr.NumTimes[0]) # change data type
+        nw = int(self.fp.hdr.NumWaves[0])
         nz = int(self.fp.hdr.Num[2]) // (nt * nw)
         dtype = self.fp._dtype
         wave = self.fp.hdr.wave[:nw]
-        imgseq = self.fp.hdr.ImgSequence
+        imgseq = self.fp.hdr.ImgSequence[0]
         
         self.setDim(nx, ny, nz, nt, nw, dtype, wave, imgseq)
 
@@ -155,12 +155,12 @@ class MrcWriter(generalIO.GeneralWriter):
         """
         self.hdr = makeHdr_like(hdr)
         self.setPixelSize(*hdr.d[::-1])
-        nz = int(hdr.Num[2]) // (int(hdr.NumWaves) * int(hdr.NumTimes))
+        nz = int(hdr.Num[2]) // (int(hdr.NumWaves[0]) * int(hdr.NumTimes[0]))
         if nz < 1:
-            raise ValueError('number of Z is less than 1 (nt: %i, nw: %i)' % (int(hdr.NumWaves), int(hdr.NumTimes)))
-        dtype = Mrc.MrcMode2dtype(hdr.PixelType)
+            raise ValueError('number of Z is less than 1 (nt: %i, nw: %i)' % (int(hdr.NumWaves[0]), int(hdr.NumTimes[0])))
+        dtype = Mrc.MrcMode2dtype(hdr.PixelType[0])
 
-        self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes, hdr.NumWaves, dtype, hdr.wave, hdr.ImgSequence)
+        self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes[0], hdr.NumWaves[0], dtype, hdr.wave, hdr.ImgSequence[0])
 
     def setExtHdr(self, extInts=None, extFloats=None):
         self.extFloats = extFloats
@@ -171,7 +171,7 @@ class MrcWriter(generalIO.GeneralWriter):
             hdr = self.hdr
         Mrc.initHdrArrayFrom(self.fp.hdr, hdr)
         self.fp.hdr.Num = hdr.Num
-        self.fp.hdr.PixelType = hdr.PixelType
+        self.fp.hdr.PixelType = hdr.PixelType[0]
 
         self.fp._initWhenHdrArraySet()
 
@@ -249,12 +249,12 @@ def makeHdr_like(hdrSrc):
     return header
     """
     hdr = Mrc.makeHdrArray()
-    init_simple(hdr, hdrSrc.PixelType, hdrSrc.Num[::-1])
+    init_simple(hdr, hdrSrc.PixelType[0], hdrSrc.Num[::-1])
     Mrc.initHdrArrayFrom(hdr, hdrSrc)
-    hdr.NumTimes = hdrSrc.NumTimes
-    hdr.NumWaves = hdrSrc.NumWaves
-    hdr.NumIntegers = hdrSrc.NumIntegers
-    hdr.NumFloats = hdrSrc.NumFloats
+    hdr.NumTimes = hdrSrc.NumTimes[0]
+    hdr.NumWaves = hdrSrc.NumWaves[0]
+    hdr.NumIntegers = hdrSrc.NumIntegers[0]
+    hdr.NumFloats = hdrSrc.NumFloats[0]
     return hdr
 
 def makeHdrFromRdr(rdr):
@@ -343,7 +343,7 @@ def shapeFromNum(Num, NumWaves=1, NumTimes=1, imgSequence=1, squeeze=True):
     return tuple(shape)
 
 def shapeFromHdr(hdr):
-    return shapeFromNum(hdr.Num, hdr.NumWaves, hdr.NumTimes, hdr.ImgSequence)
+    return shapeFromNum(hdr.Num, hdr.NumWaves[0], hdr.NumTimes[0], hdr.ImgSequence[0])
 
 def _slimShape(shape): # N.squeeze does it
     shape = list(shape)
@@ -358,7 +358,7 @@ def getWaveFromHdr(hdr, wave):
     return wavelength
     """
     wave = int(wave)
-    nw = hdr.NumWaves
+    nw = hdr.NumWaves[0]
     if wave in hdr.wave[:nw]:
         return wave
     elif wave < nw: # idx
@@ -371,7 +371,7 @@ def getWaveIdxFromHdr(hdr, wave):
     return index
     """
     wave = int(wave)
-    nw = hdr.NumWaves
+    nw = hdr.NumWaves[0]
     if wave in hdr.wave[:nw]:
         wave = list(hdr.wave).index(wave)
         return wave
@@ -439,7 +439,7 @@ class Mrc3(Mrc.Mrc2):
         this should be called before writing down data and header
         """
         if self._mode in ['r+', 'w'] and (byteorder != '=' or (byteorder == '=' and self._fileIsByteSwapped)):
-            pxtype = self.hdr.PixelType
+            pxtype = self.hdr.PixelType[0]
             if pxtype == 0:
                 dt = '%su1'
             elif pxtype == 1:
@@ -518,6 +518,7 @@ class Mrc3(Mrc.Mrc2):
         # todo check type, shape
         if self._fileIsByteSwapped:
             a = a.astype(self._dtype)
+
 
         return a.tofile(self._f)
 

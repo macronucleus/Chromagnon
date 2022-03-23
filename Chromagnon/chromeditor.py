@@ -74,7 +74,7 @@ class ChromagnonPanel(wx.Panel):
         if self.clist.map_str != 'None':
             #G.makeTxt(self, box, 'Local: ')
             self.local_label = G.makeTxt(self, box, 'Local: ' + self.clist.map_str)
-            print(self.clist.map_str)
+            #print(self.clist.map_str)
             
             # \n
             box = G.newSpaceV(sizer)
@@ -111,7 +111,7 @@ class ChromagnonPanel(wx.Panel):
         box = G.newSpaceV(sizer)
         G.makeTxt(self, box, ' ')
         box = G.newSpaceV(sizer)
-        G.makeTxt(self, box, 'Pixel size ZYX (um): %.3f  %.3f  %.3f' % tuple(self.clist.creader.pxlsiz))
+        G.makeTxt(self, box, 'Pixel size ZYX (um): %.3f  %.3f  %.3f' % tuple(self.clist.pxlsiz))
 
         if self.clist.nt > 1:
             # \n
@@ -153,8 +153,12 @@ class ChromagnonPanel(wx.Panel):
         save a '.local' file and opens new image viewer
         """
         import wx, tempfile
-        import imgio
-        from Priithon.all import Y
+        try:
+            from .. import imgio
+            from ..Priithon.all import Y
+        except (ValueError, ImportError):
+            import imgio
+            from Priithon.all import Y
 
         if w is None:
             wave = int(self.wavechoice.GetStringSelection())
@@ -195,7 +199,7 @@ class ChromagnonPanel(wx.Panel):
             if self.clist.mapyx.ndim == 5:
                 b = N.max(b, 0)
 
-            a[1] = af.applyShift(b, self.clist.alignParms[t,w])
+            a[1] = af.applyShift(b, self.clist.alignParms[t,w]-self.clist.alignParms[t,self.clist.refwave])
             pz, py, px = img.pxlsiz
         else:
             a = N.zeros(self.clist.mapyx.shape[-3:], N.uint8)
@@ -222,14 +226,15 @@ class ChromagnonPanel(wx.Panel):
         #for w in xrange(self.clist.nw):
         vs = []
         for d in range(2):
-            slcs = [slice(d,d+1)] + slcs1
+            slcs = tuple([slice(d,d+1)] + slcs1)
             vs.append(inds[slcs].ravel())
         iis = N.array(list(zip(*vs)))
 
         vs = []
         for d in range(2):
-            slcs = [slice(t,t+1), slice(w,w+1), slice(d,d+1)] + slcs1
-            vs.append(mapyx[slcs].ravel())
+            slcs = tuple([slice(t,t+1), slice(w,w+1), slice(d,d+1)] + slcs1)
+            rslc = tuple([slice(t,t+1), slice(self.clist.refwave,self.clist.refwave+1), slice(d,d+1)] + slcs1)
+            vs.append((mapyx[slcs] - mapyx[rslc]).ravel())
         yxs = N.array(list(zip(*vs)))
 
         wave = self.clist.wave[w]
@@ -323,9 +328,14 @@ class ChromagnonPanel(wx.Panel):
         """
         # prepare output file name
         base, ext = os.path.splitext(self.clist.basename)
-        defname = base + '.csv'
+        if not hasattr(self.clist, 'mapyx'):
+            self.clist.mapyx = None
+            oext = '.csv'
+        else:
+            oext = '.tif'
+        defname = base + oext
         out = ''
-        dlg = wx.FileDialog(self, 'Please select a file', self.clist.dirname, defname, '*.csv', wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+        dlg = wx.FileDialog(self, 'Please select a file', self.clist.dirname, defname, '*'+oext, wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
 
         if dlg.ShowModal() == wx.ID_OK:
             out = dlg.GetPath()
@@ -333,14 +343,11 @@ class ChromagnonPanel(wx.Panel):
             
         if not out:
             return
-        
-        with open(out, 'w') as w:
-            writer = csv.writer(w)
-            writer.writerow(['time','wavelength']+aligner.ZYXRM_ENTRY)
-            for t in range(self.clist.nt):
-                for w, wave in enumerate(self.clist.waves):
-                    l = list(self.clist.alignParms[t,w])
-                    writer.writerow([t,wave]+l)
+
+        #with open(out, 'w') as w:
+
+        with chromformat.ChromagnonWriter(out, self.clist, self.clist) as cwriter:
+            cwriter.writeAlignParamAll()
 
     def OnItemSelected(self, evt=None):
         """
@@ -367,13 +374,18 @@ class ChromagnonPanel(wx.Panel):
             
             self.clist.DeleteItem(i)
             self.clist.alignParms = N.delete(self.clist.alignParms, i, axis=1)
-            if self.clist.waves[i] == self.clist.refwave:
+            if i == self.clist.refwave:#self.clist.wave[i] == self.clist.refwave:
                 refwave_deleted = True
-            self.clist.waves = N.delete(self.clist.waves, i)
+            self.clist.wave = N.delete(self.clist.wave, i)
+
+            if hasattr(self.clist, 'mapyx'):
+                self.clist.mapyx = N.delete(self.clist.mapyx, i, axis=1)
 
         if refwave_deleted:
-            self.clist.refwave = self.clist.waves[0]
-        self.clist.nw = len(self.clist.waves)
+            self.clist.refwave = 0 #self.clist.wave[0]
+        self.clist.nw = len(self.clist.wave)
+
+        print(self.clist.refwave)
             
         self.OnItemSelected()
         wx.Yield()
@@ -386,18 +398,27 @@ class ChromagnonPanel(wx.Panel):
             G.openMsg(self, 'The maximum wavelength is 5', 'I am sorry for that')
             return 
 
-        if wx.version().startswith('3'):
-            index = self.InsertStringItem(sys.maxsize, '0')
-        else:
+        if int(wx.VERSION[0]) == 3:
+            index = self.clist.InsertStringItem(sys.maxsize, '0')
+        elif int(wx.VERSION[0]) <= 2:
             index = self.clist.InsertItem(sys.maxsize, '0')
+        else: # version 4 or higher
+            count = self.clist.GetItemCount()
+            index = self.clist.InsertItem(count, '0')
 
         self.clist.alignParms = N.insert(self.clist.alignParms, self.clist.alignParms.shape[1], 0, axis=1)
         self.clist.alignParms[:,-1,-3:] = 1
 
-        waves = list(self.clist.waves)
+        waves = list(self.clist.wave)
         waves.append(0)
-        self.clist.waves = N.array(waves)
-        self.clist.nw = len(self.clist.waves)
+        self.clist.wave = N.array(waves)
+        self.clist.nw = len(self.clist.wave)
+
+        if hasattr(self.clist, 'mapyx'):
+            mapyx = self.clist.mapyx
+            zero = N.zeros_like(mapyx[:,0]).reshape(mapyx.shape[:1] + (1,) + mapyx.shape[2:])
+            mapyx = N.concatenate([mapyx, zero], axis=1)
+            self.clist.mapyx = mapyx
         
         for i, p in enumerate(self.clist.alignParms[self.clist.t,index]):
             self.clist.SetItem(index, i+1, str(p))#SetStringItem(index, i+1, str(p))
@@ -433,17 +454,20 @@ class ChromagnonList(wx.ListCtrl,
 
     def getWaveIndex(self, index):
         wave = eval(self.GetItem(index, 0).GetText())
-        return list(self.waves).index(wave)
+        return list(self.wave).index(wave)
         
     def readFile(self):
         """
         get header information
         set self.alignParms
         """
+        # when reading the file, it also load some parameters, including mapyx, onto ChromagnonList
         self.creader = chromformat.ChromagnonReader(self.fn, self, self)
+        
         #print self.alignParms.shape
-        self.waves = self.wave[:self.nw]
+        self.wave = self.wave[:self.nw]
         self.t = 0
+        self.pxlsiz = self.creader.pxlsiz
 
         if not hasattr(self, 'mapyx'):
             self.map_str = 'None'
@@ -455,6 +479,12 @@ class ChromagnonList(wx.ListCtrl,
                 self.map_str += ', '.join(addstrs) + '(pixels))'
             else:
                 self.map_str = 'Section-wise'
+            self.metadata = self.creader.metadata
+            self.ex_metadata = self.creader.ex_metadata
+            self.roi_size = self.creader.roi_size
+            self.dtype = self.creader.dtype
+            self.imgSequence = self.creader.imgSequence
+            
 
 
     def populate(self):
@@ -469,7 +499,7 @@ class ChromagnonList(wx.ListCtrl,
             self.InsertColumn(i+1, entry, wx.LIST_FORMAT_RIGHT)
             self.SetColumnWidth(i+1,  SIZE_COLS)
 
-        for w, wave in enumerate(self.waves):
+        for w, wave in enumerate(self.wave):
             # column 0
             ii = next(self.counter)
             #print('inserting item', ii, wave)
@@ -493,7 +523,7 @@ class ChromagnonList(wx.ListCtrl,
             parent.set_tSlice(t)
         
         self.t = t
-        for w, wave in enumerate(self.waves):
+        for w, wave in enumerate(self.wave):
             index = self.getWaveListIndex(wave)
             for i, p in enumerate(self.alignParms[t, w]):
                 #print('setting item', index, wave)
@@ -518,7 +548,7 @@ class ChromagnonList(wx.ListCtrl,
         if col:
             self.alignParms[self.t, w, col-1] = val
         else:
-            self.waves[w] = val
+            self.wave[w] = val
 
         self.applyGraphics(index)
 

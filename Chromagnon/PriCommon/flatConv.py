@@ -90,6 +90,10 @@ def flatConv(fn, flatFile, out=None, suffix=SUF):
     h = imgio.Reader(fn)
 
     f = imgio.Reader(flatFile)
+
+    if h.shape != f.shape:
+        from Priithon.all import F
+    
     o = imgio.Writer(out)
     o.setFromReader(h)
     if out.endswith('ome.tif'):
@@ -101,6 +105,8 @@ def flatConv(fn, flatFile, out=None, suffix=SUF):
         if tgt_wave in f.wave:
             rw = h.getWaveIdx(tgt_wave)
             fs = f.getArr(w=rw, z=0)
+            if h.shape != f.shape:
+                fs = F.getPadded(fs, h.shape)
             
             for t in range(h.nt):
                 for z in range(h.nz):

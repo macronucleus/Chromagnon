@@ -590,7 +590,10 @@ class HistogramCanvas(MyCanvasBase):
             gamma = None
         self.setBraces(float(f[0]), float(f[1])) #20060823 , gamma)
         if gamma and hasattr(self, "my_viewer"):
-            self.my_viewer.cmgray(gamma)
+            self.my_viewer.gamma = gamma
+            self.my_viewer.setGamma()
+            self.my_viewer.changeHistogramScaling()
+            self.my_viewer.updateHistColMap()
             
     def OnLog(self,ev=77777):
         if self.m_log:

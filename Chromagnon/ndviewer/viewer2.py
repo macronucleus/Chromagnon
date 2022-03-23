@@ -185,7 +185,10 @@ class GLViewer(GLViewerCommon):
         self.pic_ny, self.pic_nx = max(self.pic_nys), max(self.pic_nxs)
 
         if smin == smax == 0:
-            from Priithon.all import U
+            try:
+                from ..Priithon.all import U
+            except (ValueError, ImportError):
+                from Priithon.all import U
             smin, smax = U.mm(img)
 
         tex_nx = 2

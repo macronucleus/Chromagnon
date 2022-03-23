@@ -568,10 +568,8 @@ if _wx:
 
         def OnCancel(self, evt):
             self.item.SetTextColour(wx.BLACK)
-            self.panel.list.SetItem(self.item)
+            self.currlist.SetItem(self.item)
 
-                #self.panel.label.SetLabel('Cancelled')
-                #self.panel.label.SetForegroundColour('black')
             self.echo('Cancelled', 'blue')
 
             self.stopWithErr = True

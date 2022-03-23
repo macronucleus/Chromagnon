@@ -109,6 +109,14 @@ class ChromagnonWriter(object):#bioformatsIO.BioformatsWriter):
         
         #self.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, errtype=None, errval=None, traceback=None):
+        self.close()
+        if errtype:
+            raise errtype(errval)
+
     def close(self):
         if not self._closed:
             if self.mapyx is None:#holder.mapyx is None:
@@ -209,6 +217,14 @@ class ChromagnonReader(object):
             #if set2holder:
             self.loadParm()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, errtype=None, errval=None, traceback=None):
+        self.close()
+        if errtype:
+            raise errtype(errval)
+            
     def close(self):
         if self.text:
             self.fp.close()
@@ -314,13 +330,19 @@ class ChromagnonReader(object):
             self.holder.refwave = self.twaves.index(self.refwave)
         elif len(somewaves) >= 1: # the reference wavelength was not found but some found
             self.holder.refwave = somewaves[0]
-            from PriCommon import guiFuncs as G
+            try:
+                from ..PriCommon import guiFuncs as G
+            except (ValueError, ImportError):
+                from PriCommon import guiFuncs as G
             message = 'The original reference wavelength %i was not found in the target %s' % (self.refwave, self.holder.img.fn)
             G.openMsg(msg=message, title='WARNING')
 
         else:
             #self.holder.parm = N.zeros((self.rdr.nt, self.rdr.nw, self.num_entry), self.dtype)
-            from PriCommon import guiFuncs as G
+            try:
+                from ..PriCommon import guiFuncs as G
+            except (ValueError, ImportError):
+                from PriCommon import guiFuncs as G
             message = 'No common wavelength was found in %s and %s' % (os.path.basename(self.file), self.rdr.file)
             G.openMsg(msg=message, title='WARNING')
             return

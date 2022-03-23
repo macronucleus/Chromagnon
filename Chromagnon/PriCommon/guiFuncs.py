@@ -1,4 +1,4 @@
-import os
+import os, sys
 import six
 import wx
 try:
@@ -27,12 +27,12 @@ def newStaticBox(panel, sizer, title='', size=wx.DefaultSize):
     sizer.Add(groupBoxSizer, 0, wx.GROW|wx.ALL, 5)
     return staticBox, groupBoxSizer
 
-def newSpaceV(verticalSizer):
+def newSpaceV(verticalSizer, **sizerKwds):
     """
     returns horizontalBoxSizer
     """
     box = wx.BoxSizer(wx.HORIZONTAL)
-    verticalSizer.Add(box)#, 0, wx.ALL, 5)
+    verticalSizer.Add(box, **sizerKwds)#, 0, wx.ALL, 5)
     return box
 
 def newSpaceH(horizontalSizer, size):
@@ -355,11 +355,17 @@ class FileSelectorDialog(wx.Dialog):
 
         # list of sub-dirs -- add trailing '/'
         try:
-            ddDirs = sorted( [f1+'/' for f1 in os.listdir(d) if os.path.isdir(os.path.join(d,f1))] )
+            if sys.version_info.major >= 3:
+                ddDirs = sorted( [f1+'/' for f1 in os.listdir(d) if os.path.isdir(os.path.join(d,f1))] )
+            else:
+                ddDirs = sorted( [f1+'/' for f1 in os.listdir(d) if (type(f1) == unicode and os.path.isdir(os.path.join(d,f1)))] )
         except OSError:
             ddDirs = []
 
-        ddFiles = sorted( [f1 for f1 in glob.glob1(d,f) if not os.path.isdir(os.path.join(d,f1))] )
+        if sys.version_info.major >= 3:
+             ddFiles = sorted( [f1 for f1 in glob.glob1(d,f) if not os.path.isdir(os.path.join(d,f1))] )
+        else:
+            ddFiles = sorted( [f1 for f1 in glob.glob1(d,f) if (type(f1) == unicode and not os.path.isdir(os.path.join(d,f1)))] )
         if not self.showHiddenFiles:
             ddDirs = [f1 for f1 in ddDirs if not f1.startswith('.')]
             ddFiles = [f1 for f1 in ddFiles if not f1.startswith('.')]

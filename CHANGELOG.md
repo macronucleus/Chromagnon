@@ -11,6 +11,18 @@ also makes a folder for config.
 6. (v0.90 20211114) `Mrc.py` is copied to `imgio` to avoid circular
 import.
 7. (v0.90 20211114) `setup.py` was cleaned up, removing `py2app`.
+8. (v0.91 20211117) `DepricationWarning` for `wxpython` in
+`Priithon.usefulX.listFilesViewer` was fixed.
+9. (v0.91 20211117) `FutureWarning` for `numpy` in `Mrc.py` and
+`imgio.mrcIO` were fixed (but Mrc.py is duplicated).
+10. (v0.91 20211122) Fixed for filenames for non-unicode problem in
+`PriCommon.guiFuncs.refreshList` in python 2.
+11. (v0.91 20220128) Fixed `addWavelength` in `ChromagnonEditor` on
+windows (wxpython v4).
+12. (v0.91 20220128) Fixed `save as...` in `ChromagnonEditor` because
+the out put file was in the old format.
+13. (v0.91 20220323) Fixed some import errors associated with the
+    directory structures.
 
 v0.8(May. 2019)
 ----
