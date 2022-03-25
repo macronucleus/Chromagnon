@@ -75,7 +75,7 @@ try:
         LIST_Y=150
         
 except ImportError:
-    if len(sys.argv) > 1: # commandline use
+    if __name__ != '__main__' or len(sys.argv) > 1: # commandline use
         # a dummy class for wx
         class wx(object):
             def __init__(self):

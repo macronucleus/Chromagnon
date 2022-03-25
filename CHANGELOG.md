@@ -22,7 +22,11 @@ windows (wxpython v4).
 12. (v0.91 20220128) Fixed `save as...` in `ChromagnonEditor` because
 the out put file was in the old format.
 13. (v0.91 20220323) Fixed some import errors associated with the
-    directory structures.
+directory structures.
+14. (v0.91a 20220325) Fixed ModuleNotFoundError when importing
+`Chromagnon` without `wx` and `pyopengl`
+15. (v0.91a 20220325) Changed `bioformatsIO.py` not to raise a warning
+    when `python-bioformats` or `javabridge` are not installed.
 
 v0.8(May. 2019)
 ----

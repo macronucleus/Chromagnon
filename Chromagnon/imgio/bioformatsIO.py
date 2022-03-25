@@ -18,6 +18,7 @@ import numpy as N
 URL='http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html'
 #newURL='http://jdk.java.net/12/' # 20190829
 HAS_JDK = False
+DO_WARN = False
 
 try:
     ### -------- BioFormats --------------####
@@ -86,7 +87,7 @@ try:
         raise ValueError('pixeltype %s was not found' % pixeltype)
 
 except:
-    if not commonfuncs.main_is_frozen():
+    if not commonfuncs.main_is_frozen() and DO_WARN:
         import traceback, warnings
         #traceback.print_exc()
         errs = traceback.format_exc()
