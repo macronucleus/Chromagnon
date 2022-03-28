@@ -1,0 +1,76 @@
+
+409M	Frameworks
+==================
+341M	libmkl_*
+25M	libicudata.58.2.dylib # + libiconv lxml unicode --> down size method
+23M	libwx_*
+2.7M	libpython3.6m.dylib
+1.9M	libcrypto.1.0.0.dylib # openSSL
+1.5M	libtcl8.6.dylib  # tkinter
+1.4M	libtk8.6.dylib
+1.2M	libiomp5.dylib # numpy
+
+
+517M	Resources
+==================
+329M	jdk
+188M	lib
+
+lib
+----
+155M	python3.6
+ 33M	python36.zip
+
+python3.6
+---------
+ 22M	OpenGL
+ 31M	bioformats
+ 96K	config-3.6m-darwin
+1.8M	javabridge
+ 33M	lib-dynload
+ 17M	numpy
+ 50M	scipy
+  0B	site.pyc
+660K	tifffile
+
+
+scipy
+----
+1.3M	fftpack
+1.6M	integrate
+2.6M	interpolate
+2.2M	io
+5.6M	linalg
+2.2M	misc
+1.4M	ndimage  *
+508K	odr
+3.3M	optimize *
+2.6M	signal
+8.2M	sparse
+4.0M	spatial
+7.7M	special
+5.0M	stats
+
+OpenGL
+----
+4.0K	AGL
+824K	EGL
+5.3M	GL
+ 16K	GLE
+660K	GLES1
+1.7M	GLES2
+ 56K	GLES3
+ 96K	GLU
+ 72K	GLUT
+652K	GLX
+ 36K	Tk     # why here?
+536K	WGL
+ 11M	raw
+
+
+python36.zip
+===========
+ 46M	wx           # same dylibs also in Frameworks, py, locale, lib not required?
+ 13M	Chromagnon
+2.4M	distutils     # required???
+776K	setuptools    # required???

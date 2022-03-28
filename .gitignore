@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.py~
+
+*.dll
+*.lib
+
+*.bak
+*.png
+*.tiff
+*.mrc
+*.zip
+.#*
