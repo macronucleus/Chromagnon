@@ -4,9 +4,9 @@ import os, sys, time, csv
 import Chromagnon as ch
 import numpy as N
 
-from Priithon.all import F, Mrc
+from Priithon.all import F
 from PriCommon import imgGeo
-from imgio import mrcIO
+from imgio import mrcIO, Mrc
 
 
 METHODS=['quadrisection', 'logpolar', 'simplex']

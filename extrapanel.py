@@ -3,9 +3,9 @@ import wx
 import numpy as N
 
 try:
-    from PriCommon import guiFuncs as G, commonfuncs as C, listbox
+    from common import guiFuncs as G, commonfuncs as C, listbox
 except (ValueError, ImportError):
-    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, listbox
+    from Chromagnon.common import guiFuncs as G, commonfuncs as C, listbox
     
 
 if sys.version_info.major == 2:

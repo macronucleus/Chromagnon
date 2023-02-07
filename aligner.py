@@ -4,13 +4,15 @@ import numpy as N
 from scipy import ndimage as nd
 
 try:
-    from PriCommon import imgGeo, imgFilters, xcorr, fntools
-    from Priithon.all import Mrc, U
+    from common import fntools
     import imgio
+    from PriCommon import imgGeo, imgFilters, xcorr#, fntools
+    from Priithon.all import U
 except ImportError:
-    from Chromagnon.PriCommon import imgGeo, imgFilters, xcorr, fntools
-    from Chromagnon.Priithon.all import Mrc, U
+    from Chromagnon.common import fntools
     from Chromagnon import imgio
+    from Chromagnon.PriCommon import imgGeo, imgFilters, xcorr#, fntools
+    from Chromagnon.Priithon.all import U
 
 if sys.version_info.major == 2:
     import alignfuncs as af, cutoutAlign, chromformat
@@ -216,7 +218,10 @@ class Chromagnon(object):
 
     def progress(self):
         if self.progressfunc:
-            next(self.progressfunc)
+            try:
+                next(self.progressfunc)
+            except StopIteration:
+                self.echo_func('Progress StopIteration')
             
     def setIf_failed(self, if_failed=af.IF_FAILED[0]):
         self.if_failed = if_failed

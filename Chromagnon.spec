@@ -104,7 +104,7 @@ else:
     cversion = ''
 # ------- pyinstaller
 
-datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
+datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(code, 'common', '*.py'), 'common'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
 if 0:#sys.platform.startswith('linux'):
     datas += [(os.path.join(pylibpath, 'libglut.*'), 'lib')]
     

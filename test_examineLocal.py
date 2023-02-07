@@ -598,7 +598,6 @@ def arrPearson(fn):#, plot=False, dim=0):
     return canvas
 
 def plotPearsonArr(arr, dim=0):
-    from Priithon.all import P
     x = N.arange(arr.shape[-1])#nrow)
     P.pcolor(x, x, arr[dim], vmin=0, vmax=1.0, cmap='rainbow')
     P.colorbar()

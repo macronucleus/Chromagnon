@@ -3,24 +3,24 @@ import numpy as N
 import sys, os
 
 try:
+    import imgio
     from Priithon.all import U, F
     from PriCommon import xcorr, imgResample, imgGeo,imgFilters
-    import imgio
 
     if sys.version_info.major == 2 and hasattr(sys, 'app'):
-        from PriCommon import ppro
+        from common import ppro
     else:
-        from PriCommon import ppro26 as ppro
+        from common import ppro26 as ppro
         
 except ImportError:
+    from Chromagnon import imgio
     from Chromagnon.Priithon.all import U, F
     from Chromagnon.PriCommon import xcorr, imgResample, imgGeo,imgFilters
-    from Chromagnon import imgio
     
     if sys.version_info.major == 2 and hasattr(sys, 'app'):
-        from Chromagnon.PriCommon import ppro
+        from common import ppro
     else:
-        from Chromagnon.PriCommon import ppro26 as ppro
+        from Chromagnon.common import ppro26 as ppro
 
 if sys.version_info.major == 2:
     import cutoutAlign, chromformat

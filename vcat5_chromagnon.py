@@ -23,12 +23,11 @@ if __name__ == '__main__':
 # ------------- import modules
 import sys, os, tempfile, shutil
 import six
+import numpy as N
 
 try:
-    from Priithon.all import N
     import imgio
 except (ValueError, ImportError):
-    from Chromagnon.Priithon.all import N
     from Chromagnon import imgio
 
 ## for packaging, here the relative import was impossible to run this script as __main__

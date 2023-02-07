@@ -18,14 +18,13 @@ if __name__ == '__main__':
 # ------------- import basic modules
 import sys, os
 import six
+import numpy as N
 
 try:
-    from PriCommon import commonfuncs as C
-    from Priithon.all import U, N, Mrc
+    from common import commonfuncs as C
     import imgio
 except (ValueError, ImportError):
-    from Chromagnon.PriCommon import commonfuncs as C
-    from Chromagnon.Priithon.all import U, N, Mrc
+    from Chromagnon.common import commonfuncs as C
     from Chromagnon import imgio
 
 ## for packaging, here the relative import was impossible to run this script as __main__
@@ -46,10 +45,10 @@ LOCAL_CHOICE = ['None', 'Projection']#, 'Section-wise']
 try:
     import wx
     try:
-        from PriCommon import guiFuncs as G, listbox
+        from common import guiFuncs as G, listbox
         from ndviewer import main as aui
     except (ValueError, ImportError):
-        from Chromagnon.PriCommon import guiFuncs as G, listbox
+        from Chromagnon.common import guiFuncs as G, listbox
         from Chromagnon.ndviewer import main as aui
         
     try:
@@ -685,7 +684,7 @@ def command_line():
                      help='choose from %s (default=%s)' % (af.MIN_PXLS_YXS, af.MIN_PXLS_YXS[1]))
         p.add_argument('--maxShift', '-s', default=af.MAX_SHIFT, type=float,
                      help='maximum shift in micrometers possibily misaligned in your system (default=%.2f um)' % af.MAX_SHIFT)
-        p.add_argument('--not_crop_margins', '-c', action='store_false',
+        p.add_argument('--not_crop_margins', '-c', action='store_true',
                      help='do not crop margins after alignment (default=False; do crop margins)')
         p.add_argument('--average_references', '-a', action='store_true',
                      help='average reference image (default=False)')
