@@ -26,7 +26,10 @@ directory structures.
 14. (v0.91a 20220325) Fixed ModuleNotFoundError when importing
 `Chromagnon` without `wx` and `pyopengl`
 15. (v0.91a 20220325) Changed `bioformatsIO.py` not to raise a warning
-    when `python-bioformats` or `javabridge` are not installed.
+when `python-bioformats` or `javabridge` are not installed.
+16. (v0.92 20230207) Multiple image series in a file is supported but
+    only the first one is used. Also imgio has been a lot changed;
+    `tifffile` version had been upgraded and  ome.tif is written out by tifffile.
 
 v0.8(May. 2019)
 ----
