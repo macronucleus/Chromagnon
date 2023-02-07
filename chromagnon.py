@@ -267,10 +267,17 @@ class BatchPanel(wx.Panel):
                 if dlg.ShowModal() == wx.ID_OK:
                     return
                 
-            if h.nseries > 1:
-                dlg = wx.MessageDialog(self, 'Multiple series data sets are not allowed, please make a file with a single image in a file', 'Error in image file', wx.OK | wx.ICON_EXCLAMATION)
-                if dlg.ShowModal() == wx.ID_OK:
-                    return
+            if 0:#h.nseries > 1:
+                try:
+                    name = h.metadata['Image'][0]['Name']
+                    dlg = wx.MessageDialog(self, 'The file contains %i series, but only the first image (%s) is used by Chromagnon' % (h.nseries, name), 'Warning for image series', wx.OK | wx.ICON_EXCLAMATION)
+                    dlg.ShowModal()
+                except:
+                    raise
+                    dlg = wx.MessageDialog(self, 'Multiple series data sets are not allowed, please make a file with a single image in a file', 'Error in image file', wx.OK | wx.ICON_EXCLAMATION)
+                    if dlg.ShowModal() == wx.ID_OK:
+                        return
+
         self.lastpath = os.path.dirname(fn)
         C.saveConfig(lastpath=self.lastpath)
         return h
