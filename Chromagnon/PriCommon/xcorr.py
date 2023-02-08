@@ -256,6 +256,8 @@ def Xcorr(a, b, phaseContrast=PHASE, nyquist=NYQUIST, gFit=True, win=11, ret=Non
         afa = af
         bfa = bf
         fact = N.std(a) * N.std(b) * a.size
+        if not fact:
+            fact = 1
     del a, b, af, bf
 
     targetShape = shape #+ (npad * 2)

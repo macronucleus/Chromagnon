@@ -2287,7 +2287,9 @@ def load(fn):
        if imgFN is None  call Y.FN()  for you
     """
     import os
-    if fn[-5:].lower() == ".fits":
+    if type(fn) in (list, tuple):
+        a = N.array([load(f) for f in fn])
+    elif fn[-5:].lower() == ".fits":
         #import useful as U
         a = loadFits( fn )
     elif fn[-4:].lower() == ".sif":
@@ -2296,17 +2298,23 @@ def load(fn):
     elif fn[-4:].lower() == ".his":
         #import useful as U
         a = loadHIS( fn )
-    elif fn.lower().endswith(('.dv', '.mrc')):
-        from . import Mrc
-        a = Mrc.bindFile(fn)
+    #elif fn.lower().endswith(('.dv', '.mrc')):
+    #    from . import Mrc
+    #    a = Mrc.bindFile(fn)
     elif os.path.isdir(fn):
         try:
-            from .. import imgio
-        except (ValueError, ImportError):
             import imgio
-        h = imgio.imgSeqIO(fn)
+        except (ValueError, ImportError):
+            from .. import imgio
+        try:
+            h = imgio.imgSeqIO.ImgSeqReader(fn)
+        except ValueError: # labeling format unknown
+            a = N.array([load(os.path.join(fn, f)) for f in os.listdir(fn)])
         a = N.squeeze(h.asarray())
-        h.close()
+        try:
+            h.close()
+        except NameError:
+            pass
     else:#if not fn.lower().endswith(('tif', 'tiff')):
         old="""
         try:
@@ -2319,9 +2327,9 @@ def load(fn):
         except (IOError, SystemError, ImportError, OSError): # ImportError for Image"""
         try:
             try:
-                from .. import imgio
-            except (ValueError, ImportError):
                 import imgio
+            except (ValueError, ImportError):
+                from .. import imgio
             old="""
             h = imgio.Reader(fn)
             a = N.squeeze(h.asarray())
@@ -2338,7 +2346,7 @@ def load(fn):
     #    h.close()
 
     return a
-    
+
 old='''
 def loadImg(fn, i0=0, iDelta=1, squeezeGreyRGB=True):
     """Loads image file (tiff,jpg,...) and return it as array
@@ -2462,19 +2470,24 @@ def loadImg_seq(fns, channels=None, verbose=0): #### #, i0=0, iDelta=1, squeezeG
 
 def saveImg(arr, fn, rescaleTo8bit=True, rgbOrder='rgba'):
     try:
-        from .. import imgio
-    except (ValueError, ImportError):
         import imgio
+    except (ValueError, ImportError):
+        from .. import imgio
     return imgio.imgIO.save(arr, fn, rescaleTo8bit, rgbOrder)
+
+def saveImg8(arr, fn, forceMultipage=False, rgbOrder="rgba"):
+    return saveImg(arr, fn, rescaleTo8bit=True, rgbOrder=rgbOrder)
+
+
 
 def uninit_javabridge():
     """
     necessary to turn off the java connection after loading with bioformats
     """
     try:
-        from .. import imgio
-    except (ValueError, ImportError):
         import imgio
+    except (ValueError, ImportError):
+        from .. import imgio
     imgio.uninit_javabridge()
 
 old='''

@@ -7,15 +7,17 @@ import wx, wx.lib.scrolledpanel as scrolled
 import wx.lib.agw.aui as aui # from wxpython4.0, wx.aui does not work well, use this instead
 
 try:
+    from ..common import guiFuncs as G ,microscopy
+    from .. import imgio
     from ..Priithon import histogram#, useful as U
     from ..Priithon.all import Y, U, F
-    from ..PriCommon import guiFuncs as G ,microscope, imgResample
-    from .. import imgio
+    from ..PriCommon import imgResample
 except (ValueError, ImportError):
+    from common import guiFuncs as G ,microscopy
+    import imgio
     from Priithon import histogram#, useful as U
     from Priithon.all import Y, U, F
-    from PriCommon import guiFuncs as G ,microscope, imgResample
-    import imgio
+    from PriCommon import imgResample
 
 from . import viewer2
 from . import glfunc as GL
@@ -76,7 +78,7 @@ class ImagePanel(wx.Panel):
         #self.loaded = False
         
         ## self.doc contains all the information on the displayed image
-        if isinstance(imFile, six.string_types):#str):
+        if isinstance(imFile, six.string_types) or hasattr(imFile, 'shape'):#str):
             self.doc = imgio.Reader(imFile)
         else:
             self.doc = imFile
@@ -299,7 +301,7 @@ class ImagePanel(wx.Panel):
             self.saveScrButton = G.makeButton(self.sliderPanel, box, self.onSaveScr, title='Save screen')
 
             self.choice_viewers = ['XY', 'XZ', 'ZY']
-            label, self.viewerch = G.makeListChoice(self.sliderPanel, box, 'viewer', self.choice_viewers, defValue=[self.choice_viewers[0]])
+            label, self.viewerch = G.makeListChoice(self.sliderPanel, box, 'viewer ', self.choice_viewers, defValue=[self.choice_viewers[0]])
             self.viewerch.Enable(0)
         
         # t slider
@@ -509,14 +511,14 @@ class ImagePanel(wx.Panel):
 
     def onSaveScr(self, evt=None):
         #from Priithon.all import Y
-        from PIL import Image
+        #from PIL import Image
 
         fn = Y.FN(save=1)#, verbose=0)
-        Image.init()
+        #Image.init()
         if not fn:
             return
-        elif os.path.splitext(fn)[-1] not in Image.EXTENSION:
-            G.openMsg(parent=self.parent, msg='Please supply file extension.\nThe file was not saved', title="File format unknown")
+        elif os.path.splitext(fn)[-1][1:] not in imgio.imgIO.WRITABLE_FORMATS:#Image.EXTENSION:
+            G.openMsg(parent=self.parent, msg='Please supply file extension.\nThe file was not saved %s' % os.path.splitext(fn)[-1][1:], title="File format unknown")
             return
             
         # choose viewers
@@ -529,7 +531,7 @@ class ImagePanel(wx.Panel):
         #refresh
         self.hist[0].setBraces(self.hist[0].leftBrace, self.hist[0].rightBrace)
         # save
-        Y.vSaveRGBviewport(v, fn)
+        Y.vSaveRGBviewport(v, fn, flipY=False)
 
         
     def initHists(self):
@@ -621,7 +623,12 @@ class ImagePanel(wx.Panel):
         box = G.newSpaceV(sizer)
         G.makeTxt(self.histsPanel, box, ' ') # dummy
         box = G.newSpaceV(sizer)
-        self.xy_label = G.makeTxt(self.histsPanel, box, ' '*32)
+        self.xy_label = G.makeTxt(self.histsPanel, box, ' '*64)
+
+        box = G.newSpaceV(sizer)
+        self.roi_label0 = G.makeTxt(self.histsPanel, box, ' '*64)
+        box = G.newSpaceV(sizer)
+        self.roi_label1 = G.makeTxt(self.histsPanel, box, ' '*64)
 
         self.histsPanel.SetAutoLayout(1)
         self.histsPanel.SetupScrolling()
@@ -660,7 +667,7 @@ class ImagePanel(wx.Panel):
         self._setColor(i, r, g, b, RefreshNow=1)
         
     def setColor(self, i, wavelength, RefreshNow=True):
-        r, g, b = microscope.LUT(wavelength)
+        r, g, b = microscopy.LUT(wavelength)
         self._setColor(i, r, g, b, RefreshNow)
 
     def _setColor(self, i, r, g, b, RefreshNow=True):
@@ -1021,6 +1028,9 @@ class ImagePanel(wx.Panel):
         return retSlice
 
     def getROI(self):
+        """
+        return (z0,y0,x0), (z1,y1,x1)
+        """
         start = self.doc.roi_start
         stop = self.doc.roi_start + self.doc.roi_size
         return tuple(start), tuple(stop)
@@ -1116,7 +1126,7 @@ def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
     frame = MyFrame(size=FRAMESIZE, parent=parent)
     frame.Show()
 
-    if isinstance(fns, six.string_types) or not hasattr(fns, '__iter__'):
+    if isinstance(fns, six.string_types) or not hasattr(fns, '__iter__') or hasattr(fns, 'shape'):
         fns = [fns]
     #elif type(fns) == tuple:
     #    fns = fn
@@ -1130,7 +1140,8 @@ def main(fns, parent=None, useCropbox=viewer2.CROPBOX):
         elif hasattr(fn, 'fn'):
             name = os.path.basename(fn.fn)
         else:
-            raise ValueError('file name is not found')
+            name = 'array'
+            #raise ValueError('file name is not found')
             
         frame.imEditWindows.addPage(panel, name, select=True)
     return frame

@@ -4,13 +4,13 @@ import numpy as N
 from scipy import ndimage as nd
 
 try:
-    from Chromagnon.PriCommon import imgGeo
     from Chromagnon import imgio
     from Chromagnon.Priithon.all import F
+    from Chromagnon.PriCommon import imgGeo
 except ImportError:
-    from PriCommon import imgGeo
     import imgio
     from Priithon.all import F
+    from PriCommon import imgGeo
 
 
 IDTYPE = '101'
@@ -247,8 +247,9 @@ class ChromagnonReader(object):
             for t in range(self.nt):
                 for w in range(self.nw):
                     row = next(self.reader)
-                    if t == 0:
-                        self.wave.append(int(round(self.eval(row[1]))))
+                    wave = int(round(self.eval(row[1])))
+                    if wave not in self.wave:#t == 0:
+                        self.wave.append(wave)
                     self.alignParms[t,w] = [self.eval(v) for v in row[2:]]
             self.refwave = int(round(self.wave[refwave]))
 
@@ -331,18 +332,18 @@ class ChromagnonReader(object):
         elif len(somewaves) >= 1: # the reference wavelength was not found but some found
             self.holder.refwave = somewaves[0]
             try:
-                from ..PriCommon import guiFuncs as G
+                from ..common import guiFuncs as G
             except (ValueError, ImportError):
-                from PriCommon import guiFuncs as G
+                from common import guiFuncs as G
             message = 'The original reference wavelength %i was not found in the target %s' % (self.refwave, self.holder.img.fn)
             G.openMsg(msg=message, title='WARNING')
 
         else:
             #self.holder.parm = N.zeros((self.rdr.nt, self.rdr.nw, self.num_entry), self.dtype)
             try:
-                from ..PriCommon import guiFuncs as G
+                from ..common import guiFuncs as G
             except (ValueError, ImportError):
-                from PriCommon import guiFuncs as G
+                from common import guiFuncs as G
             message = 'No common wavelength was found in %s and %s' % (os.path.basename(self.file), self.rdr.file)
             G.openMsg(msg=message, title='WARNING')
             return

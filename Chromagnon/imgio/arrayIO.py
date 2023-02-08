@@ -21,7 +21,7 @@ class ArrayReader(generalIO.GeneralReader):
             ff = name#'/test/test.tif'
         generalIO.GeneralReader.__init__(self, ff, mode)
         self.fp = fn
-        self.filename = self.fn = name
+        #self.filename = self.fn = name
         self.flip_required = False
 
         self.openFile2()
@@ -32,6 +32,9 @@ class ArrayReader(generalIO.GeneralReader):
     def close(self):
         if hasattr(self, 'arr'):
             del self.arr
+
+    def closed(self):
+        return not hasattr(self, 'arr')
         
     def openFile2(self):
         #self.fp = self.fn

@@ -2,14 +2,16 @@ from __future__ import print_function
 import numpy as N
 
 try:
-    from Priithon.all import P, U, Mrc
+    from Priithon.all import P, U
 
     from PriCommon import xcorr, imgGeo
     import imgio
+    from imgio import Mrc
 except ImportError:
-    from Chromagnon.Priithon.all import P, U, Mrc
+    from Chromagnon.Priithon.all import P, U
     from Chromagnon.PriCommon import xcorr, imgGeo
     from Chromagnon import imgio
+    from Chromagnon.imgio import Mrc
 
 from . import aligner, alignfuncs, cutoutAlign
 
@@ -354,7 +356,8 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
     return dic, zyx
     """
-    from PriCommon import imgFilters, imgFit, imgGeo, microscope
+    from PriCommon import imgFilters, imgFit, imgGeo
+    from common import microscopy
     from Priithon.all import Y
     h = imgio.Reader(fn)#mrcIO.MrcReader(fn)
     if refwave >= h.nw:
@@ -1704,7 +1707,7 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
                 #region = regions[1] > threshold
                 factor = an.img.nx / regions[1].shape[-1]
                 region = imgFilters.zoomFourier(regions[1], factor, use_abs=True, padd=100)
-                from Priithon.all import Mrc
+                from imgio import Mrc
                 Mrc.save((region > (threshold * 2.5)).astype(N.uint16), 'region%s_win%i.mrc' % (fn[-1], npxls), ifExists='overwrite')
                 #continue
                 ind = N.nonzero(region > threshold)

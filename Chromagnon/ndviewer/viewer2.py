@@ -972,11 +972,11 @@ class GLViewer(GLViewerCommon):
             pic_ny, pic_nx = self.imgList[wi][2].shape[-2:]
             if 0 <= xi < pic_nx and 0 <= yi < pic_ny:
                 if self.dims == (1,2):
-                    xy_t = "xy: "
+                    xy_t = "Cursor XY: "
                 elif self.dims == (0,2):
-                    xy_t = "xz: "
+                    xy_t = "Cursor XZ: "
                 elif self.dims == (1,0):
-                    xy_t = "zy: "
+                    xy_t = "Cursor ZY: "
                 t ="Value: %.2f" % self.imgList[wi][2][int(yi), int(xi)]
                 xy_t += "(%d, %d)" %  (xi, yi)
             else:
@@ -985,6 +985,11 @@ class GLViewer(GLViewerCommon):
             parent = self.GetParent()
             parent.intensity_label[wi].SetLabel(t)
         parent.xy_label.SetLabel(xy_t)
+
+        roi0 = 'ROI start (x,y,z):  %i %i %i' % tuple(self.mydoc.roi_start[::-1])
+        roi1 = 'ROI size  (x,y,z):  %i %i %i' % tuple(self.mydoc.roi_size[::-1])
+        parent.roi_label0.SetLabel(roi0)
+        parent.roi_label1.SetLabel(roi1)
 
     
     def doLDown(self, xeff, yeff):

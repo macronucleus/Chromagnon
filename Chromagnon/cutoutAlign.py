@@ -2,11 +2,10 @@
 from __future__ import print_function
 __version__ = 0.1
 
+import numpy as N
 try:
-    from Chromagnon.Priithon.all import Mrc, N
     from Chromagnon.PriCommon import imgGeo
 except ImportError:
-    from Priithon.all import Mrc, N
     from PriCommon import imgGeo
 
 

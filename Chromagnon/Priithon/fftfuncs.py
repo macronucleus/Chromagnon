@@ -978,9 +978,19 @@ def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     `a` should be a real array,
       otherwise it gets converted to
       minFdtype
+
+    the number of pixels in the last dimension of `a` should be even,
+    otherwise it is clipped off
     """
+    # 20220817 added to eliminate artifacts due to odd X pixels
+    if a.shape[-1] % 2:
+        a = a[...,:-1]
+    
     if a.dtype.type not in fftw.RTYPES:
         a = N.asarray(a, minFdtype)
+
+
+    
 
     return fftw.rfft(a, nthreads=nthreads)
 def irfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):

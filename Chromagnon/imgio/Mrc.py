@@ -352,22 +352,27 @@ def save(a, fn, ifExists='ask', zAxisOrder=None,
     if hdr is not None:
         initHdrArrayFrom(m.hdr, hdr)
 
+    def mm(arr):
+        return N.max(arr), N.min(arr)
+    def mmm(arr):
+        return N.max(arr), N.min(arr), N.mean(arr)
+        
     if calcMMM:
-        from . import useful as U
+        #from Priithon import useful as U
         wAxis = axisOrderStr(m.hdr).find('w')
         if wAxis < 0:
-            m.hdr.mmm1 = U.mmm(a)
+            m.hdr.mmm1 = mmm(a)
         else:
             nw = m.hdr.NumWaves[0]
-            m.hdr.mmm1 = U.mmm(a.take((0,),wAxis))
+            m.hdr.mmm1 = mmm(a.take((0,),wAxis))
             if nw >=2:
-                m.hdr.mm2 = U.mm(a.take((1,),wAxis))
+                m.hdr.mm2 = mm(a.take((1,),wAxis))
             if nw >=3:
-                m.hdr.mm3 = U.mm(a.take((2,),wAxis))
+                m.hdr.mm3 = mm(a.take((2,),wAxis))
             if nw >=4:
-                m.hdr.mm4 = U.mm(a.take((3,),wAxis))
+                m.hdr.mm4 = mm(a.take((3,),wAxis))
             if nw >=5:
-                m.hdr.mm5 = U.mm(a.take((4,),wAxis))
+                m.hdr.mm5 = mm(a.take((4,),wAxis))
 
     if extInts is not None or  extFloats is not None:
         raise NotImplementedError("todo: implement ext hdr")

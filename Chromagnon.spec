@@ -104,18 +104,20 @@ else:
     cversion = ''
 # ------- pyinstaller
 
-datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
-if sys.platform.startswith('linux'):
+datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(code, 'common', '*.py'), 'common'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
+if 0:#sys.platform.startswith('linux'):
     datas += [(os.path.join(pylibpath, 'libglut.*'), 'lib')]
     
 if not PLUGIN:
-    datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
+    #datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
+    datas += [(os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]#, (os.path.join(os.path.dirname(site), 'lib-dynload', '_posixsubprocess.cpython-37m-x86_64-linux-gnu.so'), os.path.join('lib', 'python3.7', 'lib-dynload'))]
     
 a = Analysis([prog],
              pathex=[code],
              binaries=binaries,
              datas=datas,
-             hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs', 'scipy.spatial.transform._rotation_groups'],
+             hiddenimports=['six', 'packaging', 'packaging.version', 'packaging.specifiers', 'packaging.requirements', 'appdirs', 'scipy.spatial.transform._rotation_groups'],#, '_posixsubprocess', 'subprocess', 'multiprocessing'],
+             
 
              hookspath=[],
              runtime_hooks=[],
@@ -123,6 +125,7 @@ a = Analysis([prog],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher)
+
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher,)
 
@@ -137,6 +140,8 @@ exe = EXE(pyz,
           upx=False, #True,
           runtime_tmpdir=None,
           console=console)#False)
+
+
 
 if sys.platform.startswith('darwin'):
     app = BUNDLE(exe,

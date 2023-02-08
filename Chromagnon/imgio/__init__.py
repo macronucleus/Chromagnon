@@ -6,26 +6,28 @@ import six
 import numpy as N
 
 if sys.version_info.major == 2:
-    import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
+    import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO, nd2io
 elif sys.version_info.major >= 3:
     try:
-        from . import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
+        from . import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO, nd2io
     except ImportError:
-        from imgio import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO
-        
-from .bioformatsIO import uninit_javabridge
+        from imgio import generalIO, mrcIO, imgIO, imgSeqIO, multitifIO, bioformatsIO, arrayIO, nd2io
+
+uninit_javabridge = bioformatsIO.uninit_javabridge
 
 READABLE_FORMATS = []
 WRITABLE_FORMATS = []
 _names = ['seq', 'tif', 'mrc', 'bio']
-for module in [generalIO, imgIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO, arrayIO]:
+for module in [generalIO, imgIO, imgSeqIO, multitifIO, mrcIO, bioformatsIO, arrayIO, nd2io]:
     reload(module)
     READABLE_FORMATS += module.READABLE_FORMATS
     WRITABLE_FORMATS += module.WRITABLE_FORMATS
 READABLE_FORMATS = tuple(sorted(list(set(READABLE_FORMATS))))
 WRITABLE_FORMATS = tuple(sorted(list(set(WRITABLE_FORMATS))))
 
-JDK_MSG = 'Reading your image format "%s" requires Java Development Kit (JDK).'
+JDK_MSG = 'Reading/Writing your image format "%s" is not supported.'
+if not bioformatsIO.HAS_JDK:
+    JDK_MSG += ' Installing Java Development Kit (JDK) may help.'
     
 def Reader(fn, *args, **kwds):
     """
@@ -50,12 +52,14 @@ def _switch(fn, read=True, *args, **kwds):
         formats = {'seq': imgSeqIO.READABLE_FORMATS,
                    'tif': multitifIO.READABLE_FORMATS,
                    'mrc': mrcIO.READABLE_FORMATS,
-                   'bio': bioformatsIO.READABLE_FORMATS}
+                   'bio': bioformatsIO.READABLE_FORMATS,
+                    'nd2': nd2io.READABLE_FORMATS}
         klasses = {'seq': imgSeqIO.ImgSeqReader,
                    'tif': multitifIO.MultiTiffReader,
                    'mrc': mrcIO.MrcReader,
                    'bio': bioformatsIO.BioformatsReader,
-                   'arr': arrayIO.ArrayReader}
+                   'arr': arrayIO.ArrayReader,
+                    'nd2': nd2io.ND2Reader}
     else: # write
         formats = {'seq': imgSeqIO.WRITABLE_FORMATS,
                    'tif': multitifIO.WRITABLE_FORMATS,
@@ -75,7 +79,8 @@ def _switch(fn, read=True, *args, **kwds):
         
 
     ## --- JDK check----
-    if ext in bioformatsIO.bioformats.READABLE_FORMATS and ext not in formats['bio'] and ext not in formats['seq']:
+    _allfmt = formats['tif'] + formats['mrc'] + formats['seq'] + formats['bio']
+    if ext not in _allfmt and ext in bioformatsIO.bioformats.READABLE_FORMATS:# and ext not in formats['bio'] and ext not in formats['seq']:
         raise ValueError(JDK_MSG % ext)
     #-------------
     
@@ -97,7 +102,11 @@ def _switch(fn, read=True, *args, **kwds):
 
     # ome.tif is written by BioformatsWriter
     elif fn.endswith('ome.tif') and not read:
-        return klasses['bio'](fn, *args, **kwds)
+        tifversion = tifffile.__version__.split('.')
+        if (int(tifversion[0]) == 2020 and int(tifversion[1]) >= 11) or int(tifversion[0]) > 2020:
+            return klasses['tif'](fn, style='ome', *args, **kwds)
+        else:
+            return klasses['bio'](fn, *args, **kwds)
     
     # specific formats
     elif ext in formats['tif']:
@@ -111,6 +120,8 @@ def _switch(fn, read=True, *args, **kwds):
                 return klasses['bio'](fn, *args, **kwds)
             except:
                 raise ValueError('The input file %s was not readable' % fn)
+    elif ext in nd2io.READABLE_FORMATS:
+        return klasses['nd2'](fn, *args, **kwds)
     elif read and ext in imgIO.READABLE_FORMATS:
         return imgIO.load(fn)
     elif ext in formats['mrc']:
@@ -135,9 +146,94 @@ def load(fn):
     if type(h) == N.ndarray:
         a = h
     else:
-        a = N.squeeze(h.asarray())
+        a = h.arr_with_header() #N.squeeze(h.asarray())
         h.close()
     return a
+
+def save(arr, outfn, dimorder='twzyx', wave=[], pzyx=[.1,.1,.1], metadata={}):
+    """
+    arr: numpy array
+    outfn: output file name with extension (usually '.dv' or '.tif')
+    
+    return outputfilename
+    """
+    import re
+
+    # check if the array is writable into the target file
+    base, ext = os.path.splitext(outfn)
+    if ext.replace('.', '') not in WRITABLE_FORMATS:
+        raise ValueError('%s is not writable, please choose from %s' % (ext, WRITABLE_FORMATS))
+
+    if arr.ndim > 3 and ext not in ('.dv', '.mrc', '.tif'):
+        raise ValueError('%i dimension array is not compatible with %s format' % (arr.dim, ext))
+    
+    if N.iscomplexobj(arr) and ext not in ('.dv', '.mrc'):
+        raise ValueError('The array is complex type, please use ".dv" format')
+
+    # dtype check
+    match = re.match(r"([a-z]+)([0-9]+)", arr.dtype.name, re.I)
+    if match:
+        dtypename, dtypenum = match.groups()
+        dtypenum = int(dtypenum)
+    else:
+        dtypename = arr.dtype.name
+        dtypenum = 1000
+    
+    if 'int' in dtypename and dtypenum > 16:
+        if dtypename.startswith('u'):
+            arr = arr.astype(N.uint16) # can be converted to 8 bit in the writer
+        else:
+            arr = arr.astype(N.int16)
+    elif dtypename == 'float' and dtypenum > 32:
+        arr = arr.astype(N.float32)
+    elif dtypenum == 'complex' and dtypenum > 64:
+        arr = arr.astype(N.complex64)
+
+    # more than 5 dimension is saved in a tifffle
+    if arr.ndim > 5:
+        if ext != '.tif':
+            raise ValueError('dimension of %i can only be saved in tif format' % arr.ndim)
+        multitifIO.tifffile.imsave(outfn, arr, metadata={'wave': wave}.update(metadata))
+        return outfn
+
+    # save in conventional microscopy formats
+    # dimension data
+    kwd = {}
+    for i, s in enumerate(arr.shape[::-1]):
+        kwd['n'+dimorder[::-1][i]] = s
+    for nd in ['nt', 'nw', 'nz', 'ny']:
+        if nd not in kwd:
+            kwd[nd] = 1
+    arr = arr.reshape((1,) * (5-arr.ndim) + arr.shape)
+        
+    with Writer(outfn) as o:
+        # header
+        kwd['imgSequence'] = o.findImgSequence(dimorder[:-2])
+        kwd['dtype'] = arr.dtype
+        kwd['wave'] = wave
+        
+        o.setDim(**kwd)
+        o.setPixelSize(*pzyx)
+        if hasattr(o, 'metadata'):
+            o.metadata.update(metadata)
+
+        dstr = generalIO.IMGSEQ[kwd['imgSequence']]
+
+        # start saving
+        ind = [0,0,0]
+        for t in range(kwd['nt']):
+            ind[dstr.index('T')] = t
+            for w in range(kwd['nw']):
+                ind[dstr.index('W')] = w
+                for z in range(kwd['nz']):
+                    ind[dstr.index('Z')] = z
+                    a = arr[tuple(ind)]
+                    o.writeArr(a, t=t, w=w, z=z)
+        
+    return outfn
+    
+    
+    
 
 def copy(fn, out='test.dv'):
     """
@@ -236,6 +332,8 @@ def copyRegion(fn, out=None, twzyx0=(0,0,0,0,0), twzyx1=(None,None,None,None,Non
             what1 = ''.join([s.upper() + str(v) for s,v in twzyx1s if v is not None])
             whats = '_'.join((what0, what1))
             base, ext = os.path.splitext(fn)
+            if ext not in WRITABLE_FORMATS:
+                ext = '.dv'
             out = base + whats + ext
             if os.path.isfile(out) and ifExists != 'overwrite':
                 raise ValueError('The output file name %s exists, please specify another output file name.' % os.path.basename(out))

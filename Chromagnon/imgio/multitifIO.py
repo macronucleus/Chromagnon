@@ -5,20 +5,30 @@ try:
 except ImportError:
     import generalIO
 import six
-import tifffile
-from tifffile import tifffile as tifff
-## MEMO: "ImageJ does  not support non-contiguous data" means shape does not match
 
-import struct, copy
+
+import struct, copy, inspect
     
 import numpy as N
 
-WRITABLE_FORMATS = ('tif', 'tiff')
-READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
+try:
+    import tifffile # 2020.11.26 - 2021.7.2
+    from tifffile import tifffile as tifff
+    ## MEMO: "ImageJ does  not support non-contiguous data" means shape does not match
+    WRITABLE_FORMATS = ('tif', 'tiff')
+    tifversion = tifffile.__version__.split('.')
+    if int(tifversion[0]) > 2021 or (int(tifversion[0]) >= 2021 and int(tifversion[1]) >= 11):
+        WRITABLE_FORMATS += ('ome.tif', 'ome.tiff')
+        READABLE_FORMATS = WRITABLE_FORMATS + ('lsm',)
+    else:
+        READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
+except ImportError:
+    WRITABLE_FORMATS = READABLE_FORMATS = ()
+    
 
 IMAGEJ_METADATA_TYPES = ['Info', 'Labels', 'Ranges', 'LUTs', 'Plot', 'ROI', 'Overlays']
 
-PXUNIT_FACTORS = {'m': 0, 'mm': -3, u'\xb5'+'m': -6, 'nm': -9, 'micron': -6}
+PXUNIT_FACTORS = {'m': 0, 'mm': -3, u'\xb5'+'m': -6, 'nm': -9, 'micron': -6, 'um': -6}
 
 
 def _convertUnit(val, fromwhat='mm', towhat=u'\xb5'+'m'):
@@ -160,10 +170,15 @@ class MultiTiffReader(generalIO.GeneralReader):
             self.setPixelSize(pz, py, px)
         
         elif self.fp.is_ome:
-            if 'OME' in self.fp.ome_metadata:
-                self.metadata = meta = self.fp.ome_metadata['OME']
+            tifversion = tifffile.__version__.split('.')
+            if int(tifversion[0]) >= 2020:
+                self.metadata = xml2dict(self.fp.ome_metadata)
             else:
-                self.metadata = meta = self.fp.ome_metadata
+                self.metadata = self.fp.ome_metadata
+            if 'OME' in self.metadata:
+                self.metadata = meta = self.metadata['OME']
+            else:
+                self.metadata = meta = self.metadata
             # pixel size
             px = meta['Image']['Pixels']
             pxlsiz = [0.1, 0.1, 0.1]
@@ -304,22 +319,27 @@ class MultiTiffReader(generalIO.GeneralReader):
             ndata = tifffile.product(series.shape[-2:])
             dtype = N.dtype(byteorder)
             self.handle.seek(series.offset + (ndata * dtype.itemsize * i))
-            img = self.handle.read_array(byteorder, count=ndata, out=None, native=True)
+
+            parameters = inspect.signature(self.handle.read_array)
+            if 'native' in parameters.parameters.keys():
+                img = self.handle.read_array(byteorder, count=ndata, out=None, native=True)
+            else:
+                img = self.handle.read_array(byteorder, count=ndata, out=None)
             arr = img.reshape(self.shape)
         return arr
 
 
 class MultiTiffWriter(generalIO.GeneralWriter):
-    def __init__(self, fn, mode=None, style='imagej', software='multitifIO.py', extra_metadata={}):
+    def __init__(self, fn, mode=None, style='imagej', software='multitifIO.py', metadata={}):
         """
         mode is 'wb' whatever the value is...
         style: 'imagej', 'ome', ..., ('RGB' does not work yet)
         """
         self.style = style #imagej = imagej
-        self.metadata = {}
+        self.metadata = metadata #{}
         self.software = software
-        self.ex_metadata = extra_metadata
-        self.extratags = ()
+        #self.ex_metadata = extra_metadata
+        #self.extratags = ()
         self.init = False
 
         generalIO.GeneralWriter.__init__(self, fn, mode)
@@ -334,15 +354,51 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         open a file for reading
         """
         imagej = self.style == 'imagej'
+        ome = self.style == 'ome'
         tifversion = tifffile.__version__.split('.')
         if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
-            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, bigtiff=not(imagej)) 
+            self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, ome=ome)#, bigtiff=not(imagej))
+        elif int(tifversion[0]) == 0 and int(tifversion[1]) == 15:
+            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)
         else:
-            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)#, bigtiff=not(imagej))
+            self.fp = tifffile.TiffWriter(self.fn, imagej=imagej, ome=ome)#, bigtiff=not(imagej))
 
         self.handle = self.fp._fh
-        self.dataOffset = self.handle.tell()
+        self.dataOffset = None #self.handle.tell()
+
+    def close(self):
+        """
+        closes the current file
+        """
+        tifversion = tifffile.__version__.split('.')
+        if (int(tifversion[0]) == 2020 and int(tifversion[1]) >= 11) or int(tifversion[0]) > 2020:
+            # it is necessary to overwrite description after seuqnentially add image sections
+            if hasattr(self, 'nt') and hasattr(self, 'fp') and self.fp._storedshape:
+                shape = (self.nt,self.nz,self.nw,self.ny,self.nx)
+                if self.style == 'imagej':
+                    colormapped = self.fp._colormap is not None
+                    isrgb = self.fp._storedshape[-1] in (3, 4)
+                    des = tifffile.tifffile.imagej_description(shape=shape, rgb=isrgb, colormaped=colormapped, **self.metadata)
+                elif self.style == 'ome':
+                    if self.fp._subifdslevel < 0:
+                        datashape = self.makeShape(squeeze=True)
+                        storedshape = (N.product(shape[:3]), 1, 1, self.ny, self.nx, 1)
+                        self.fp._ome.addimage(
+                            self.dtype,
+                            datashape,
+                            storedshape,
+                            **self.metadata
+                            )
+                    des = self.fp._ome.tostring(declaration=True).encode()
+
+
+                self.fp.overwrite_description(des)
         
+        if hasattr(self, 'fp') and hasattr(self.fp, 'close'):
+            self.fp.close()
+        elif hasattr(self, 'fp'):
+            del self.fp
+
     def doOnSetDim(self):
         # ImageJ's dimension order is always TZCYXS
         # since tifffile only accepts ascii, micron characters often used in ImageJ should be removed...20210216
@@ -351,6 +407,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         if self.style == 'imagej': 
             self.imgSequence = 1
             self.metadata.update(self._makeMetadata())
+            datasize = self._secByteSize * self.nt * self.nw
+            if datasize >= (2**32):
+                raise ValueError('ImageJ format does not allow file size more than 4GB but your data has %.1f GB.' % (datasize/(10**9)))
         elif self.style == 'ome':
             self.metadata.update(self.makeOMEMetadata())
         else:
@@ -358,7 +417,6 @@ class MultiTiffWriter(generalIO.GeneralWriter):
 
         unit = 10**6
         self.res = [(int(p), unit) for p in 1/self.pxlsiz[-2:] * unit]
-
 
                     
         
@@ -378,129 +436,132 @@ class MultiTiffWriter(generalIO.GeneralWriter):
             arr = barr
 
         self.writeArr(N.ascontiguousarray(arr), t=t, z=z)
-            
+
         
     def writeSec(self, arr, i=None):
+        tifversion = tifffile.__version__.split('.')
+        
         if len(self.axes) == 3 and arr.ndim != 3:
             raise ValueError('array has to be 3 dimensions of "YXS"')
-        
-        if not self.init:
-            self.doOnSetDim()
-            test = N.zeros((self.ny, self.nx), self.dtype)
-            self.dataOffset, self._secByteSize = self.fp.save(test, resolution=self.res, metadata=self.metadata, returnoffset=True, extratags=self.extratags)
-            self.handle.seek(self.handle.tell() - self._secByteSize)
-
-            self.init = True
-        
-        if i is not None:
-            self.seekSec(i)
 
         if self.style == 'RGB':
             photometric = 'RGB'
         else:
             photometric = None
+        
+        if not self.init:
+            self.doOnSetDim()
 
-        tifversion = tifffile.__version__.split('.')
-        if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
+            if int(tifversion[0]) >= 2020:
+                self._secByteSize = (self.ny*self.nx) * arr.itemsize
+            else:
+                test = N.zeros((self.ny, self.nx), self.dtype)
+                self.dataOffset, self._secByteSize = self.fp.save(test, resolution=self.res, metadata=self.metadata, returnoffset=True)#, extratags=self.extratags)
+                self.handle.seek(self.handle.tell() - self._secByteSize)
+
+            self.init = True
+        
+        elif i is not None:
+            self.seekSec(i)
+
+        if int(tifversion[0]) >= 2020:
+            offset, sec = self.fp.write(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric, contiguous=True)
+        elif int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, photometric=photometric)
         elif hasattr(self.fp, 'save'):#int(tifversion[0]) >= 2020:
             offset, sec = self.fp.save(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric, contiguous=True)
         else:
             offset, sec = self.fp.write(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric)
+
+        if int(tifversion[0]) >= 2020 and not self.dataOffset:
+            self.dataOffset = offset
  
     def _makeMetadata(self):
         """
         "Info" field does not work...
         Somebody tell me why
         """
-        #ex_meta = ''
-        #for key, val in self.ex_metadata.items():
-        #if 
-        
-        metadata = {
-                    'images': self.nsec,
-                    'channels': self.nw,
-                    'slices': self.nz,
-                    'hyperstack': (self.ndim > 3 and (len(self.axes)==2 or self.nw == 1)) or (self.ndim > 4 and (len(self.axes)==3 and self.nw > 1)),
-                    'unit': 'micron',
-                    'loop': False,
-                    'frames': self.nt,
-                    # my field goes to "description"
-                    'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
-                    }
+        tifversion = tifffile.__version__.split('.')
+
+        if int(tifversion[0]) >= 2020:
+                    metadata = {
+                        'images': self.nsec,
+                        'channels': self.nw,
+                        'slices': self.nz,
+                        'frames': self.nt,
+                        'hyperstack': True,
+                        'loop': False,
+                        #'mode': 'grayscale',
+                        #'spacing': self.pxlsiz[0],
+                        'unit': 'micron',
+                        'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
+            }
+        else:
+            metadata = {
+                        'images': self.nsec,
+                        'channels': self.nw,
+                        'slices': self.nz,
+                        'hyperstack': (self.ndim > 3 and (len(self.axes)==2 or self.nw == 1)) or (self.ndim > 4 and (len(self.axes)==3 and self.nw > 1)),
+                        'unit': 'micron',
+                        'loop': False,
+                        'frames': self.nt,
+                        # my field goes to "description"
+                        'waves': ','.join([str(wave) for wave in self.wave[:self.nw]])
+                        }
         if self.style == 'imagej':
-            metadata['ImageJ'] = '1.51h'
+            if int(tifversion[0]) == 0:
+                metadata['ImageJ'] = '1.51h'
             metadata['mode'] = 'grayscale'
             metadata['spacing'] = self.pxlsiz[0]
         elif self.style == 'RGB':
             metadata['images'] = self.nz * self.nt
 
 
-        if 'Ranges' in self.ex_metadata:
-            nw_range = len(self.ex_metadata['Ranges']) // 2
-            if nw_range != self.nw:
-                del self.ex_metadata['Ranges']
+
 
         if self.style == 'imagej':
-            # 20210618
-            if int(tifffile.__version__.split('.')[0]) == 0:
-                self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
-            else:
-                self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp.tiff.byteorder)
+            if 'Ranges' in self.ex_metadata:
+                nw_range = len(self.ex_metadata['Ranges']) // 2
+                if nw_range != self.nw:
+                    del self.ex_metadata['Ranges']
+            # 20210618 -> 20220805
+           # if hasattr(self.fp, '_byteorder'):
+           #     self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp._byteorder)
+           # else:
+           #     self.extratags = imagej_metadata_tags(self.ex_metadata, self.fp.tiff.byteorder)
 
             
         return metadata
 
-    notworking='''
     def makeOMEMetadata(self):
-        UUID = 'urn:uuid:58600c40-5b05-494a-8a8c-a85ed62c6f99'
-        def makeTiffData():
-            data = [0] * self.nsec
-            for t in range(self.nt):
-                for w in range(self.nw):
-                    for z in range(self.nz):
-                        i = self.findFileIdx(t=t, w=w, z=z)
-                        data[i] = {'UUID': {'FilenName': self.fn,
-                                                'value': UUID},
-                                    'IFD': i,
-                                    'PlaneCount': 1,
-                                    'FirstT': t,
-                                    'FirstC': w,
-                                    'FirstZ': z}
-            return data
+        axes = self.makeDimensionStr(squeeze=True).replace('W', 'C')
+        dimension = self.makeDimensionStr(squeeze=False).replace('W', 'C')[::-1]
+        
+        metadata = {
+            'Pixels': {
+                    'axes': axes,
+                    'Interleaved': False,
+                    'Type': pixeltype_to_ome(self.dtype),
+                    'DimensionOrder': dimension,
+                    'SizeX': self.nx,
+                    'SizeY': self.ny,
+                    'SizeZ': self.nz,
+                    'SizeC': self.nw,
+                    'SizeT': self.nt,
+                    'PhysicalSizeX': float(self.pxlsiz[-1]),
+                    'PhysicalSizeY': float(self.pxlsiz[-2]),
+                    'PhysicalSizeZ': float(self.pxlsiz[-3]),
+                    'PhysicalSizeXUnit': u'\xb5'+'m',
+                    'PhysicalSizeYUnit': u'\xb5'+'m',
+                    'PhysicalSizeZUnit': u'\xb5'+'m',
+                }}
+        channels = [{} for w in range(len(self.wave))]
+        for w, wave in enumerate(self.wave):
+            channels[w]['EmissionWavelength'] = wave
+            channels[w]['EmissionWavelengthUnit'] = 'nm'
+        metadata['Pixels']['Channel']  = channels
                 
-        
-        d = {'OME':{
-                '{http://www.w3.org/2001/XMLSchema-instance}schemaLocation': 'http://www.openmicroscopy.org/Schemas/OME/2016-06 http://www.openmicroscopy.org/Schemas/OME/2016-06/ome.xsd',
-                'UUID': UUID,
-                'Creator': self.software,
-                'StructuredAnnotations': None,
-                'Image':{
-                     'ID': 'Image:0',
-                     'Name': 'default.png',
-                     'Pixels':
-                         {'ID': 'Pixels:0',
-                          'Type': pixeltype_to_ome(self.dtype),
-                          'BigEndian': sys.byteorder == 'big',
-                          'Interleaved': False,
-                          'DimensionOrder': imgSeq_to_ome(self.imgSequence),
-                          'SizeX': self.nx,
-                          'SizeY': self.ny,
-                          'SizeZ': self.nz,
-                          'SizeC': self.nw,
-                          'SizeT': self.nt,
-                          'PhysicalSizeX': float(self.pxlsiz[-1]),
-                          'PhysicalSizeY': float(self.pxlsiz[-2]),
-                          'PhysicalSizeZ': float(self.pxlsiz[-3]),
-                          'PhysicalSizeXUnit': u'\xb5'+'m',
-                          'PhysicalSizeYUnit': u'\xb5'+'m',
-                          'PhysicalSizeZUnit': u'\xb5'+'m',
-                          'TiffData': makeTiffData()}
-                 }}}
-        return d
-
-    #def makeOMEMetadata(self):
-        
+        return metadata
     
 pxltypes_dtype = {N.int8: 'int8',
                     N.int16: 'int16',
@@ -514,12 +575,12 @@ pxltypes_dtype = {N.int8: 'int8',
                     N.complex64: 'complex',
                     N.complex128: 'double complex'
                     }
-imgOrders = ['XYZTC',
-             'XYCZT',
-             'XYZCT',
-             'XYTZC',
-             'XYCTZ',
-             'XYTCZ']
+#imgOrders = ['XYZTC',
+#             'XYCZT',
+#             'XYZCT',
+#             'XYTZC',
+ #            'XYCTZ',
+ #            'XYTCZ']
 
 def pixeltype_to_ome(dtype):
     if hasattr(dtype, 'type'):
@@ -534,8 +595,8 @@ def ome_to_dtype(pixeltype):
             return key
     raise ValueError('pixeltype %s was not found' % pixeltype)
 
-def imgSeq_to_ome(imgSequence):
-    return imgOrders[imgSequence]'''
+#def imgSeq_to_ome(imgSequence):
+#    return imgOrders[imgSequence]
 
 def saveAs3DRGB(h, out=None, t=0, vcat5=True):
     if not out:

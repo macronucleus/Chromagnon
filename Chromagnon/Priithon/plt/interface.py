@@ -13,13 +13,13 @@ plot_class = plot_module.plot_frame
 
 _figure = []
 _active = None
-
+_parent = None # added 20220908
 
 def figure(which_one = None):
     global _figure; global _active
     if which_one is None:
         title ='Figure %d' % len(_figure)
-        _figure.append(plot_class(title=title))
+        _figure.append(plot_class(title=title, parent=_parent)) # parent added 20220908
         _active = _figure[-1]
     elif (type(which_one) == type(1)) or (type(which_one) == type(1.)):
         try:    

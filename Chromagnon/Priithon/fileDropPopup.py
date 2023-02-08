@@ -221,7 +221,8 @@ class FileDropTarget(wx.FileDropTarget):
             return
         import __main__
         try:
-            exec('%s = U.loadImg_seq(%s)' % (v,self.fn_or_fns), __main__.__dict__)
+            #exec('%s = U.loadImg_seq(%s)' % (v,self.fn_or_fns), __main__.__dict__)
+            exec('%s = U.load(%s)' % (v,self.fn_or_fns), __main__.__dict__)
         except:
             if NO_SPECIAL_GUI_EXCEPT:
                 raise
@@ -237,7 +238,8 @@ class FileDropTarget(wx.FileDropTarget):
     def onViewSeq(self, ev):
         from Priithon.all import Y,U
         try:
-            Y.view( U.loadImg_seq( self.fn_or_fns ) )
+            #Y.view( U.loadImg_seq( self.fn_or_fns ) )
+            Y.view( U.load( self.fn_or_fns ) )
         except:
             if NO_SPECIAL_GUI_EXCEPT:
                 raise

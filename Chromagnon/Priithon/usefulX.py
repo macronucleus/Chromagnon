@@ -974,7 +974,7 @@ def FNs_am(multiple=True):
     """
     global _DIR, _WILDCARD
     try:
-        from PriCommon import guiFuncs as G
+        from common import guiFuncs as G
         import os
     except ImportError:
         raise NotImplementedError('Please install PriCommon')
@@ -2186,9 +2186,47 @@ def vLeftClickLineProfile(id=-1, abscissa='line', s='-'):
     vLeftClickDoes(id, callGlFn=fg, callFn=f)
 
 
+def vReplicateLineProfile(id0=-2, id1=-1, abscissa='line', s='+-', hold=1):
+    """
+    Plot the line profiles from one viewer (id0) to another (id1)
 
+    abscissa can be
+    'x'       to plot intensity along line against x-coordinate
+    'y'       against y-coord
+    else      against length
 
+    s: simbol of Y.plot
+    """
+    v = viewers[id0]
+    poly = v.poly
+    
+    v = viewers[id1]
+    
+    def f(poly, v):
 
+        x0,y0,x1,y1 = poly
+        dx,dy = x1-x0, y1-y0
+
+        l = N.sqrt(dx*dx + dy*dy)
+        if l>1:
+            ddx = dx/l
+            ddy = dy/l
+            #print dx,dy,l, x0,y0,x1,y1
+            xs = list(map(int, N.arange(x0, x1, ddx)+.5))
+            ys = list(map(int, N.arange(y0, y1, ddy)+.5))
+            #print len(xs), len(ys)
+            try:
+                vs = v.img[ ys,xs ]
+                if abscissa == 'x':
+                    plotxy(xs, vs, s, hold=hold)
+                elif abscissa == 'y':
+                    plotxy(ys, vs, s, hold=hold)
+                else:
+                    ploty(vs, s, hold=hold)
+            except:
+                raise #print "line profile bug:", len(xs), len(ys)
+
+    f(poly, v)
 
 
 def vLeftClickLineMeasure(id=-1, roundCoords2int=False):

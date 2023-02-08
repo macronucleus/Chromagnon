@@ -5,12 +5,12 @@ import wx, wx.lib.mixins.listctrl as listmix
 import wx.lib.agw.aui as wxaui # from wxpython4.0, wx.aui does not work well, use this instead
 
 try:
+    from common import commonfuncs as C, microscopy, guiFuncs as G
     from ndviewer import main as aui
-    from PriCommon import guiFuncs as G, commonfuncs as C, microscope
     from Priithon import Mrc
 except ImportError:
+    from Chromagnon.common import commonfuncs as C, microscopy, guiFuncs as G
     from Chromagnon.ndviewer import main as aui
-    from Chromagnon.PriCommon import guiFuncs as G, commonfuncs as C, microscope
     from Chromagnon.Priithon import Mrc
 
 if sys.version_info.major == 2:
@@ -96,7 +96,7 @@ class ChromagnonPanel(wx.Panel):
             choice = [str(factor) for factor in (1,5,10,15,20)]
             label, self.factorchoice = G.makeListChoice(self, box, 'magnification', choice, defValue=choice[2])
 
-            self.color_name = ['black'] + [colstr for colstr in microscope.COLOR_NAME]
+            self.color_name = ['black'] + [colstr for colstr in microscopy.COLOR_NAME]
             label, self.colorchoice = G.makeListChoice(self, box, 'arrow color', self.color_name, defValue=self.color_name[-1])
             
             # \n
@@ -171,7 +171,7 @@ class ChromagnonPanel(wx.Panel):
 
         factor = int(self.factorchoice.GetStringSelection())
         colstr = self.colorchoice.GetStringSelection()
-        colortable = [(0,0,0)] + microscope.COLOR_TABLE
+        colortable = [(0,0,0)] + microscopy.COLOR_TABLE
         col = colortable[self.color_name.index(colstr)]
         
         parent = self.GetParent()

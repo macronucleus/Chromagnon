@@ -1,7 +1,7 @@
 import os, re
 import numpy as N
 
-IMGSEQ = ['WTZ', 'TZW', 'TWZ', 'WZT']
+IMGSEQ = ['WTZ', 'TZW', 'TWZ', 'WZT', 'ZTW', 'ZWT']
 
 WAVE_START = 0
 WAVE_STEP  =  1
@@ -27,7 +27,7 @@ class GeneralReader(object):
         self.imgseqs = IMGSEQ
         self.metadata = {}
         self.ex_metadata = {}
-        self.useROI2getArr = False
+        #self.useROI2getArr = False
         self.flip_required = True
         
         self.mode = mode
@@ -35,7 +35,7 @@ class GeneralReader(object):
         self.axes_w = 0
 
         # current positions
-        self.t = self.w = self.z = self.y = self.x = 0
+       # self.t = self.w = self.z = self.y = self.x = 0
 
         self.openFile()
 
@@ -70,7 +70,8 @@ class GeneralReader(object):
             del self.fp
 
     def __del__(self):
-        self.close()
+        if not self.closed():
+            self.close()
         
     # initial call
     def openFile(self):
@@ -83,7 +84,8 @@ class GeneralReader(object):
             self.readHeader()
 
     def closed(self):
-        return self.handle.closed
+        if hasattr(self, 'handle') and hasattr(self.handle, 'closed'):
+            return self.handle.closed
 
     def init(self):
         pass
@@ -129,17 +131,27 @@ class GeneralReader(object):
         if nx:
             self.nx = int(nx)
             self.x = self.nx // 2
+        elif nx == 0:
+            raise ValueError('nx cannot be 0')
         if ny:
             self.ny = int(ny)
             self.y = self.ny // 2
+        elif ny == 0:
+            raise ValueError('ny cannot be 0')
         if nz:
             self.nz = int(nz)
             self.z = self.nz // 2
+        elif nz == 0:
+            raise ValueError('nz cannot be 0')
 
         if nw:
             self.nw = int(nw)
+        elif nw == 0:
+            raise ValueError('nw cannot be 0')
         if nt:
             self.nt = int(nt)
+        elif nt == 0:
+            raise ValueError('nt cannot be 0')
 
         if type(dtype) == N.dtype or dtype: # dtype can be false in python2.7 numpy1.12 scipy0.18 tifffile0.15.1
             self.dtype = dtype
@@ -168,8 +180,9 @@ class GeneralReader(object):
         self.shape = (self.ny, self.nx)
         self.ndim = len([d for d in (self.nx, self.ny, self.nz, self.nw, self.nt) if d > 1])
         self.nsec = self.nt * self.nw * self.nz
-        self.roi_start = N.zeros((3,), N.int16)
-        self.roi_size = N.array((self.nz, self.ny, self.nx), N.int16)
+        #self.roi_start = N.zeros((3,), N.int16)
+        #self.roi_size = N.array((self.nz, self.ny, self.nx), N.int16)
+        self.resetROI()
         self.setSecSize()
 
 
@@ -194,10 +207,32 @@ class GeneralReader(object):
 
     def setPixelSize(self, pz=1, py=1, px=1):
         self.pxlsiz[:] = pz, py, px
+        try:
+            self.doOnSetDim() # cannot be called before calling setDim
+        except:
+            pass
 
     def setRoi(self, zyx_start, zyx_size):
-        self.roi_start[:] = zyx_start
-        self.roi_size[:] = zyx_size
+        """
+        zyx_start: up to 3D, (z0,y0,x0)
+        zyx_size: up to 3D, (zs,ys,xs)
+        """
+        self.roi_start[-len(zyx_start):] = zyx_start
+        self.roi_size[-len(zyx_size):] = zyx_size
+
+    def resetROI(self):
+        """
+        reset 'roi_start', 'roi_size', 't','w','z','y','x'
+        """
+        self.roi_start = N.zeros((3,), N.int16)
+        self.roi_size = N.array((self.nz, self.ny, self.nx), N.int16)
+        # current positions
+        self.t = self.nt // 2
+        self.w = self.nw // 2
+        self.z = self.nz // 2
+        self.y = self.ny // 2
+        self.x = self.nx // 2
+        #self.t = self.w = self.z = self.y = self.x = 0
 
     def isRoiSet(self):
         """
@@ -207,7 +242,13 @@ class GeneralReader(object):
         if N.any(self.roi_size < maxshape) or N.any(self.roi_start > 0):
             return True
  
-
+    def getRoiSlice(self):
+        """
+        return (slice(), slice(), slice())
+        """
+        return tuple([slice(s, self.roi_size[d]+s) for d, s in enumerate(self.roi_start)])
+        
+        
     def getWaveIdx(self, wave):
         """
         return index
@@ -263,6 +304,48 @@ class GeneralReader(object):
 
     def makeWaves(self):
         return makeWaves(self.nw)
+
+    def makeShape(self, squeeze=True):
+        """
+        return a shape according to imgSequence
+        """
+        yx = (self.ny, self.nx)
+        if self.axes == 'YX':
+            if self.imgSequence == 0:
+                shape = (self.nw,self.nt,self.nz) + yx
+            elif self.imgSequence == 1:
+                shape = (self.nt,self.nz,self.nw) + yx
+            elif self.imgSequence == 2:
+                shape = (self.nt,self.nw,self.nz) + yx
+            elif self.imgSequence == 3:
+                shape = (self.nw,self.nz,self.nt) + yx
+            elif self.imgSequence == 4:
+                shape = (self.nt,self.nt,self.nw) + yx
+            elif self.imgSequence == 5:
+                shape = (self.nz,self.nw,self.nt) + yx
+        elif len(self.axes) == 3 and self.axes[0] in ('S', 'C', 'W'):
+            if self.imgSequence <= 2:
+                shape = (self.nt, self.nz, self.nw) + yx
+            else:
+                shape = (self.nz, self.nt, self.nw) + yx
+        elif len(self.axes) == 3 and self.axes[-1] in ('S', 'C', 'W'):
+            yxw = yx + (self.nw,)
+            if self.imgSequence <= 2:
+                shape = (self.nt, self.nz) + yxw
+            else:
+                shape = (self.nz, self.nt) + yxw
+
+        if squeeze:
+            shape = tuple((i for i in shape if i != 1))
+                    
+        return shape
+
+    def makeDimensionStr(self, squeeze=True):
+        dstr = IMGSEQ[self.imgSequence] + 'YX'
+        if squeeze:
+            shape = self.makeShape(False)
+            dstr =  ''.join([ds for i, ds in enumerate(dstr) if shape[i] > 1])
+        return dstr
         
     def seekSec(self, i=0):
         """
@@ -343,35 +426,34 @@ class GeneralReader(object):
         return arr
         
 
-    def getArr(self, t=0, z=0, w=0):
+    def getArr(self, t=0, z=0, w=0, useROI=False):
         """
-        return a single section according to the dimension
+        return a single section according to the dimension and current ROI
         """
         idx = self.findFileIdx(t=t, z=z, w=w)
 
         arr = self.readSec(idx)
         arr = self.flipY(arr)
-        if self.useROI2getArr:
-            arr = arr[Ellipsis,
-                          self.roi_start[-2]:self.roi_start[-2]+self.roi_size[-2],
-                          self.roi_start[-1]:self.roi_start[-1]+self.roi_size[-1]]
+        if useROI:
+            slc = (Ellipsis,) + self.getRoiSlice()[-2:]
+            arr = arr[slc]
         return arr
 
-    def get3DArr(self, t=0, w=0, zs=None):
+    def get3DArr(self, t=0, w=0, zs=None, useROI=False):
         """
         zs: if None, all z secs, else supply sequence of z sec
         
         return a 3D stack
         """
         if zs is None:
-            if self.useROI2getArr:
+            if useROI:
                 zs = list(range(self.roi_start[0], self.roi_start[0]+self.roi_size[0]))
             else:
                 zs = list(range(self.nz))
 
         nz = len(zs)
 
-        if self.useROI2getArr:
+        if useROI:
             ny = self.roi_size[1]
             nx = self.roi_size[2]
         else:
@@ -381,7 +463,7 @@ class GeneralReader(object):
         arr = N.empty((nz, ny, nx), self.dtype)
         
         for i, z in enumerate(zs):
-            arr[i] = self.getArr(t=t, z=z, w=w)
+            arr[i] = self.getArr(t=t, z=z, w=w, useROI=useROI)
         return arr
 
     def get3DArrGenerator(self, ws=None, ts=None, ret_w_t=False, zs=None):
@@ -426,15 +508,56 @@ class GeneralReader(object):
         else:
              return list(Range)
 
-    def asarray(self):
+    def asarray(self, useROI=False):
         """
         return numpy array as shape (nt, nw, nz, ny, nx)
         """
-        img = N.empty((self.nt, self.nw, self.nz, self.ny, self.nx), self.dtype)
+        if useROI:
+            shape3D = tuple(self.roi_size)
+        else:
+            shape3D = (self.nz, self.ny, self.nx)
+
+        img = N.empty((self.nt, self.nw) + shape3D, self.dtype)
+        #img = N.empty((self.nt, self.nw, self.nz, self.ny, self.nx), self.dtype)
         for t in range(self.nt):
             for w in range(self.nw):
-                img[t,w] = self.get3DArr(t=t, w=w)
+                img[t,w] = self.get3DArr(t=t, w=w, useROI=useROI)
         return img
+
+    def arr_with_header(self, useROI=False):
+        """
+        return numpy array as shape squeeze(nt, nw, nz, ny, nx) with header and ROI (if useROI is True, then ROI is still that of the parent array)
+        """
+        class header:
+            def __init__(cls):
+                attrs = ('nt', 'nw', 'nz', 'ny', 'nx', 'metadata', 'fn', 'pxlsiz', 'wave', 'ex_metadata')
+                for att in attrs:
+                    setattr(cls, att, getattr(self, att))
+
+        class roi:
+            def __init__(cls):
+                attrs = ('roi_start', 'roi_size', 't', 'w', 'z', 't', 'x')
+                for att in attrs:
+                    setattr(cls, att, getattr(self, att))
+        
+        # https://stackoverflow.com/questions/67509913/add-an-attribute-to-a-numpy-array-in-runtime
+        class ndarray_in_imgio(N.ndarray):
+            def __new__(cls, arr, header=None, roi=None):
+                obj = N.asarray(arr).view(cls)
+                obj.header = header
+                obj.roi = roi
+                return obj
+            
+            def __array_finalize__(self,obj):
+                if obj is None: return
+                self.header = getattr(obj, 'header', None)
+                self.roi = getattr(obj, 'roi', None)
+
+        data = N.squeeze(self.asarray(useROI=useROI)) 
+        
+        data = ndarray_in_imgio(data, header(), roi())
+
+        return data
 
 class GeneralWriter(GeneralReader):
     def __init__(self, fn, mode='wb'):

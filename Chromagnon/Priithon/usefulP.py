@@ -336,6 +336,14 @@ def plotClose(which_one = None):
     from . import plt
     plt.close(which_one)
 
+def plotSetParent(parent=None):
+    """
+    set parent of the plot frame
+    The parent is changed AFTER calling this function.
+    """
+    from . import plt
+    plt.interface._parent = parent
+    
 def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None):
     """
     arr1 is a "table" of x,y1,...,yn values

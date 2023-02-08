@@ -44,6 +44,23 @@ class MrcReader(generalIO.GeneralReader):
         self.pxlsiz = self.fp.hdr.d[::-1]
 
         self.hdr = self.fp.hdr
+        #self.metadata['title'] = self.hdr.title
+        for ttl in self.hdr.title:
+            if type(ttl) == N.bytes_:
+                ttl = ttl.decode('UTF-8', 'ignore')
+            if '=' in ttl:
+                key, val = ttl.split('=')
+                key = key.strip()
+                val = val.strip()
+                try:
+                    val = eval(val)
+                except:
+                    pass
+            else:
+                key = ttl
+                val = ''
+            if key:
+                self.metadata[key] = val
 
         self.fp._secByteSize = self._secByteSize
 
@@ -74,16 +91,51 @@ class MrcReader(generalIO.GeneralReader):
     def readSec(self, i):
         return self.fp.readSec(i)
 
+    old='''
+    def asarray(self, useROI=False):
+        """
+        return numpy array as shape (nt, nw, nz, ny, nx)
+        """
+        if useROI:
+            nz, ny, nx = tuple(self.roi_size)
+        else:
+            nz, ny, nx = (self.nz, self.ny, self.nx)
+        
+        a = Mrc.bindFile(self.fn)
+        if self.imgSequence == 0:
+            a = a.reshape(self.nw, self.nt, nz, ny, nx)
+            a = a.transpose((1,0,2,3,4))
+        elif self.imgSequence == 1:
+            a = a.reshape(self.nt, nz, self.nw, ny, nx)
+            a = a.transpose((0,2,1,3,4))
+        elif self.imgSequence == 2:
+            a = a.reshape(self.nt, self.nw, nz, ny, nx)
+        elif self.imgSequence == 3:
+            a = a.reshape(self.nw, nz, self.nt, ny, nx)
+            a = a.transpose((2,0,1,3,4))
+        elif self.imgSequence == 4:
+            a = a.reshape(nz, self.nt, self.nw, ny, nx)
+            a = a.transpose((1,2,0,3,4))
+        elif self.imgSequence == 5:
+            a = a.reshape(nz, self.nw, self.nt, ny, nx)
+            a = a.transpose((2,1,0,3,4))
+
+        
+        return a '''
+
 
 class MrcWriter(generalIO.GeneralWriter):
-    def __init__(self, outfn, hdr=None, extInts=None, extFloats=None):
+    def __init__(self, outfn, hdr=None, extInts=None, extFloats=None, metadata={}):
         """
         prepare your hdr and output filename
+
+        metadata: goes to title (number of keys <= 10)
         """
         generalIO.GeneralWriter.__init__(self, outfn, mode='w')
         self.flip_required = False
         
         self.hdr = hdr
+        self.metadata = metadata
         self.setExtHdr(extInts=extInts, extFloats=extFloats)
         if outfn.endswith('.dv'):
             self.byteorder = '<' # deltavision format
@@ -135,7 +187,7 @@ class MrcWriter(generalIO.GeneralWriter):
             mes = N.zeros((rdr.nt,), rdr.dtype)
             for t in range(rdr.nt):
                 for w in range(rdr.nw):
-                    arr = rdr.get3DArr(w=w, t=t)
+                    arr = rdr.get3DArr(w=w, t=t, useROI=True)
                     mis[t,w] = N.min(arr)
                     mas[t,w] = N.max(arr)
                     if w == 0:
@@ -177,6 +229,16 @@ class MrcWriter(generalIO.GeneralWriter):
 
         if self.byteorder == '<':
             self.hdr.dvid = -16224 # little_indian number
+
+        for key, val in self.metadata.items():
+            try:
+                if val:
+                    msg = '%s = %s' % (key, val)
+                else:
+                    msg = key
+                Mrc.setTitle(self.hdr, msg)
+            except ValueError:
+                print('WARNING: title is full, metadata "%s" is not written' % key)
 
         if (self.extInts is not None or self.extFloats is not None) or self.byteorder == '<':
             # old ImageJ assumes that the dv format (byteorder == <) has extended header

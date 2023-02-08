@@ -9,9 +9,9 @@ except ImportError:
     import generalIO, mrcIO, multitifIO
 
 try:
-    from ..PriCommon import microscope, fntools, commonfuncs
+    from ..common import fntools, commonfuncs
 except (ValueError, ImportError):    
-    from PriCommon import microscope, fntools, commonfuncs
+    from common import fntools, commonfuncs
     
 import numpy as N
 
@@ -63,7 +63,11 @@ try:
         HAS_JDK = True
     
     # ------ now ready to go -----------------------------
-    READABLE_FORMATS = bioformats.READABLE_FORMATS
+    READABLE_FORMATS = tuple(bioformats.READABLE_FORMATS)
+    #for ext in ('mrc', 'dv', 'tif', 'tiff'):
+    #    if ext in READABLE_FORMATS:
+    #        READABLE_FORMATS.remove(ext)
+    #READABLE_FORMATS = tuple(READABLE_FORMATS)
     WRITABLE_FORMATS = ('dv', 'ome.tif')
         
 
@@ -94,8 +98,8 @@ except:
         warnings.warn(errs, UserWarning)
         
 
-    READABLE_FORMATS = []
-    WRITABLE_FORMATS = []
+    READABLE_FORMATS = ()
+    WRITABLE_FORMATS = ()
     # dummy fucs
     def pixeltype_to_bioformats(dtype):
         return N.int8
@@ -111,11 +115,11 @@ except:
             import bioformats
         except ImportError: # bioformats is simply not installed
             class bioformats:
-                READABLE_FORMATS = []
-                WRITABLE_FORMATS = []
+                READABLE_FORMATS = ()
+                WRITABLE_FORMATS = ()
         except: # JDK is not installed
             class bioformats:
-                READABLE_FORMATS = ['al3d', 'am', 'amiramesh', 'apl', 'arf', 'avi', 'bmp',
+                READABLE_FORMATS = ('al3d', 'am', 'amiramesh', 'apl', 'arf', 'avi', 'bmp',
                         'c01', 'cfg', 'cxd', 'czi', 'dat', 'dcm', 'dicom', 'dm3',# 'dv',
                         'eps', 'epsi', 'fits', 'flex', 'fli', 'gel', 'gif', 'grey',
                         'hdr', 'html', 'hx', 'ics', 'ids', 'img', 'ims', 'ipl',
@@ -125,9 +129,9 @@ except:
                         'nrrd', 'obsep', 'oib', 'oif', 'ome', 'pcx', #'ome.tiff'
                         'pgm', 'pic', 'pict', 'png', 'ps', 'psd', 'r3d', 'raw',
                         'scn', 'sdt', 'seq', 'sld', 'stk', 'svs', #'tif', 'tiff',
-                        'tnb', 'txt', 'vws', 'xdce', 'xml', 'xv', 'xys', 'zvi']
-                WRITABLE_FORMATS = ['avi', 'eps', 'epsi', 'ics', 'ids', 'jp2', 'jpeg', 'jpg',
-                        'mov', 'ome', 'ome.tiff', 'png', 'ps', 'tif', 'tiff']
+                        'tnb', 'txt', 'vws', 'xdce', 'xml', 'xv', 'xys', 'zvi')
+                WRITABLE_FORMATS = ('avi', 'eps', 'epsi', 'ics', 'ids', 'jp2', 'jpeg', 'jpg',
+                        'mov', 'ome', 'ome.tiff', 'png', 'ps', 'tif', 'tiff')
 
     try:
         javabridge
@@ -442,13 +446,14 @@ class AbstractReader(object):
                     ome.DO_XYTZC,
                     ome.DO_XYCTZ,
                     ome.DO_XYTCZ]
+
         
     def closed(self):
         return self._closed
 
     @property
     def pixels(self):
-        return self.omexml.image(0).Pixels
+        return self.omexml.image(self.series).Pixels
 
     @property
     def nz(self):
@@ -669,11 +674,19 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
         if hasattr(self.omexml, 'root_node'):
             for node in self.omexml.root_node.getchildren():
                 name = repr(node).split()[1].split('}')[1].replace("'", '')
-                if name not in  ('Image', 'StructuredAnnotations'):
+                if name not in  ('Image', 'StructuredAnnotations') or (self.nseries>1 and name == 'StructuredAnnotations'):
                     self.metadata[name] = dict(list(node.items()))
                     for cnode in node.getchildren():
                         cname = repr(cnode).split()[1].split('}')[1].replace("'", '')
                         self.metadata[name][cname] = dict(list(cnode.items()))
+                elif self.nseries > 1 and name == 'Image':
+                    self.metadata.setdefault(name, [])
+                    self.metadata[name].append(dict(list(node.items())))
+                    for cnode in node.getchildren():
+                        cname = repr(cnode).split()[1].split('}')[1].replace("'", '')
+                        self.metadata[name][-1][cname] = dict(list(cnode.items()))
+                    
+                    
 
 
     def _readOMETiffHeader(self, omeformat=True):
@@ -708,13 +721,17 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
         return rdr
     
 
-    def getArr(self, t=0, z=0, w=0):
+    def getArr(self, t=0, z=0, w=0, useROI=False):
         if self.is_ometiff:
             xywh = None
         else:
             xywh = N.empty((4,), N.int16)
-            xywh[:2] = self.roi_start[1:][::-1]
-            xywh[2:] = self.roi_size[1:][::-1]
+            if useROI:
+                xywh[:2] = self.roi_start[1:][::-1]
+                xywh[2:] = self.roi_size[1:][::-1]
+            else:
+                xywh[:2] = N.zeros((2,), N.int16)
+                xywh[2:] = N.array((self.nx, self.ny), N.int16)
             xywh = tuple(xywh)
 
         # spectral imaging of Olympus microscope was not read correctly by Bioformats

@@ -26,7 +26,7 @@ line = h.readline()
 exec(line)
 h.close()
 
-packages = ['Chromagnon', 'Chromagnon.Priithon', 'Chromagnon.Priithon.plt', 'Chromagnon.PriCommon', 'Chromagnon.ndviewer', 'Chromagnon.imgio', 'Chromagnon.imgio.mybioformats']
+packages = ['Chromagnon', 'Chromagnon.common', 'Chromagnon.Priithon', 'Chromagnon.Priithon.plt', 'Chromagnon.PriCommon', 'Chromagnon.ndviewer', 'Chromagnon.imgio', 'Chromagnon.imgio.mybioformats']
 
 extra_options = dict(
     install_requires=['numpy', 'scipy', 'tifffile<=2021.7.2', 'chardet', 'six'],

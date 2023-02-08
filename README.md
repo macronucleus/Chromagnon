@@ -46,11 +46,11 @@ Dependencies:
 * `python` (v2.7 or >v3.6)
 * `numpy`
 * `scipy`
-* `tifffile <= 2021.7.2` 
-* `chardet`
+* `chardet` (optional for GUI)
 * `wxPython` (optional for GUI)
 * `PyOpenGL` (optional for GUI)
 * `pyFFTW` (optional for fast Fourier transform)
+* `tifffile <= 2021.7.2` (optional for reading/writing tiff) 
 * `javabridge` (optional for reading more image file formats)
 * `python-bioformats` (optional for reading more image file formats)
 * `lxml` (optional for reading more image file formats)

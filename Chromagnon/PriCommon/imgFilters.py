@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
 try:
-    from ..Priithon.all import N, U, Y, F, Mrc
+    from Priithon.all import N, U, Y, F
 except (ValueError, ImportError):
-    from Priithon.all import N, U, Y, F, Mrc
+    from ..Priithon.all import N, U, Y, F
 from scipy import optimize
 try:
     from . import imgFit
@@ -954,7 +955,7 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
         else:
             v = ret[1]
             zyx = ret[2:2+ndim]
-            if N.any(N.abs(zyx - vzyx[1:]) > win/2.):#zyx < 0 or zyx > img.shape or ):
+            if N.any(N.abs(zyx - vzyx[-ndim:]) > win/2.):#zyx < 0 or zyx > img.shape or ):
                 mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
                 poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [sigma_peak])
             else:

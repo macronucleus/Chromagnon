@@ -5,9 +5,9 @@ try:
     #raise ImportError
     from PIL import Image
     backend = 'PIL'
-    WRITABLE_FORMATS = ['bmp', 'eps', 'gif', 'icns', 'ico', 'im', 'jpg', 'jpeg', 'jpeg2000', 'msp', 'pcx', 'png', 'ppm', 'sgi', 'spider', 'tif', 'webp', 'xbm']
-    READABLE_FORMATS = WRITABLE_FORMATS + ['cur', 'dcx', 'dds', 'fli', 'flc', 'fpx', 'ftex', 'gbr', 'gd', 'imt', 'iptc', 'naa', 'mcidas', 'mic', 'mpo', 'pcd', 'pixar', 'psd', 'tga', 'wal', 'xpm']
-    WRITABLE_FORMATS += ['palm', 'pdf', 'xv']
+    WRITABLE_FORMATS = ('bmp', 'eps', 'gif', 'icns', 'ico', 'im', 'jpg', 'jpeg', 'jpeg2000', 'msp', 'pcx', 'png', 'ppm', 'sgi', 'spider', 'tif', 'webp', 'xbm')
+    READABLE_FORMATS = WRITABLE_FORMATS + ('cur', 'dcx', 'dds', 'fli', 'flc', 'fpx', 'ftex', 'gbr', 'gd', 'imt', 'iptc', 'naa', 'mcidas', 'mic', 'mpo', 'pcd', 'pixar', 'psd', 'tga', 'wal', 'xpm')
+    WRITABLE_FORMATS += ('palm', 'pdf', 'xv')
 except ImportError:
     try:
         import wx
@@ -15,14 +15,14 @@ except ImportError:
         wcs = wx.Image.GetImageExtWildcard()
         wcs = wcs.split('|')[0][1:-1]
         wcs = wcs.split(';')
-        READABLE_FORMATS = WRITABLE_FORMATS = [s.replace('*.', '') for s in wcs]
+        READABLE_FORMATS = WRITABLE_FORMATS = tuple([s.replace('*.', '') for s in wcs])
         # 16-bit tif cannot be read by wxpython
         try:
             from . import multitifIO
         except ImportError:
             import multitifIO
     except ImportError:
-        READABLE_FORMATS = WRITABLE_FORMATS = []
+        READABLE_FORMATS = WRITABLE_FORMATS = ()
 
 ###---------- sequence of images -----------###
 def getHandle(fn):

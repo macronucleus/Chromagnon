@@ -1,9 +1,10 @@
 try:
-    from ..Priithon.all import U, N
-except (ValueError, ImportError):
     from Priithon.all import U, N
+    from common import ppro26 as ppro
+except (ValueError, ImportError):
+    from ..Priithon.all import U, N
+    from ..common import ppro26 as ppro
 
-from . import ppro26 as ppro
 NCPU = ppro.NCPU
 
 import scipy.ndimage.interpolation as ndii
@@ -145,8 +146,8 @@ def getOffset(shape, invmat, ty, tx, start=0):
 
 def affine_transform(arr, invmat, offset=0.0, order=ORDER):
     return U.nd.affine_transform(arr, invmat, offset,
-                               #output=N.float32, cval=arr.min(), order=order)
-                               output=N.float32, cval=0, order=order)
+                               output=N.float32, cval=arr.min(), order=order)
+                               #output=N.float32, cval=0, order=order)
 
 
 # 
