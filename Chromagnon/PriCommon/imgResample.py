@@ -1,10 +1,9 @@
 try:
-    from Priithon.all import U, N
-    from common import ppro26 as ppro
-except (ValueError, ImportError):
     from ..Priithon.all import U, N
-    from ..common import ppro26 as ppro
+except (ValueError, ImportError):
+    from Priithon.all import U, N
 
+from . import ppro26 as ppro
 NCPU = ppro.NCPU
 
 import scipy.ndimage.interpolation as ndii
@@ -113,7 +112,7 @@ def trans3D_affine(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, ncpu=NCPU
 
         arr = canvas
 
-    if dtype in (N.int, N.uint8, N.uint16, N.uint32):
+    if dtype in (int, N.uint8, N.uint16, N.uint32):
         arr = N.where(arr < 0, 0, arr)
         
     return arr.astype(dtype)
@@ -146,8 +145,8 @@ def getOffset(shape, invmat, ty, tx, start=0):
 
 def affine_transform(arr, invmat, offset=0.0, order=ORDER):
     return U.nd.affine_transform(arr, invmat, offset,
-                               output=N.float32, cval=arr.min(), order=order)
-                               #output=N.float32, cval=0, order=order)
+                               #output=N.float32, cval=arr.min(), order=order)
+                               output=N.float32, cval=0, order=order)
 
 
 # 

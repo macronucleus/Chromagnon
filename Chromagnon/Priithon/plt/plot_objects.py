@@ -75,12 +75,13 @@ def draw_point_list(start,stop,pen,dc):
         start and stop are 2xN arrays of x,y point coordinates.  N lines
         are drawn, one between each of the start,stop pairs using the
         specified pen.  The lines are drawn on the given device context, dc.    
-    """    
+    """
+    #print('draw_point_list')
     dc.SetPen(pen)
     for i in range(len(start)):
         pt1 = start[i]
         pt2 = stop[i]
-        dc.DrawLine(pt1[0],pt1[1],pt2[0],pt2[1])
+        dc.DrawLine(int(pt1[0]),int(pt1[1]),int(pt2[0]),int(pt2[1]))
     dc.SetPen(wx.NullPen)
 
 #-----------------------------------------------------------------------#
@@ -752,6 +753,7 @@ class border_object(property_object):
         color = get_color(self.color)
         pen = wx.Pen(color, self.weight, style)        
         dc.SetPen(pen)
+        #print('draw_fast')
         dc.DrawLines(self.single_line)
         dc.SetPen(wx.NullPen)
 
@@ -785,8 +787,10 @@ class poly_line(poly_points):
             style = line_style_map[self.style]
             dc.SetPen(wx.Pen(color, self.weight,style))
             try:
+                #print('draw')
                 dc.DrawLines(self.scaled)           
             except:
+                #print('draw except')
                 dc.DrawLines(list(map(tuple,self.scaled)))
             dc.SetPen(wx.NullPen)
                     
@@ -848,12 +852,12 @@ class poly_marker(poly_points):
                         (0.0,0.577350*size*6)],xc,yc)
 
     def _cross(self, dc, xc, yc, size=1):
-        dc.DrawLine(xc-3*size,yc-3*size,xc+3*size,yc+3*size)
-        dc.DrawLine(xc-3*size,yc+3*size,xc+3*size,yc-3*size)
+        dc.DrawLine(int(xc-3*size),int(yc-3*size),int(xc+3*size),int(yc+3*size))
+        dc.DrawLine(int(xc-3*size),int(yc+3*size),int(xc+3*size),int(yc-3*size))
 
     def _plus(self, dc, xc, yc, size=1):
-        dc.DrawLine(xc-3*size,yc,xc+3*size,yc)
-        dc.DrawLine(xc,yc-3*size,xc,yc+3*size)
+        dc.DrawLine(int(xc-3*size),int(yc),int(xc+3*size),int(yc))
+        dc.DrawLine(int(xc),int(yc-3*size),int(xc),int(yc+3*size))
 
 class line_object(poly_points):
     """ Combines poly_line and poly_marker into a single
@@ -964,8 +968,8 @@ class image_object(property_object):
         return bb
 
     def scale_and_shift(self, scale=1, shift=0,upperleft=None,size=None):
-        if scale is 1: scale = array((1,1))
-        if shift is 0: shift = array((0,0))
+        if scale == 1: scale = array((1,1))
+        if shift == 0: shift = array((0,0))
         graph_pixels_per_axis_unit = scale
         self.scale = graph_pixels_per_axis_unit/self.image_pixels_per_axis_unit
         self.origin = shift

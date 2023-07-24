@@ -47,20 +47,41 @@ class MrcReader(generalIO.GeneralReader):
         #self.metadata['title'] = self.hdr.title
         for ttl in self.hdr.title:
             if type(ttl) == N.bytes_:
-                ttl = ttl.decode('UTF-8', 'ignore')
-            if '=' in ttl:
-                key, val = ttl.split('=')
-                key = key.strip()
-                val = val.strip()
-                try:
-                    val = eval(val)
-                except:
-                    pass
+                #ttl = ttl.decode('UTF-8', 'ignore')
+                ttl = ttl.decode('ascii', 'ignore') # combatibility to TIFF
+
+            neq = ttl.count('=')
+            if neq > 1:#'=' in ttl: # this does not find separation of =
+                for sep in [',', ':', ';', ' ']:
+                    if sep in ttl:
+                        ttls = ttl.split(',')
+                        break
+                else:
+                    ttls = [ttl]
+            elif neq == 1:
+                ttls = [ttl]
             else:
                 key = ttl
                 val = ''
-            if key:
-                self.metadata[key] = val
+                if key:
+                    self.metadata[key] = val
+                ttls = []
+
+            for ttl0 in ttls:
+                kvs = ttl0.split('=')
+                nvs = len(kvs)
+                for i in range(nvs//2):
+                    kv = kvs[i*2:(i+1)*2]
+                    if len(kv) == 2:
+                        key, val = kv
+                        key = key.strip()
+                        val = val.strip()
+                        
+                        try:
+                            val = eval(val)
+                        except:
+                            self.metadata[key] = val
+                            #pass
 
         self.fp._secByteSize = self._secByteSize
 
@@ -230,15 +251,29 @@ class MrcWriter(generalIO.GeneralWriter):
         if self.byteorder == '<':
             self.hdr.dvid = -16224 # little_indian number
 
+        # writing metadata into title
         for key, val in self.metadata.items():
+            if val:
+                msg = '%s = %s' % (key, val)
+            else:
+                msg = key
+
+            if N.bytes_(msg) in self.hdr.title:
+                continue
+
+            # try to write
             try:
-                if val:
-                    msg = '%s = %s' % (key, val)
-                else:
-                    msg = key
                 Mrc.setTitle(self.hdr, msg)
             except ValueError:
-                print('WARNING: title is full, metadata "%s" is not written' % key)
+                written = False
+                for i, s in enumerate(self.hdr.title):
+                    if not s:
+                        Mrc.setTitle(hdr, msg[:80], i)
+                        # Mrc only support title up to 80 characters
+                        written = True
+                        break
+                if not written:
+                    print('WARNING: title is full, metadata "%s" is not written' % key)
 
         if (self.extInts is not None or self.extFloats is not None) or self.byteorder == '<':
             # old ImageJ assumes that the dv format (byteorder == <) has extended header

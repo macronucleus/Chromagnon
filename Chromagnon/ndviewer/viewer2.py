@@ -89,7 +89,7 @@ class GLViewer(GLViewerCommon):
         ld: None uses self.mydoc info, otherwise supply [z,y,x]
         """
         if ld is None:
-            leftDown = N.zeros((3,), N.int)
+            leftDown = N.zeros((3,), int)
             debug="""
             if hasattr(self, 'pic_ny'):
                 if self.dims in  ((1,2), (1,0)): # XY, ZY

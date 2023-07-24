@@ -1,9 +1,9 @@
 ### Here all kinds of fitting
 from __future__ import print_function
 try:
-    from Priithon.all import N, U
-except (ValueError, ImportError):
     from ..Priithon.all import N, U
+except (ValueError, ImportError):
+    from Priithon.all import N, U
 try:
     from . import imgFilters, imgGeo
 except ValueError:

@@ -17,13 +17,16 @@ try:
     ## MEMO: "ImageJ does  not support non-contiguous data" means shape does not match
     WRITABLE_FORMATS = ('tif', 'tiff')
     tifversion = tifffile.__version__.split('.')
-    if int(tifversion[0]) > 2021 or (int(tifversion[0]) >= 2021 and int(tifversion[1]) >= 11):
+    if int(tifversion[0]) > 2021 or (int(tifversion[0]) >= 2021 and int(tifversion[1]) >= 4):#11):
         WRITABLE_FORMATS += ('ome.tif', 'ome.tiff')
         READABLE_FORMATS = WRITABLE_FORMATS + ('lsm',)
     else:
         READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
 except ImportError:
     WRITABLE_FORMATS = READABLE_FORMATS = ()
+    class tifff:
+        def __init__():
+            pass
     
 
 IMAGEJ_METADATA_TYPES = ['Info', 'Labels', 'Ranges', 'LUTs', 'Plot', 'ROI', 'Overlays']
@@ -535,7 +538,10 @@ class MultiTiffWriter(generalIO.GeneralWriter):
 
     def makeOMEMetadata(self):
         axes = self.makeDimensionStr(squeeze=True).replace('W', 'C')
-        dimension = self.makeDimensionStr(squeeze=False).replace('W', 'C')[::-1]
+        dimension = self.makeDimensionStr(squeeze=False).replace('W', 'C')#[::-1]
+        # for compatibility to 2021.7.2
+        extrdims = ''.join([dstr for dstr in dimension if dstr not in axes])
+        dimension = axes[::-1] + extrdims[::-1]
         
         metadata = {
             'Pixels': {

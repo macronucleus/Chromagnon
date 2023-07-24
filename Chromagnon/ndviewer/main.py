@@ -412,6 +412,19 @@ class ImagePanel(wx.Panel):
         if self.orthogonal_toggle.GetValue() and len(self.viewers) == 1:
             self.loadImage2Memory()
             self._mgr.GetPane('Image').Left().Position(1)
+            if self.useCropbox:
+                if hasattr(self.doc, 'roi_start'):
+                    mydoc = self.doc
+                else:
+                    mydoc = self.doc.img
+                ly = mydoc.roi_start[-2] #cropbox_l[self.dims[0]]
+                uy = mydoc.roi_size[-2] + ly #cropbox_u[self.dims[0]]
+                lx = mydoc.roi_start[-1] #cropbox_l[self.dims[1]]
+                ux = mydoc.roi_size[-1] + lx #cropbox_u[self.dims[1]]
+                y0 = (ly + uy)//2
+                x0 = (lx + ux)//2
+                mydoc.y = y0
+                mydoc.x = x0
             self.OnAddX()
             self.OnAddY()
             self.OnAddLastViewer()

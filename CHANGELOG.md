@@ -29,7 +29,12 @@ directory structures.
 when `python-bioformats` or `javabridge` are not installed.
 16. (v0.92 20230207) Multiple image series in a file is supported but
     only the first one is used. Also imgio has been a lot changed;
-    `tifffile` version had been upgraded and  ome.tif is written out by tifffile.
+    `tifffile` version had been upgraded and  ome.tif is written out
+    by tifffile. Furthermore, with the `nd2` package, nd2 files are
+    directly read without installing bioformats.
+17. (v0.93 20230707) Writing ome.tif is compatible for
+`tifffile` 2021.7.2.
+18. (v0.93 20230709) Bug fix for DeltaVision deconvolved files.
 
 v0.8(May. 2019)
 ----

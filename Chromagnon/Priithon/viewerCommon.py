@@ -546,9 +546,13 @@ class GLViewerCommon(wxgl.GLCanvas):
 
         self.SetCurrent(self.context)        
         #x,y = ev.m_x,  self.m_h-ev.m_y
-        x, y = ev.GetPosition() # 20141127
-        y = self.m_h - y
-        xEff_float, yEff_float= gluUnProject(x,y,0)[:2]
+       # x, y = ev.GetPosition() # 20141127
+       # y = self.m_h - y
+        #xEff_float, yEff_float= gluUnProject(x,y,0)[:2] # does not work on M2 Mac 20230225
+        x = ev.GetX()
+        y = self.m_h-ev.GetY()
+        x0, y0, scale, aspR = self.m_x0, self.m_y0, self.m_scale, self.m_aspectRatio
+        xEff_float, yEff_float = int( (x-x0)/scale ) , int( (y-y0)/(scale*aspR) ) 
 
         # 20080701:  in new coord system, integer pixel coord go through the center of pixel
 

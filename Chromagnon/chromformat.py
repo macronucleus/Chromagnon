@@ -377,9 +377,9 @@ class ChromagnonReader(object):
             
     def finalDim(self):
         if self.rdr is not None and hasattr(self.rdr, 'ny'):
-            nzyx = N.array((self.nz, self.rdr.ny, self.rdr.nx), N.int)
+            nzyx = N.array((self.nz, self.rdr.ny, self.rdr.nx), int)
         else:
-            nzyx = N.array((self.nz, self.reader.ny, self.reader.nx), N.int)
+            nzyx = N.array((self.nz, self.reader.ny, self.reader.nx), int)
         return nzyx
             
     def readMap3D(self, t=0, w=0):

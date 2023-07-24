@@ -960,7 +960,7 @@ def chopImage2D(arr, npxls=(32,32), shiftOrigin=(0,0)):#False):
     slcs = []
     #for zs in zslc:
     for ys in yslc:
-        slc = [[ys,xs] for xs in xslc]
+        slc = [tuple([ys,xs]) for xs in xslc]
         arrs.append([arr[s] for s in slc])
         slcs.append(slc)
     return slcs, arrs
@@ -1111,7 +1111,7 @@ def xcorNonLinear(arr, ref, npxls=60, threshold=None, pxlshift_allow=MAX_SHIFT_L
                     if var > threshold:
                         yx, c = xcorr.Xcorr(a, b)
                         #cs[[slice(i,i+1)]+tslcs[y][x]] += c
-                        cs[[slice(yi,yi+1),slice(xi,xi+1)]+tslcs[y][x]] += c
+                        cs[(slice(yi,yi+1),slice(xi,xi+1))+tslcs[y][x]] += c
                         csd = c[:c.shape[0]//4].std()
                         cqual = (c.max() - csd) / (c.sum() / cfact)
                         region[2,2*y+yi,2*x+xi] = cqual
@@ -1295,6 +1295,7 @@ def iterNonLinear(arr, ref, npxl=MIN_PXLS_YX, affine=None, initGuess=None, thres
         maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
         slc = [slice(int(maxcutY), int(shape[0]-maxcutY)),
                slice(int(maxcutX), int(shape[1]-maxcutX))]
+        slc = tuple(slc)
 
     if initGuess is not None:
         ret += initGuess

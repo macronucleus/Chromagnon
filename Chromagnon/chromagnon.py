@@ -468,7 +468,7 @@ class BatchPanel(wx.Panel):
 
     def OnOutFormatChosen(self, evt=None):
         outext = self.outextch.GetStringSelection()
-        if outext == self.outext_choices[-1] and not imgio.bioformatsIO.HAS_JDK:
+        if outext == 'ome.tif' and 'ome.tif' not in imgio.multitifIO.WRITABLE_FORMAT and not imgio.bioformatsIO.HAS_JDK:
             listbox.imgio_dialog('Writing the file format (%s) requres Java Development Kit (JDK)' % outext)
             confdic = C.readConfig()
             outext = confdic.get('format', aligner.WRITABLE_FORMATS[0])
@@ -507,8 +507,8 @@ class BatchPanel(wx.Panel):
                 return
 
             # check wavelengths
-            waves1 = [list(map(int, self.listRef.getFile(index)[2].split(','))) for index in self.listRef.columnkeys]
-            waves2 = [list(map(int, self.listTgt.getFile(index)[2].split(','))) for index in self.listTgt.columnkeys]
+            waves1 = [list(map(int, map(float, self.listRef.getFile(index)[2].split(',')))) for index in self.listRef.columnkeys]
+            waves2 = [list(map(int, map(float, self.listTgt.getFile(index)[2].split(',')))) for index in self.listTgt.columnkeys]
             nts = all([t == 1 for t in self.listRef.nts])
 
             # combine wavelengths

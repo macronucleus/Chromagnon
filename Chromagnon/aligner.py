@@ -493,7 +493,7 @@ class Chromagnon(object):
                     #print(yx)
                     del ref, c
                 # create 2D projection image
-                xs = N.round_(self.refxs-ret[w,2]).astype(N.int)
+                xs = N.round_(self.refxs-ret[w,2]).astype(int)
                 if xs.max() >= self.img.nx:
                     xsbool = (xs < self.img.nx)
                     xsinds = N.nonzero(xsbool)[0]
@@ -603,7 +603,7 @@ class Chromagnon(object):
                     ret[w,0] = yz[1] / zzoom + zshift
 
 
-                zs = N.round_(self.refzs-ret[w,0]).astype(N.int)
+                zs = N.round_(self.refzs-ret[w,0]).astype(int)
                 if zs.max() >= self.img.nz:
                     zsbool = (zs < self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
@@ -720,7 +720,7 @@ class Chromagnon(object):
 
         if N.all((N.array(self.mapyx.shape[-2:]) - self.img.shape[-2:]) >= 0):
             slcs = imgGeo.centerSlice(self.mapyx.shape[-2:], win=self.img.shape[-2:], center=None)
-            self.mapyx = self.mapyx[slcs] # Ellipsis already added
+            self.mapyx = self.mapyx[tuple(slcs)] # Ellipsis already added
         else:
             self.mapyx = imgFilters.paddingValue(self.mapyx, shape=self.img.shape[-2:], value=0)
 
@@ -737,7 +737,7 @@ class Chromagnon(object):
                 img = self.img.get3DArr(w=w, t=t)
                 #img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
 
-                zs = N.round_(self.refzs-self.alignParms[t,w,0]).astype(N.int)
+                zs = N.round_(self.refzs-self.alignParms[t,w,0]).astype(int)
                 if zs.max() >= self.img.nz:
                     zsbool = (zs < self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
@@ -806,7 +806,7 @@ class Chromagnon(object):
             if w == self.refwave:
                 continue
 
-            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(N.int)
+            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
             arr3D = self.get3DArr(w=w, t=0)
             var = (refvar + arr3D.var()) / 2.
             threshold = var * 0.1
@@ -856,7 +856,7 @@ class Chromagnon(object):
             if w == self.refwave:
                 continue
 
-            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(N.int)
+            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
             arr3D = self.get3DArr(w=w, t=0)
             var = (refvar + arr3D.var()) / 2.
             threshold = var * 0.1
@@ -1025,7 +1025,7 @@ class Chromagnon(object):
             shiftZYX = N.array((mm[0], MM[0], mm[1], MM[1], mm[2], MM[2]))
 
             # rearrange as a slice
-            shiftZYX = shiftZYX.astype(N.int)
+            shiftZYX = shiftZYX.astype(int)
             slc = [Ellipsis, 
                    slice(shiftZYX[0], shiftZYX[1]),
                    slice(shiftZYX[2], shiftZYX[3]),
@@ -1115,14 +1115,14 @@ class Chromagnon(object):
                     #ret[w,1:3] = yx
                     del ref, c
                     print(yx)
-                    zs = N.round_(self.refxs-yx[-1]).astype(N.int)#ret[w,2]).astype(N.int)
+                    zs = N.round_(self.refxs-yx[-1]).astype(int)#ret[w,2]).astype(int)
                 else:
-                    zs = N.round_(self.refxs-alignParms[w,2]).astype(N.int)
+                    zs = N.round_(self.refxs-alignParms[w,2]).astype(int)
                 nz = self.img.nx
                 removeEdge=True
                 img = img.T
             else:
-                zs = N.round_(self.refzs-alignParms[w,0]).astype(N.int)
+                zs = N.round_(self.refzs-alignParms[w,0]).astype(int)
                 nz = self.img.nz
                 removeEdge=False
                 

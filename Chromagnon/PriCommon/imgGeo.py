@@ -85,7 +85,7 @@ def affine(a, r, mag, tyx=(0,0), center=(0,0)):
 
 def affine_index(indexarray, r, mag, tyx=(0,0), center=None):
     if center is None:
-        center = N.array(indexarray.shape[-2:], N.float) / 2.
+        center = N.array(indexarray.shape[-2:], float) / 2.
     
     rotRadian = N.pi / 180. * r
     cosTheta = N.cos(rotRadian)
