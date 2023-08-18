@@ -607,7 +607,7 @@ if _wx:
             self.panel.aui.imEditWindows.DeletePage(evt.data[0])
 
         def OnProgress(self, evt):
-            self.panel.progress.SetValue(evt.data[0])
+            self.panel.progress.SetValue(int(round(evt.data[0])))
 
 
 class ThreadFlat(ThreadWithExc):

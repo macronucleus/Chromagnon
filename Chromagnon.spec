@@ -53,21 +53,34 @@ if sys.platform.startswith('win'):
     code=os.path.abspath(os.path.join('Z:', 'py'))
     src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
-
-    binaries = [(os.path.join(libbin, 'mkl_avx.dll'), '.'), (os.path.join(libbin, 'mkl_avx2.dll'), '.')]
+   # if os.path.isfile(os.path.join(libbin, 'mkl_avx.dll')):
+   #     binaries = [(os.path.join(libbin, 'mkl_avx.dll'), '.')]#, (os.path.join(libbin, 'mkl_avx2.dll'), '.')]
+   # elif os.path.isfile(os.path.join(libbin, 'mkl_avx.2.dll')):
+   #     binaries = [(os.path.join(libbin, 'mkl_avx.2.dll'), '.')]
     if not PLUGIN:
-        if pyversion == 3:
-            glut = 'glut64.dll'
-        elif pyversion == 2:
+        if os.path.isfile(os.path.join(libbin, 'freeglut.dll')):
             glut = os.path.join(libbin, 'freeglut.dll')
+        else:
+            glut = 'glut64.dll'
+        #if pyversion == 3:
+        #    glut = 'glut64.dll'
+        #elif pyversion == 2:
+        #    glut = os.path.join(libbin, 'freeglut.dll')
         binaries += [(os.path.join(home, conda, glut), '.')]
     pylib = 'pyd'
     jvm = 'jvm.dll'
     suffix = 'Win' + ex_suffix
     
 else: # mac + linux
-    code=os.path.join(home, 'codes', 'py')
-    src = os.path.join(home, 'codes', 'src', 'Chromagnon', 'Chromagnon')
+    if os.path.isdir(os.path.expanduser('~/codes/py')):
+        CODE='codes'
+    elif os.path.isdir(os.path.expanduser('~/local/py')):
+        CODE='local'
+    else:
+        raise ValueError('directory for codes not found')
+    
+    code=os.path.join(home, CODE, 'py')
+    src = os.path.join(home, CODE, 'src', 'Chromagnon', 'Chromagnon')
 
     site=os.path.join(conda, 'lib', 'python%i.%i' % (pyversion, sys.version_info.minor), 'site-packages')
     print('site is', site)
@@ -104,13 +117,31 @@ else:
     cversion = ''
 # ------- pyinstaller
 
-datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(code, 'common', '*.py'), 'common'), (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
+datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(code, 'common', '*.py'), 'common')]#, (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
 if 0:#sys.platform.startswith('linux'):
     datas += [(os.path.join(pylibpath, 'libglut.*'), 'lib')]
     
 if not PLUGIN:
     #datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
-    datas += [(os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]#, (os.path.join(os.path.dirname(site), 'lib-dynload', '_posixsubprocess.cpython-37m-x86_64-linux-gnu.so'), os.path.join('lib', 'python3.7', 'lib-dynload'))]
+    try:
+        import javabridge,  bioformats
+        jv = os.path.dirname(javabridge.__file__)
+        bf = os.path.dirname(os.path.dirname(bioformats.__file__))
+        datas += [(os.path.join(jv, 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(bf, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
+    except ImportError:
+        pass
+    try:
+        import nd2
+        nd2 = os.path.dirname(nd2.__file__)
+        datas += [(os.path.join(nd2, '*.typed'), 'nd2')]
+    except ImportError:
+        pass
+
+    #if 1:#sys.platform.startswith('win'): # v=0.7.1
+    #    datas += [(os.path.join(nd2, '*.typed'), 'nd2')]
+    #else:
+    #    datas += [(os.path.join(nd2, '_sdk', '*'), os.path.join('nd2', '_sdk'))]
+    #datas += [(os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
     
 a = Analysis([prog],
              pathex=[code],

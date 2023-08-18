@@ -128,7 +128,7 @@ class ExtraDialog(wx.Dialog):
         btnsizer.AddButton(btn)
         btnsizer.Realize()
 
-        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        sizer.Add(btnsizer, 0)#, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
 
         sizer.Fit(self)
 
