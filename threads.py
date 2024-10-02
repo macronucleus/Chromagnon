@@ -149,6 +149,7 @@ class ThreadWithExc(threading.Thread):
         dorot4time = parms[12]
         doZ = parms[13]
         rmv_ref, rmv_tgt = parms[14]
+        order = parms[15]
         
         saveAlignParam = True
         alignChannels = True
@@ -284,7 +285,7 @@ class ThreadWithExc(threading.Thread):
                     #if cutout:
                     an.setRegionCutOut(cutout)
 
-                    out = an.saveAlignedImage()
+                    out = an.saveAlignedImage(order=order)
                     print('saved %s' % out)
                     donetgt.append(index)
 

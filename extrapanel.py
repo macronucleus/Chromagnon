@@ -82,6 +82,13 @@ class ExtraDialog(wx.Dialog):
         bb, box = G.newStaticBox(self, box, title='Maximum shift the channels are possibly misaligned', size=wx.DefaultSize)
         label, self.maxshift_text = G.makeTxtBox(self, box, 'Shift (um)', defValue=confdic.get('max_shift', str(af.MAX_SHIFT)), tip='Maximum shift the channels are possibly misaligned', sizeX=40)
 
+        # -------- interpolation order -----------
+        # \n
+        box = G.newSpaceV(sizer)
+        bb, box = G.newStaticBox(self, box, title='Interpolation order of the result', size=wx.DefaultSize)
+        orderChoice = [str(i) for i in range(7)]
+        label, self.orderListChoice = G.makeListChoice(self, box, '0 = Nearest Neighbor, 1 = Bilinear, 3 = cubic, 6 = affine', orderChoice, defValue=confdic.get('interpolation_order', 3))
+
         # --------- Do rotation for time series ------
         # \n
         box = G.newSpaceV(sizer)

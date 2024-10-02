@@ -35,6 +35,9 @@ when `python-bioformats` or `javabridge` are not installed.
 17. (v0.93 20230707) Writing ome.tif is compatible for
 `tifffile` 2021.7.2.
 18. (v0.93 20230709) Bug fix for DeltaVision deconvolved files.
+19. (v0.93 20240508) `imgResample.trans3D_affine` dzyx fixed -0.5 as
+    the center of magnification.
+20. (v0.93 20240509) Avoid a double import in `__init__.py`
 
 v0.8(May. 2019)
 ----
