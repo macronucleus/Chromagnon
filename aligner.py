@@ -1070,7 +1070,7 @@ class Chromagnon(object):
         arr = self.img.get3DArr(w=w, t=t)
 
         #if self.mapyx is not None:
-        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w], order=order)
+        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w], interp=order)#order=order)
         #else:
         #    arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
         arr = arr[self.cropSlice]
