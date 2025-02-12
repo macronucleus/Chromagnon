@@ -14,11 +14,13 @@ from shutil import rmtree
 pyversion = sys.version_info.major
 
 # http://stackoverflow.com/questions/2159211/use-distribute-setuptools-to-create-symlink-or-run-script
+# to make symlink during installation
 from setuptools.command.install import install
 class CustomInstallCommand(install):
     """Customized setuptools install command."""
     def run(self):
         install.run(self)
+        # post-processing code
 
 mainscript = os.path.join('Chromagnon', 'chromagnon.py')
 h = open('Chromagnon/version.py')
