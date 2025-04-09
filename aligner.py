@@ -1177,7 +1177,7 @@ class Chromagnon(object):
             nz = self.cropSlice[-3].stop - self.cropSlice[-3].start
 
             des.setDim(nx, ny, nz)
-            if type(des) == imgio.mrcIO.MrcWriter:
+            if type(des) == imgio.mrcIO.Writer:
                 des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
                 des.doOnSetDim()
 
@@ -1186,7 +1186,7 @@ class Chromagnon(object):
             pass
 
         ##   --- extended header ----
-        if type(des) == imgio.mrcIO.MrcWriter:
+        if type(des) == imgio.mrcIO.Writer:
             nsecs = self.img.nsec#hdr.Num[-1]
             if hasattr(des.fp, 'extFloats') and des.fp.extFloats.shape[0] >= nsecs:
                 if self.cropSlice[-3].start is not None and self.cropSlice[-3].stop is not None:

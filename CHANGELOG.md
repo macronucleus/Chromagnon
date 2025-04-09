@@ -38,6 +38,8 @@ when `python-bioformats` or `javabridge` are not installed.
 19. (v0.93 20240508) `imgResample.trans3D_affine` dzyx fixed -0.5 as
     the center of magnification.
 20. (v0.93 20240509) Avoid a double import in `__init__.py`
+21. (v0.94 20250409) Fixed `alignfuncs._compCost` slice problem.
+22. (v0.94 20250409) `imgio` partly supports `nd2`, `czi`, `lif`, `oib`.
 
 v0.8(May. 2019)
 ----
