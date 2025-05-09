@@ -484,8 +484,8 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
             shiftZYX = cutoutAlign.getShift([0]+list(yxs)+[0,1,1], [0]+list(shape))
             maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
             maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-            slc = [slice(int(shiftZYX[2]), int(shiftZYX[3])),
-                   slice(int(shiftZYX[4]), int(shiftZYX[5]))]
+            slc = tuple([slice(int(shiftZYX[2]), int(shiftZYX[3])),
+                   slice(int(shiftZYX[4]), int(shiftZYX[5]))])
             b = b[slc]
             c = ref[slc]
 
