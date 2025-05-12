@@ -57,7 +57,7 @@ if sys.platform.startswith('win'):
     code=os.path.abspath(os.path.join('Z:', 'py'))
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
-    os.path.environ['JDK_HOME'] = os.path.environ['JAVA_HOME']
+    os.environ['JDK_HOME'] = os.environ['JAVA_HOME']
     rtm = ['./runtime_hook.py']
 
     suffix = 'Win' + ex_suffix
