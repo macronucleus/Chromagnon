@@ -57,6 +57,9 @@ if sys.platform.startswith('win'):
     code=os.path.abspath(os.path.join('Z:', 'py'))
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
+    os.path.environ['JDK_HOME'] = os.path.environ['JAVA_HOME']
+    rtm = ['./runtime_hook.py']
+
     suffix = 'Win' + ex_suffix
 else: # mac + linux
     if os.path.isdir(os.path.expanduser('~/codes')):
@@ -68,7 +71,8 @@ else: # mac + linux
     
     code=os.path.join(home, CODE, 'py')
     #src = os.path.join(home, CODE, 'src', 'Chromagnon', 'Chromagnon')
-
+    rtm = []
+    
     # mac
     if sys.platform == 'darwin':
         suffix = 'Mac' + ex_suffix
@@ -112,6 +116,7 @@ else:
 a = Analysis([prog],
              pathex=[code],
              datas = datas,
+             runtime_hooks = rtm,
             # hiddenimports=['numpy', 'numpy.core._multiarray_umath', 'scipy._lib.array_api_compat.numpy.fft', 'scipy.special._special_ufuncs'],
             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'openjdk'])
 
