@@ -58,7 +58,7 @@ if sys.platform.startswith('win'):
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
     os.environ['JDK_HOME'] = os.environ['JAVA_HOME']
-    rtm = [os.apth.join(code, 'Chromagnon', 'runtime_hook.py')]
+    rtm = [os.path.join(code, 'Chromagnon', 'runtime_hook.py')]
 
     suffix = 'Win' + ex_suffix
 else: # mac + linux
