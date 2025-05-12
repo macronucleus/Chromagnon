@@ -142,7 +142,7 @@ if debug:
     exe = EXE(pyz, a.scripts, exclude_binaries=True)
     coll = COLLECT(exe, a.binaries, a.datas)
 else:
-    exe = EXE(pyz, a.scripts, a.binaries, a.datas, console=False, name='%s%s%s' % (name, cversion, suffix))#'Chromagnon')#, target_arch='universal2')
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, console=True, name='%s%s%s' % (name, cversion, suffix))#'Chromagnon')#, target_arch='universal2')
     ## universal does not work for scipy
     # PyInstaller.utils.osx.IncompatibleBinaryArchError: /Users/matsuda/miniconda3/envs/chrom2/lib/python3.12/lib-dynload/_struct.cpython-312-darwin.so is not a fat binary!
     if sys.platform.startswith('darwin'):
