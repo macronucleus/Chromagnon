@@ -69,7 +69,6 @@ else: # mac + linux
     
     code=os.path.join(home, CODE, 'py')
     #src = os.path.join(home, CODE, 'src', 'Chromagnon', 'Chromagnon')
-    rtm = []
     
     # mac
     if sys.platform == 'darwin':
@@ -115,7 +114,7 @@ else:
 a = Analysis([prog],
              pathex=[code],
              datas = datas,
-             runtime_hooks = rtm,
+            # runtime_hooks = rtm,
             # hiddenimports=['numpy', 'numpy.core._multiarray_umath', 'scipy._lib.array_api_compat.numpy.fft', 'scipy.special._special_ufuncs'],
             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'openjdk'])
 
