@@ -57,6 +57,7 @@ if sys.platform.startswith('win'):
     code=os.path.abspath(os.path.join('Z:', 'py'))
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
+
     suffix = 'Win' + ex_suffix
 else: # mac + linux
     if os.path.isdir(os.path.expanduser('~/codes')):
@@ -68,7 +69,7 @@ else: # mac + linux
     
     code=os.path.join(home, CODE, 'py')
     #src = os.path.join(home, CODE, 'src', 'Chromagnon', 'Chromagnon')
-
+    
     # mac
     if sys.platform == 'darwin':
         suffix = 'Mac' + ex_suffix
@@ -96,14 +97,18 @@ pip = True #
 if pip:
     try:
         import javabridge,  bioformats
+        os.environ['JDK_HOME'] = os.environ['JAVA_HOME']
         jv = os.path.dirname(javabridge.__file__)
         bf = os.path.dirname(os.path.dirname(bioformats.__file__))
         datas = [(os.path.join(jv, 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(bf, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
+        console=True
         
     except ImportError:
+        console = False
         datas = []
         #pass
 else:
+    console = False
     datas = []
     
 
@@ -112,6 +117,7 @@ else:
 a = Analysis([prog],
              pathex=[code],
              datas = datas,
+            # runtime_hooks = rtm,
             # hiddenimports=['numpy', 'numpy.core._multiarray_umath', 'scipy._lib.array_api_compat.numpy.fft', 'scipy.special._special_ufuncs'],
             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'openjdk'])
 
@@ -123,7 +129,7 @@ if True:
         to_remove = ["_AES", "_ARC4", "_DES", "_DES3", "_SHA256", "_counter"]
         dname = f'%s.cp37-win_amd64.pyd'
     elif sys.platform == 'darwin':
-        to_remove = ["_asyncio", "_bisect", "_blake2", "_bz2", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", u'_codecs_hk', u'_codecs_iso2022', u'_codecs_jp', u'_codecs_kr', u'_codecs_tw', u'_contextvars', u'_csv', u'_ctypes', u'_datetime', u'_decimal', u'_elementtree', u'_hashlib', u'_heapq', u'_json', u'_lzma', u'_md5', u'_multibytecodec', u'_multiprocessing', u'_opcode', u'_pickle', u'_posixshmem', u'_posixsubprocess', u'_queue', u'_random', u'_scproxy', u'_sha1', u'_sha256', u'_sha3', u'_sha512', u'_socket', u'_ssl', u'_statistics', u'_struct', u'_tkinter', u'_uuid', u'array', u'binascii', u'fcntl', u'grp', u'math', u'mmap', u'pyexpat', u'readline', u'resource', u'select', u'syslog', u'termios', u'unicodedata', u'zlib']
+        to_remove = ["_asyncio", "_bisect", "_blake2", "_bz2", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", u'_codecs_iso2022', u'_codecs_jp', u'_codecs_kr', u'_codecs_tw', u'_contextvars', u'_csv', u'_ctypes', u'_datetime', u'_decimal', u'_elementtree', u'_hashlib', u'_heapq', u'_json', u'_lzma', u'_md5', u'_multibytecodec', u'_multiprocessing', u'_opcode', u'_pickle', u'_posixshmem', u'_posixsubprocess', u'_queue', u'_random', u'_scproxy', u'_sha1', u'_sha256', u'_sha3', u'_sha512', u'_socket', u'_ssl', u'_statistics', u'_struct', u'_tkinter', u'_uuid', u'array', u'binascii', u'fcntl', u'grp', u'math', u'mmap', u'pyexpat', u'readline', u'resource', u'select', u'syslog', u'termios', u'unicodedata', u'zlib']
 
         dname = f'%s.cpython-310-darwin.so'
         
@@ -142,7 +148,7 @@ if debug:
     exe = EXE(pyz, a.scripts, exclude_binaries=True)
     coll = COLLECT(exe, a.binaries, a.datas)
 else:
-    exe = EXE(pyz, a.scripts, a.binaries, a.datas, console=True, name='%s%s%s' % (name, cversion, suffix))#'Chromagnon')#, target_arch='universal2')
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, console=console, name='%s%s%s' % (name, cversion, suffix))#'Chromagnon')#, target_arch='universal2')
     ## universal does not work for scipy
     # PyInstaller.utils.osx.IncompatibleBinaryArchError: /Users/matsuda/miniconda3/envs/chrom2/lib/python3.12/lib-dynload/_struct.cpython-312-darwin.so is not a fat binary!
     if sys.platform.startswith('darwin'):
