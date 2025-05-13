@@ -38,20 +38,23 @@ The source
 The source code is written in pure python and works on the following platforms and dependencies.
 
 Platforms successfully tested:
-* MacOSX64bit (10.9.5 or higher)
-* Windows64bit (XP or higher)
-* Linux Ubuntu(16-18), CentOS(6)
+* MacOSX64bit
+* Windows64bit
+* Linux Ubuntu, CentOS(6)
 
 Dependencies:
-* `python` (v2.7 or >v3.6)
+* `python`
 * `numpy`
 * `scipy`
-* `chardet` (optional for GUI)
+* `chardet` or `charset-normalizer` (optional for GUI)
 * `wxPython` (optional for GUI)
 * `PyOpenGL` (optional for GUI)
 * `pyFFTW` (optional for fast Fourier transform)
-* `tifffile <= 2021.7.2` (optional for reading/writing tiff)
+* `tifffile` (optional for reading/writing tiff)
 * `nd2` (optional for reading Nikon nd2 file)
+* `czifile` (optional for reading Zeiss czi file)
+* `oiffile` (optional for reading Olympus oif/oib file)
+* `readlif` (optional for reading Leica lif file)
 * `javabridge` (optional for reading more image file formats)
 * `python-bioformats` (optional for reading more image file formats)
 * `lxml` (optional for reading more image file formats)
