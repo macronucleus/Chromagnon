@@ -90,6 +90,7 @@ else: # mac + linux
     if sys.platform == 'darwin':
         suffix = 'Mac' + ex_suffix
         jvm = 'libjvm.dylib'
+        pylibpath = os.path.join(conda, 'lib')
     # linux
     else:
         suffix = ''
@@ -106,6 +107,7 @@ else: # mac + linux
 
 
 prog = os.path.abspath(os.path.join(src, 'Chromagnon', module))
+print(prog, 'is file', os.path.isfile(prog))
 #DISTPATH=os.path.relpath(os.path.join(src, 'dist')) # not working??
         
 # ------ chromagnon version
@@ -120,6 +122,7 @@ else:
 datas = [(os.path.join(code, 'Priithon', '*.py'), 'Priithon'), (os.path.join(code, 'Priithon', 'plt', '*.py'), os.path.join('Priithon', 'plt')), (os.path.join(code, 'PriCommon', '*.py'), 'PriCommon'), (os.path.join(code, 'common', '*.py'), 'common')]#, (os.path.join(site, 'tifffile', '*.%s' % pylib), 'tifffile')]
 if 0:#sys.platform.startswith('linux'):
     datas += [(os.path.join(pylibpath, 'libglut.*'), 'lib')]
+#datas += [(os.path.join(pylibpath, 'libpython3.12.*'), 'lib')]
     
 if not PLUGIN:
     #datas += [(os.path.join(site, 'javabridge', '*.%s' % pylib), 'javabridge'), (os.path.join(site, 'javabridge', 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(site, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
@@ -162,7 +165,8 @@ pyz = PYZ(a.pure, a.zipped_data,
 
 exe = EXE(pyz,
           a.scripts,
-          a.binaries - TOC([(jvm, None, None)]),
+        #  a.binaries - TOC([(jvm, None, None)]),
+          #a.binaries - TOC([('libpython3.12.dylib', None, None)]),
           a.zipfiles,
           a.datas,
           name='%s%s%s' % (name, cversion, suffix),

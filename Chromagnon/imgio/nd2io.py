@@ -10,6 +10,7 @@ import numpy as N
 
 try:
     import nd2
+    # should be > 0.10.1, 0.5.3 did not work (no read_frame)
     from nd2._util import AXIS
     WRITABLE_FORMATS = ()
     READABLE_FORMATS = ('nd2',)
@@ -17,12 +18,12 @@ except ImportError:
     WRITABLE_FORMATS = READABLE_FORMATS = ()
 
 
-class ND2Reader(generalIO.GeneralReader):
+class Reader(generalIO.Reader):
     def __init__(self, fn):
         """
         fn: file name
         """
-        generalIO.GeneralReader.__init__(self, fn)
+        generalIO.Reader.__init__(self, fn)
 
     def openFile(self):
         """
@@ -69,9 +70,28 @@ class ND2Reader(generalIO.GeneralReader):
         # excitation wavelength
         self.exc = [cc.channel.excitationLambdaNm for cc in self.fp.metadata.channels]
 
+        # objective lens
+        try:
+            self.optics_data['na'] = [cc.microscope.objectiveNumericalAperture for cc in self.fp.metadata.channels]
+            self.optics_data['n1'] = [cc.microscope.immersionRefractiveIndex for cc in self.fp.metadata.channels]
+            self.optics_data['mag'] = [cc.microscope.objectiveMagnification for cc in self.fp.metadata.channels]
+        except KeyError:
+            pass
+
+        try:
+            self.na = self.optics_data['na'][0]
+            self.n1 = self.optics_data['n1'][0]
+            self.mag = self.optics_data['mag'][0]
+        except IndexError:
+            pass
+
 
     def readSec(self, i=None):
-        arr = self.fp._get_frame(i)
+        if hasattr(self.fp, 'read_frame'):
+            arr = self.fp.read_frame(i)
+        else:
+            arr = self.fp._get_frame(i)
+            
         if arr.ndim == 3 and self.axes[0] in ('S', 'C', 'W'):# == 'SYX'
             arr = arr[self.axes_w]
         elif arr.ndim == 3 and self.axes[-1] in ('S', 'C', 'W'):# == 'SYX'

@@ -1,9 +1,9 @@
 ### Here all kinds of fitting
 from __future__ import print_function
 try:
-    from ..Priithon.all import N, U
-except (ValueError, ImportError):
     from Priithon.all import N, U
+except (ValueError, ImportError):
+    from ..Priithon.all import N, U
 try:
     from . import imgFilters, imgGeo
 except ValueError:
@@ -491,7 +491,7 @@ def rotateIndicesND(slicelist, dtype=N.float64, rot=0, mode=2, store_shape=False
         s2 = tuple([int(ss) for ss in s2]) # numpy array cannot use used for slice
         inds = N.indices(s2, N.float32)
         ind_shape = inds.shape
-        nz = N.product(ind_shape[:-2])
+        nz = N.prod(ind_shape[:-2]) #uct(ind_shape[:-2])
         nsec = nz / float(ndim)
         if ndim > 2:
             inds = N.reshape(inds, (nz,)+ind_shape[-2:])

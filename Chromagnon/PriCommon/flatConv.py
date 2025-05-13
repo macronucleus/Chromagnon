@@ -12,7 +12,7 @@ except ImportError:
 try:
     import wx
     import time
-    from . import guiFuncs as G
+    from common import guiFuncs as G
     _wx = True
 except ImportError:
     _wx = False
@@ -263,7 +263,7 @@ if _wx:
             """
             view with viewer
             """
-            from PriCommon import ndviewer
+            import ndviewer
             import sys
             # prepare viewer
             if not self.aui:
@@ -290,8 +290,8 @@ if __name__ == '__main__':
 
     usage = r"""%prog imgFiles [options]"""
     p = optparse.OptionParser(usage=usage)
-    p.add_option('--out', '-O',
-                 help='output file name (default inputfile + %s)' % EXT)
+    p.add_option('--suffix', '-S', default=SUF,
+                 help='suffix for the output file names (default inputfile + %s)' % SUF)
     p.add_option('--flatFile', '-F',
                  help='flatFielding file required for flatfielding')
     p.add_option('--make', '-m', action='store_true',
@@ -306,25 +306,21 @@ if __name__ == '__main__':
     else:
         make = options.make
         del options.make
-        #fns = arguments#[0]
-        #args = arguments[1:]
 
         fns = []
         for fn in arguments:
             fns += glob.glob(os.path.expandvars(os.path.expanduser(fn)))
 
         if make:
-            outs = [makeFlatConv(fn) for fn in fns]
+            outs = [makeFlatConv(fn, suffix=EXT) for fn in fns]
             if len(outs) > 1:
-                if options.out:
-                    out = options.out
-                else:
-                    out = os.path.commonprefix(outs) + EXT
-                out = O.copyImgs.merge(outs, out, mergeAlong='w')
+                out = os.path.commonprefix(outs) + EXT
+                out = imgio.merge(outs, out, along='w')
                 [os.remove(out) for out in outs]
             else:
                 out = outs[0]
             print(out, ' saved')
         else:
             for fn in fns:
-                print(flatConv(fn, **options.__dict__), ' done')
+                out = flatConv(fn, **options.__dict__)
+                print(out, ' done')

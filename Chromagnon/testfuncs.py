@@ -38,7 +38,7 @@ def prepImg4AffineZ(fn, w=None, phaseContrast=True):
     #yz, c = xcorr.Xcorr(prefyz, pimgyz, phaseContrast=phaseContrast)
     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=phaseContrast)
 
-    xs = N.round_(an.refxs-yx[1]).astype(N.int)
+    xs = N.round(an.refxs-yx[1]).astype(int)
     if xs.max() >= an.img.nx:
         xsbool = (xs < an.img.nx)
         xsinds = N.nonzero(xsbool)[0]
@@ -101,7 +101,7 @@ def prepImg4Affine(fn, w=None, phaseContrast=True):
 
     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=phaseContrast)
     
-    xs = N.round_(an.refxs-yx[1]).astype(N.int)
+    xs = N.round(an.refxs-yx[1]).astype(int)
     if xs.max() >= an.img.nx:
         xsbool = (xs < an.img.nx)
         xsinds = N.nonzero(xsbool)[0]
@@ -111,7 +111,7 @@ def prepImg4Affine(fn, w=None, phaseContrast=True):
 
     yz = alignfuncs.iterationXcor(imgyz, an.refyz, maxErr=an.maxErrZ, niter=an.niter, phaseContrast=an.phaseContrast, echofunc=an.echofunc)
 
-    zs = N.round_(an.refzs-yz[1]).astype(N.int)
+    zs = N.round(an.refzs-yz[1]).astype(N.int)
     if zs.max() >= an.img.nz:
         zsbool = (zs < an.img.nz)
         zsinds = N.nonzero(zsbool)[0]
@@ -210,13 +210,13 @@ def prepareImg(fn, chrom=None, aligned=False, z=None, w=None):
                 arr = N.max(arr, axis=0)
     elif z is None:
         arr3D = an.get3DArr(w=w)
-        zs = N.round_(an.refzs-an.alignParms[0,w,0]).astype(N.int)
+        zs = N.round(an.refzs-an.alignParms[0,w,0]).astype(N.int)
         arr = alignfuncs.prep2D(arr3D, zs=zs)
     else:
         #z0 = int(round(z - an.alignParms[0,w,0]))
         try:
             len(z)
-            z0 = N.round_(N.array(z) - an.alignParms[0,w,0])
+            z0 = N.round(N.array(z) - an.alignParms[0,w,0])
             arr = N.max(an.get3DArr(w=w, zs=z0.astype(N.int)), axis=0)
         except TypeError:
             z0 = int(round(z - an.alignParms[0,w,0]))
@@ -1796,7 +1796,7 @@ def align2D(fn, npxls, t=0):
         if an.img.nz > 1:
             img = an.img.get3DArr(w=w, t=t)
 
-            zs = N.round_(N.array(an.refzs)).astype(N.int)
+            zs = N.round(N.array(an.refzs)).astype(N.int)
 
             if zs.max() >= an.img.nz:
                 zsbool = (zs < an.img.nz)

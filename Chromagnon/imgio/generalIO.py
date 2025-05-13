@@ -6,7 +6,11 @@ IMGSEQ = ['WTZ', 'TZW', 'TWZ', 'WZT', 'ZTW', 'ZWT']
 WAVE_START = 0
 WAVE_STEP  =  1
 
-READABLE_FORMATS = WRITABLE_FORMATS = []
+READABLE_FORMATS = WRITABLE_FORMATS = ['npy']
+
+NA=None#1.4
+N1=None#1.515
+MAG=None
 
 class ImageIOError(Exception):
     """
@@ -14,7 +18,7 @@ class ImageIOError(Exception):
     """
     pass
 
-class GeneralReader(object):
+class Reader(object):
     def __init__(self, fn, mode='r'):
         """
         fn: file name
@@ -27,12 +31,18 @@ class GeneralReader(object):
         self.imgseqs = IMGSEQ
         self.metadata = {}
         self.ex_metadata = {}
+        self.optics_data = {}
         #self.useROI2getArr = False
         self.flip_required = True
         
         self.mode = mode
         self.axes = 'YX' # axes of one section
         self.axes_w = 0
+
+        self.mag= MAG
+        self.na = NA
+        self.n1 = N1
+
 
         # current positions
        # self.t = self.w = self.z = self.y = self.x = 0
@@ -109,6 +119,7 @@ class GeneralReader(object):
         return imgSeq value
         """
         axes = axis_order_string.upper()
+        axes = ''.join([a for a in axes if a in self.imgseqs[0]])
         if len(axes) <= 1:
             ## because my code tend to use t->w->z, here imgSeq = 2,
             ## however, 0 is more prevalent in the rest of world...
@@ -196,7 +207,10 @@ class GeneralReader(object):
             if not hasattr(self, '_secExtraByteSize'):
                 self._secExtraByteSize = 0
             npxls = self.ny * self.nx
-            self._secByteSize = int(N.nbytes[self.dtype] * npxls) + self._secExtraByteSize
+            try:
+                self._secByteSize = int(N.dtype(self.dtype.__name__).itemsize * npxls) + self._secExtraByteSize
+            except(AttributeError):
+                self._secByteSize = int(N.dtype(self.dtype).itemsize * npxls) + self._secExtraByteSize
         self.doOnSetDim()
 
     def doOnSetDim(self):
@@ -320,7 +334,7 @@ class GeneralReader(object):
             elif self.imgSequence == 3:
                 shape = (self.nw,self.nz,self.nt) + yx
             elif self.imgSequence == 4:
-                shape = (self.nt,self.nt,self.nw) + yx
+                shape = (self.nz,self.nt,self.nw) + yx
             elif self.imgSequence == 5:
                 shape = (self.nz,self.nw,self.nt) + yx
         elif len(self.axes) == 3 and self.axes[0] in ('S', 'C', 'W'):
@@ -396,6 +410,33 @@ class GeneralReader(object):
             self.axes_w = w
             
         return int(i)
+
+    def findDimFromIdx(self, i=0):
+        if self.imgSequence == 0:
+            z = i % (self.nw * self.nt)
+            t = ((i-z) / (self.nz)) % self.nt
+            w = (i-z)//(self.nz*self.nt)
+        elif self.imgSequence == 1:
+            w = i % (self.nt * self.nz)
+            z = ((i-w) / (self.nw)) % self.nz
+            t = (i-w)//(self.nw*self.nz)
+        elif self.imgSequence == 2:
+            z = i % (self.nw * self.nt)
+            w = ((i-z) / (self.nz)) % self.nw
+            t = (i-z)//(self.nz*self.nw)
+        elif self.imgSequence == 3:
+            t = i % (self.nw * self.nz)
+            z = ((i-t) / (self.nt)) % self.nz
+            w = (i-t) / (self.nz*self.nt)
+        elif self.imgSequence == 4:
+            w = i % (self.nt * self.nz)
+            t = ((i-w) / (self.nw)) % self.nt
+            z = (i-w) / (self.nw*self.nt)
+        elif self.imgSequence == 5:
+            t = i % (self.nw * self.nz)
+            w = ((i-t) / (self.nt)) % self.nw
+            z = (i-t) / (self.nw*self.nt)
+        return t, w, z
 
     def readSec(self, i=None):
         """
@@ -559,7 +600,7 @@ class GeneralReader(object):
 
         return data
 
-class GeneralWriter(GeneralReader):
+class Writer(Reader):
     def __init__(self, fn, mode='wb'):
         """
         fn: file name
@@ -569,14 +610,14 @@ class GeneralWriter(GeneralReader):
         self._secExtraByteSize = 0
         
         # call self.openFile()
-        GeneralReader.__init__(self, fn, mode)
+        Reader.__init__(self, fn, mode)
 
     def setFromReader(self, rdr):
         """
         read dimensions, imgSequence, dtype, pixelsize from a reader
         """
         self.setPixelSize(*rdr.pxlsiz)
-        self.metadata = rdr.metadata
+        self.metadata.update(rdr.metadata)# = rdr.metadata
         self.ex_metadata = rdr.ex_metadata
         self.setDim(rdr.roi_size[-1], rdr.roi_size[-2], rdr.roi_size[-3], rdr.nt, rdr.nw, rdr.dtype, rdr.wave, rdr.imgSequence)
 
@@ -625,6 +666,12 @@ class GeneralWriter(GeneralReader):
         
         for z, a in enumerate(arr):
             self.writeArr(a, t=t, w=w, z=z)
+
+    def mergeMetadataFromReaders(self, rdrs, along='t'):
+        """
+        rdrs: list of Reader objects
+        """
+        pass
 
 
 def makeWaves(nw, start=WAVE_START, step=WAVE_STEP):

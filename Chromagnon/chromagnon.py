@@ -415,6 +415,9 @@ class BatchPanel(wx.Panel):
             self.extra_parms['zacuur'] = eval(dlg.accurListChoice.GetStringSelection())
             C.saveConfig(accur=self.extra_parms['zacuur'])
 
+            self.extra_parms['order'] = eval(dlg.orderListChoice.GetStringSelection())
+            C.saveConfig(interpolation_order=self.extra_parms['order'])
+            
             self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
             C.saveConfig(max_shift=self.extra_parms['max_shift'])
 
@@ -600,8 +603,8 @@ class BatchPanel(wx.Panel):
                          self.extra_parms.get('calibfn', ''),
                          self.extra_parms.get('dorot4time', True),
                          self.extra_parms.get('doZ', True),
-                         (ref_is_temp, fns_is_temp)
-                         ] 
+                         (ref_is_temp, fns_is_temp),
+                         self.extra_parms.get('order', af.ORDER)] 
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")

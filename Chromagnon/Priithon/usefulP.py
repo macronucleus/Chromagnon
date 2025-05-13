@@ -58,12 +58,16 @@ def _col(c, overwriteHold=False):
     return plot_colors[ i % len(plot_colors) ]+c
 
 def _getFig(figureNo):
-    from . import plt
-    if figureNo is None:
-        plt.validate_active()
-        fig = plt.interface._active
-    else:
-        fig = plt.interface._figure[figureNo]
+    try:
+        import wxmplot.interactive as wi
+        fig = wi.get_plot_window()
+    except ImportError:
+        from . import plt
+        if figureNo is None:
+            plt.validate_active()
+            fig = plt.interface._active
+        else:
+            fig = plt.interface._figure[figureNo]
 
     return fig
 
@@ -73,10 +77,16 @@ def plotDatapoints(dataset=0, figureNo=None):
 
     figureNo None means "current"
     """
-    fig = _getFig(figureNo)
+    try:
+        import wxmplot.interactive as wi
+        fig = wi.get_plot_window()
+        axes = fig.panel.axes
+        return N.array(fig.panel.conf.data_save[axes][dataset])
+    except ImportError:
+        fig = _getFig(figureNo)
 
-    a = N.asarray( fig.client.line_list[dataset].points )
-    return N.transpose(a)
+        a = N.asarray( fig.client.line_list[dataset].points )
+        return N.transpose(a)
 
                     
 def plotGetXminmax(figureNo=None):
@@ -151,17 +161,25 @@ def plotSetTitle(title='', figureNo=None):
     """
     fig = _getFig(figureNo)
 
-    fig.client.title.text=title
-    fig.client.update()
+    if hasattr(fig, 'client'):
+        fig.client.title.text=title
+        fig.client.update()
+    else:
+        fig.set_title(title)
+        
 def plotSetXTitle(title='', figureNo=None):
     """
     title = '' means <no title>
     figureNo None means "current"
     """
     fig = _getFig(figureNo)
+    if hasattr(fig, 'client'):
 
-    fig.client.x_title.text=title
-    fig.client.update()
+        fig.client.x_title.text=title
+        fig.client.update()
+    else:
+        fig.set_xlabel(title)
+        
 def plotSetYTitle(title='', figureNo=None):
     """
     title = '' means <no title>
@@ -169,8 +187,11 @@ def plotSetYTitle(title='', figureNo=None):
     """
     fig = _getFig(figureNo)
 
-    fig.client.y_title.text=title
-    fig.client.update()
+    if hasattr(fig, 'client'):
+        fig.client.y_title.text=title
+        fig.client.update()
+    else:
+        fig.set_ylabel(title)
 
 def plotSetAxis(setting='equal', figureNo=None):
     """
@@ -283,13 +304,17 @@ def plotFigure(which_one = None):
     """if which_one = None       : start a new plot window
        if which_one is 'integer' : select that figure as active
     """
-    from . import plt
     try:
-        return plt.figure(which_one)
-        #if which_one is None:
-        #    plothold(on=0)
-    except wx.PyDeadObjectError: 
-        print("** figure '%s' invalid - made new one **"%which_one)
+        import wxmplot.interactive as wi
+        return wi.get_plot_window()
+    except ImportError:
+        from . import plt
+        try:
+            return plt.figure(which_one)
+            #if which_one is None:
+            #    plothold(on=0)
+        except wx.PyDeadObjectError: 
+            print("** figure '%s' invalid - made new one **"%which_one)
 
 def plotFigureGetNo(createNewIfNeeded=False):
     """
@@ -321,13 +346,15 @@ def plotClear(figureNo=None):
     # see interface: if not _active.hold in ['on','yes']:
     fig = _getFig(figureNo)
 
-    fig.line_list.data = [] # clear it out
-    fig.image_list.data = [] # clear it out
-    try:
-        del fig._sebCurrentColorIndex # reset colors 
-    except AttributeError:
-        pass
-    fig.update()
+    if hasattr(fig, 'client'):
+        fig.line_list.data = [] # clear it out
+        fig.image_list.data = [] # clear it out
+        try:
+            del fig._sebCurrentColorIndex # reset colors 
+        except AttributeError:
+            pass
+        fig.update()
+    
     
 def plotClose(which_one = None):
     """
@@ -344,7 +371,7 @@ def plotSetParent(parent=None):
     from . import plt
     plt.interface._parent = parent
     
-def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None):
+def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None, parent=None):
     """
     arr1 is a "table" of x,y1,...,yn values
     if arr2 is given than arr1 contains only the x values
@@ -395,7 +422,7 @@ def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None
         arr2 = N.abs(arr2)
         
     
-    x=arr1
+    x=N.squeeze(arr1)
     arr=arr2
 
     if logX:
@@ -403,30 +430,76 @@ def plotxy(arr1,arr2=None,c=plot_defaultStyle, logY=False, logX=False, hold=None
     if logY:
         arr = N.log10(abs(arr)+logZeroOffset)
 
-    from . import plt
-    if figureNo is not None:
-        _oldActive = plt.interface._active
-        #plotFigure(figureNo)  # would Raise !!
-        plt.interface._active = plt.interface._figure[figureNo]
-        #fig = plt.interface._figure[figureNo]        
+    try:
+        import wxmplot.interactive as plt
 
-    if hold is not None:
-        plothold(hold)
+        if 0:#figureNo is not None:
+            _oldActive = plt._active
+            plt._active = plt._figure[figureNo]
+
+        if len(arr.shape) == 1:
+            csm = _formatcsm(c, overwriteHold=hold)
+            if hold:
+                fig = plt.plot(x, arr, parent=parent, **csm)
+            else:
+                fig = plt.newplot(
+                    x, arr, parent=parent, **csm)
+        else:
+            data = []
+            for i in range(arr.shape[0]):
+                holdornot = (i>0) or hold
+                csm = _formatcsm(c, overwriteHold=holdornot)#i>0)
+                if i==0:
+                    if hold:
+                        fig = plt.plot(x, arr[i], parent=parent, **csm)
+                    else:
+                        fig = plt.newplot(x, arr[i], parent=parent, **csm)
+                        fig._sebCurrentColorIndex = 0
+                else:
+                    fig = plt.plot(x, arr[i], parent=parent, **csm)
+                plt._active = fig
+
+        plt._active = fig
+       # if hold:
+       #     fig.hold = 'on'
+       # else:
+       #     fig.hold = False
+        collist = ['red', 'green', 'blue', 'black', 'cyan', 'magenta']
+        if csm.get('color') in collist:
+             fig._sebCurrentColorIndex = collist.index(csm['color'])
+        else:
+             fig._sebCurrentColorIndex = 0
+       
+
+        #if figureNo is not None:
+        #    plt._active = _oldActive
+        
+    except ImportError:
+        from . import plt
+        
+        if figureNo is not None:
+            _oldActive = plt.interface._active
+            #plotFigure(figureNo)  # would Raise !!
+            plt.interface._active = plt.interface._figure[figureNo]
+            #fig = plt.interface._figure[figureNo]        
+
+        if hold is not None:
+            plothold(hold)
 
 
-    if len(arr.shape) == 1:
-        plt.plot(
-            x, arr, _col(c))
-    else:
-        data = []
-        for i in range(arr.shape[0]):
-            data.extend( (x, arr[i], _col(c, overwriteHold=i>0)) )
-            plt.plot( *data )
+        if len(arr.shape) == 1:
+            plt.plot(
+                x, arr, _col(c))
+        else:
+            data = []
+            for i in range(arr.shape[0]):
+                data.extend( (x, arr[i], _col(c, overwriteHold=i>0)) )
+                plt.plot( *data )
 
-    if figureNo is not None:
-        plt.interface._active = _oldActive
+        if figureNo is not None:
+            plt.interface._active = _oldActive
 
-def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None, symbolSize=0):
+def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTranspose=True, logZeroOffset=.01, figureNo=None, symbolSize=0, parent=None):
     """
     arrY is a "table" of y1,...,yn values
     x-values of 0,1,2,3,4 are used as needed
@@ -449,30 +522,40 @@ def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTra
     """
     arrY = N.asarray( arrY )
 
-    if hold is not None:
-        plothold(hold, figureNo)
 
     if len(arrY.shape) == 1 and not logX:
-        #if logX:
-        #    raise ValueError, 'Cannot use logX=True to plot x="axis-index"'
-        #plotxy(arrY) # CHECK
-        from . import plt
-        if figureNo is not None:
-            _oldActive = plt.interface._active
-            #plotFigure(figureNo)  # would Raise !!
-            plt.interface._active = plt.interface._figure[figureNo]
-            #fig = plt.interface._figure[figureNo]        
-        
-
         if logY:
             arrY = N.log10(abs(arrY)+logZeroOffset)
         if N.iscomplexobj(arrY):
             arrY = N.abs(arrY)
-        plt.plot(arrY, _col(c))
-        if figureNo is not None:
-            plt.interface._active = _oldActive
+            
+        try:
+            import wxmplot.interactive as plt
+            n = arrY.shape[0]
+            x = N.arange(n)
+            plotxy(x, arrY,c, logY, logX, hold, smartTranspose=smartTranspose, logZeroOffset=logZeroOffset, figureNo=figureNo, parent=parent)
+        except ImportError:
+            #if logX:
+            #    raise ValueError, 'Cannot use logX=True to plot x="axis-index"'
+            #plotxy(arrY) # CHECK
+            from . import plt
+
+            if hold is not None:
+                plothold(hold, figureNo)
+            
+            if figureNo is not None:
+                _oldActive = plt.interface._active
+                #plotFigure(figureNo)  # would Raise !!
+                plt.interface._active = plt.interface._figure[figureNo]
+                #fig = plt.interface._figure[figureNo]        
+
+            plt.plot(arrY, _col(c))
+            if figureNo is not None:
+                plt.interface._active = _oldActive
 
     else:
+
+            
         if len(arrY.shape) == 1: # !! logX is True
             n = arrY.shape[0]
             x = N.arange(n)
@@ -481,8 +564,93 @@ def ploty(arrY, c=plot_defaultStyle, logY=False, logX=False, hold=None, smartTra
                 arrY = N.transpose(arrY)
             n = arrY.shape[1]
             x = N.arange(n)
-        plotxy(x, arrY,c, logY, logX, smartTranspose=smartTranspose, logZeroOffset=logZeroOffset, figureNo=figureNo)
+            
+        try:
+            import wxmplot.interactive as plt
+            plotxy(x, arrY,c, logY, logX, hold=hold, smartTranspose=smartTranspose, logZeroOffset=logZeroOffset, figureNo=figureNo, parent=parent)
+        except ImportError:
+            if hold is not None:
+                plothold(hold, figureNo)
+            
+            plotxy(x, arrY,c, logY, logX, smartTranspose=smartTranspose, logZeroOffset=logZeroOffset, figureNo=figureNo, parent=parent)
 
+def _formatcsm(c, overwriteHold=False):
+    import wxmplot.interactive as wi
+    if hasattr(wi, '_active'):
+        fig = wi._active
+    else:
+        fig = None
+    #csm = _col(c, overwriteHold)
+    if c[0].isalpha() and c[0] not in 'xo':   #start colorString with letter to specify color
+        if len(c) == 1:
+            csm = c+plot_defaultStyle
+        else:
+            csm = c
+    elif c[0].isdigit():         #start colorString with digit to set new position in color-cycle
+        
+        fig._sebCurrentColorIndex = int(c[0])
+        i = fig._sebCurrentColorIndex
+        fig._sebCurrentColorIndex+=1
+
+        if len(c) == 1:
+            csm = c+plot_defaultStyle
+        else:
+            csm = c
+    elif fig: #20050723 if i is None:
+        #print('fig found')
+        if not overwriteHold:# and fig.hold not in ['on','yes']:
+           # print('fig not in on')
+            i = fig._sebCurrentColorIndex = 0
+            fig._sebCurrentColorIndex +=1
+        else:
+            #print('fig is on')
+            if not hasattr(fig, "_sebCurrentColorIndex"):
+                fig._sebCurrentColorIndex = 0
+            fig._sebCurrentColorIndex +=1
+            i = fig._sebCurrentColorIndex
+        #fig._sebCurrentColorIndex +=1
+        #print('index', fig._sebCurrentColorIndex)
+        csm = plot_colors[ i % len(plot_colors) ]+c
+    else:
+        if overwriteHold:
+            if fig and not hasattr(fig, "_sebCurrentColorIndex"):
+                fig._sebCurrentColorIndex = 0
+                fig._sebCurrentColorIndex +=1
+                i = fig._sebCurrentColorIndex
+            elif fig:
+                fig._sebCurrentColorIndex +=1
+                i = fig._sebCurrentColorIndex
+            else:
+                i = 0
+        else:
+            i = 0
+            if fig:
+                fig._sebCurrentColorIndex = i
+        csm = plot_colors[i] + c
+        
+        #fig._sebCurrentColorIndex = 0
+
+    #print(c, csm)#, fig._sebCurrentColorIndex)
+
+    coldic = {'r': 'red', 'g': 'green', 'b': 'blue', 'k': 'black', 'c': 'cyan', 'm': 'magenta'}
+    # olors can be names such as ‘red’ or hex strings ‘#RRGGBB’. by default, they are set by the theme
+    stldic = {'-': 'solid', '=': 'dashed', ':': 'dotted', ';': 'dash-dot'}
+    # styles can be one of ‘solid’, ‘short dashed’, ‘dash-dot’, ‘dashed’, ‘dotted’, ‘long-dashed’.
+    # markers can be one of ‘no symbol’, ‘o’, ‘+’, ‘x’, ‘square’, ‘diamond’, ‘thin diamond’, ‘^’, ‘v’, ‘>’, ‘<’, ‘|’, ‘_’, ‘hexagon’, ‘pentagon’, ‘tripod 1’, or ‘tripod 2’
+    csmdic = {}
+    for c in csm:
+        if c.isalpha() and c.lower() not in 'ox':
+            csmdic['color'] = coldic[c.lower()]
+        elif c in stldic:
+            if csmdic.get('style'):
+                csmdic['marker'] = c
+            else:
+                csmdic['style'] = stldic[c]
+        else:
+            csmdic['marker'] = c
+    #print(csmdic)
+    return csmdic
+        
 def plothold(on=1, figureNo=None):
     fig = _getFig(figureNo)
     

@@ -12,9 +12,23 @@ except ImportError:
 READABLE_FORMATS = WRITABLE_FORMATS = ('mrc', 'dv')
 # 'Image sequence. 0=ZTW, 1=WZT, 2=ZWT (idx = [2,1,0])
 
-class MrcReader(generalIO.GeneralReader):
+LENS_ID={
+    # Olympus
+    10205: (20, 0.75, 1),
+    10404: (40, 0.85, 1),
+    10410: (40, 1.15, 1.333),
+    10403: (40, 1.35, 1.518),
+    10603: (60, 1.20, 1.333),
+    10602: (60, 1.40, 1.518),
+    10612: (60, 1.42, 1.518),
+    10003: (100, 1.35, 1.40),
+    10002: (100, 1.40, 1.518),
+    10007: (100, 1.40, 1.518)
+             }
+
+class Reader(generalIO.Reader):
     def __init__(self, fn, mode='r'):
-        generalIO.GeneralReader.__init__(self, fn, mode)
+        generalIO.Reader.__init__(self, fn, mode)
         self.flip_required = False
 
     def openFile(self):
@@ -47,28 +61,9 @@ class MrcReader(generalIO.GeneralReader):
         #self.metadata['title'] = self.hdr.title
         for ttl in self.hdr.title:
             if type(ttl) == N.bytes_:
-                #ttl = ttl.decode('UTF-8', 'ignore')
-                ttl = ttl.decode('ascii', 'ignore') # combatibility to TIFF
-
-            neq = ttl.count('=')
-            if neq > 1:#'=' in ttl: # this does not find separation of =
-                for sep in [',', ':', ';', ' ']:
-                    if sep in ttl:
-                        ttls = ttl.split(',')
-                        break
-                else:
-                    ttls = [ttl]
-            elif neq == 1:
-                ttls = [ttl]
-            else:
-                key = ttl
-                val = ''
-                if key:
-                    self.metadata[key] = val
-                ttls = []
-
-            for ttl0 in ttls:
-                kvs = ttl0.split('=')
+                ttl = ttl.decode('UTF-8', 'ignore')
+            if '=' in ttl: # this does not find separation of =
+                kvs = ttl.split('=')
                 nvs = len(kvs)
                 for i in range(nvs//2):
                     kv = kvs[i*2:(i+1)*2]
@@ -82,12 +77,26 @@ class MrcReader(generalIO.GeneralReader):
                         except:
                             self.metadata[key] = val
                             #pass
+            else:
+                key = ttl
+                val = ''
+                if key:
+                    self.metadata[key] = val
 
         self.fp._secByteSize = self._secByteSize
 
         # excitation wavelength
         if hasattr(self.fp, 'extFloats') and self.fp.extFloats.ndim >= 2 and self.fp.extFloats.shape[-1] >= 32:
-            self.exc = self.fp.extFloats[:nw,10]
+            self.exc = N.zeros((nw,), dtype=N.float32)
+            for w in range(nw):
+                i = self.findFileIdx(w=w)
+                if i < self.fp.extFloats.shape[0]:
+                    self.exc[w] = self.fp.extFloats[i,10]
+
+        # objective
+        self.mag, self.na, self.n1 = LENS_ID.get(int(self.fp.hdr.LensNum), (generalIO.MAG, generalIO.NA, generalIO.N1))
+            
+            #self.exc = self.fp.extFloats[:nw,10]
 
     def makeHdr(self):
         """
@@ -145,14 +154,14 @@ class MrcReader(generalIO.GeneralReader):
         return a '''
 
 
-class MrcWriter(generalIO.GeneralWriter):
+class Writer(generalIO.Writer):
     def __init__(self, outfn, hdr=None, extInts=None, extFloats=None, metadata={}):
         """
         prepare your hdr and output filename
 
         metadata: goes to title (number of keys <= 10)
         """
-        generalIO.GeneralWriter.__init__(self, outfn, mode='w')
+        generalIO.Writer.__init__(self, outfn, mode='w')
         self.flip_required = False
         
         self.hdr = hdr
@@ -186,6 +195,7 @@ class MrcWriter(generalIO.GeneralWriter):
         self.hdr.ImgSequence = self.imgSequence
         self.hdr.wave[:self.nw] = self.wave[:self.nw]
         self.hdr.d[:] = self.pxlsiz[::-1]
+        self.hdr.LensNum = findLens(self.mag, self.na)
 
         self.writeHeader(self.hdr)
 
@@ -193,7 +203,7 @@ class MrcWriter(generalIO.GeneralWriter):
         """
         read dimensions, imgSequence, dtype, pixelsize from a reader
         """
-        if isinstance(rdr, MrcReader):
+        if isinstance(rdr, Reader):
             if hasattr(rdr.fp, 'extInts'):
                 self.setExtHdr(extInts=rdr.fp.extInts, extFloats=rdr.fp.extFloats)
             self.setDimFromMrcHdr(rdr.hdr)
@@ -258,6 +268,9 @@ class MrcWriter(generalIO.GeneralWriter):
             else:
                 msg = key
 
+            # escape from unicode characters
+            msg = msg.encode('ascii', errors='ignore').decode()
+
             if N.bytes_(msg) in self.hdr.title:
                 continue
 
@@ -268,8 +281,7 @@ class MrcWriter(generalIO.GeneralWriter):
                 written = False
                 for i, s in enumerate(self.hdr.title):
                     if not s:
-                        Mrc.setTitle(hdr, msg[:80], i)
-                        # Mrc only support title up to 80 characters
+                        Mrc.setTitle(hdr, msg, i)
                         written = True
                         break
                 if not written:
@@ -303,6 +315,83 @@ class MrcWriter(generalIO.GeneralWriter):
         i = self.findFileIdx(t, z, w)
 
         self.fp.writeSec(arr2D, i)
+
+    def mergeMetadataFromReaders(self, rdrs, along='t'):
+        """
+        only for mrc formats
+        """
+        nt = 0
+        nw = 0
+        nz = 0
+
+        ni = 0
+        nf = 0
+        ns = 0
+
+        for rdr in rdrs:
+            if along == 't':
+                nt += rdr.nt
+            else:
+                nt = rdr.nt
+            if along == 'w':
+                nw += rdr.nw
+            else:
+                nw = rdr.nw
+            if along == 'z':
+                nz += rdr.nz
+            else:
+                nz = rdr.nz
+
+            if hasattr(rdr.fp.hdr.NumIntegers, 'shape'):
+                ni = rdr.fp.hdr.NumIntegers[0]
+            else:
+                ni = rdr.fp.hdr.NumIntegers
+            if hasattr(rdr.fp.hdr.NumFloats, 'shape'):
+                nf = rdr.fp.hdr.NumFloats[0]
+            else:
+                nf = rdr.fp.hdr.NumFloats
+        
+        ns = nt * nw * nz
+            
+        self.fp.makeExtendedHdr(ni, nf, nSecs=ns) # this creates many instances
+        #self.fp = addExtHdrFromExt(self.fp, ni,nf)
+                                       # nf, self.fp.extInts, self.fp.extFloats)
+        #self.fp.
+
+        #print(self.fp.extFloats.shape, ns, ni, nf, self.fp._extHdrBytesPerSec)
+        d2 = 0
+        for h in rdrs:
+            for t in range(h.nt):
+                for w in range(h.nw):
+                    for z in range(h.nz):
+                        i = h.findFileIdx(t=t, w=w, z=z)
+                        ei = h.fp.extInts[i]
+                        ef = h.fp.extFloats[i]
+                        if along == 't':
+                            j = self.findFileIdx(t=d2+t, w=w, z=z)
+                        elif along == 'w':
+                            j = self.findFileIdx(t=t, w=w+d2, z=z)
+                        elif along == 'z':
+                            j = self.findFileIdx(t=t, w=w, z=z+d2)
+
+                        if j < self.fp.extInts.shape[0]:
+                            self.fp.extInts[j] = ei
+                            self.fp.extFloats[j] = ef
+                            #if z==0 and t==0:
+                            #    print(w, j, ef[10],self.fp._extHdrArray.field('float')[j][10])
+                            
+            if along == 't':
+                d2 += h.nt
+            elif along == 'w':
+                d2 += h.nw
+            elif along == 'z':
+                d2 += h.nz
+
+        self.fp.hdr.NumIntegers = self.fp.extInts.shape[-1]
+        self.fp.hdr.NumFloats = self.fp.extFloats.shape[-1]
+        self.fp.writeHeader()
+
+        self.fp.writeExtHeader(True)
 
 
 # functions
@@ -410,11 +499,12 @@ def addExtHdrFromExt(hdl, numInts=0, numFloats=0, extInts=None, extFloats=None):
 
     hdl.extInts = _reshapeExtHdr(hdl.extInts)
     hdl.extFloats = _reshapeExtHdr(hdl.extFloats)
-    extInts = _reshapeExtHdr(extInts)
-    extFloats = _reshapeExtHdr(extFloats)    
-
-    hdl.extInts[:nSecs,:numInts] = extInts[:nSecs,:numInts]
-    hdl.extFloats[:nSecs,:numFloats] = extFloats[:nSecs,:numFloats]
+    if extInts is not None:
+        extInts = _reshapeExtHdr(extInts)
+        hdl.extInts[:nSecs,:numInts] = extInts[:nSecs,:numInts]
+    if extFloats is not None:
+        extFloats = _reshapeExtHdr(extFloats)    
+        hdl.extFloats[:nSecs,:numFloats] = extFloats[:nSecs,:numFloats]
 
     return hdl
 
@@ -422,6 +512,36 @@ def _reshapeExtHdr(extHdr):
     if extHdr.ndim == 1:
         extHdr = extHdr.reshape(extHdr.shape + (1,))
     return extHdr
+
+def makeHdrFromArr(ref, targetArr=None):
+    if not hasattr(ref, 'header'):
+        raise ValueError('The reference array must have the "header" attribute')
+
+    hdr = ref.header
+    
+    if targetArr is not None:
+        ny, nx = targetArr.shape[-2:]
+        nsecs = N.prod(targetArr.shape[:-2])
+        dtype = targetArr.dtype
+        if N.prod((ref.header.nt, ref.header.nz, ref.header.nw)) != nsecs:
+            print('Number of sections is different, please edit nt, nw, and Num')
+    else:
+        ny, nx = ref.header.ny, ref.header.nx
+        dtype = ref.dtype
+        print('Please edit nw, nt, Num, dtype if they are different in the target array')
+
+
+    
+    hdr = makeHdrFromDim(nx, ny, ref.header.nz, ref.header.nt, ref.header.nw, dtype=dtype, wave=ref.header.wave, imgSequence=0)
+
+    hdr.d[:] = ref.header.pxlsiz[::-1]
+
+    for i, meta in enumerate(ref.header.metadata.keys()):
+        if i < 10:
+            Mrc.setTitle(hdr, meta, i)
+
+    return hdr
+    
 
 
 #### imgManager ####
@@ -482,7 +602,7 @@ def recalcMinMax(fn):
     """
     update scale in the header
     """
-    h = MrcReader(fn)
+    h = Reader(fn)
     hdr = makeHdr_like(h.hdr)
 
     o = Mrc3(fn, 'r+')
@@ -629,3 +749,9 @@ def nt_uint_switch(on=True):
         ret = 0
     Mrc.mrcHdr_dtype = list(zip(Mrc.mrcHdrNames, Mrc.mrcHdrFormats))
     return ret
+
+def findLens(mag=60, na=1.42):
+    for key, val in LENS_ID.items():
+        if val[0] == mag and val[1] == na:
+            return key
+    return 0

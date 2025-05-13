@@ -64,7 +64,7 @@ def initglut():
 
 class ImagePanel(wx.Panel):
     viewCut   = False
-    def __init__(self, parent, imFile=None, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, useCropbox=viewer2.CROPBOX):
+    def __init__(self, parent, imFile=None, id=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, useCropbox=viewer2.CROPBOX, dtype=None):
         wx.Panel.__init__(self, parent, id, pos, size, name='')
 
         # to make consistent with the older viewers
@@ -82,6 +82,10 @@ class ImagePanel(wx.Panel):
             self.doc = imgio.Reader(imFile)
         else:
             self.doc = imFile
+
+        self.dtype = dtype
+        if dtype:
+            self.doc.dtype=dtype
 
         #self.zsec  = [self.doc.nz//2]
         #self.zlast = [0]
@@ -112,6 +116,7 @@ class ImagePanel(wx.Panel):
                                              size=wx.Size(self.doc.nx, self.doc.ny),
                                              useCropbox=self.useCropbox
                                              ))
+        self.viewers[-1].dtype = self.dtype
 
         self._mgr.AddPane(self.viewers[0], aui.AuiPaneInfo().Floatable(False).Name('XY').Caption("XY").BestSize((self.doc.nx, self.doc.ny)).CenterPane().Position(0))
 
@@ -330,6 +335,12 @@ class ImagePanel(wx.Panel):
             box = G.newSpaceV(sizer)
             self.loadImgButton = G.makeButton(self.sliderPanel, box, self.loadImage2Memory, title='Load whole data into memory', tip='If the Z/T slider or changing scaling is too slow, try this funtion.')
 
+        if self.doc.nw == 1:
+            box = G.newSpaceV(sizer)
+            atrdic = viewer2.GLViewer.__dict__
+            self.choice_colmaps = [key for key in atrdic if type(atrdic[key]) == list and not key.startswith('_')] + ['log', 'min_max']
+            label, self.colmapch = G.makeListChoice(self.sliderPanel, box, 'colormap ', self.choice_colmaps, defValue=[self.choice_colmaps[0]], targetFunc=self.oncolmap)
+
 
     def OnAutoFocus(self, evt=None):
         """
@@ -387,14 +398,14 @@ class ImagePanel(wx.Panel):
     def loadImage2Memory(self, evt=False):
         # since bioformats is too slow, orthogonal view needs to read array data into memory
         # On my second thought, 2k x 2k image also takes long to read, it is better to load into memory always.
-        if (self.doc.nz > 1 or self.doc.nt > 1) and self.loadImgButton.IsEnabled() and issubclass(type(self.doc), imgio.generalIO.GeneralReader):
+        if (self.doc.nz > 1 or self.doc.nt > 1) and self.loadImgButton.IsEnabled() and issubclass(type(self.doc), imgio.generalIO.Reader):
             zlast = self.doc.zlast
             z = self.doc.z
             pxlsiz = self.doc.pxlsiz
             roi_start = self.doc.roi_start
             roi_size = self.doc.roi_size
             
-            self.doc = imgio.arrayIO.ArrayReader(self.doc)
+            self.doc = imgio.arrayIO.Reader(self.doc)
             self.doc.zlast = zlast
             self.doc.z = z
             self.doc.pxlsiz = pxlsiz
@@ -454,6 +465,7 @@ class ImagePanel(wx.Panel):
                                                  size=wx.Size(self.doc.nz, self.doc.ny),
                                                  useCropbox=self.useCropbox
                                                  ))
+            self.viewers[-1].dtype = self.dtype
             self._mgr.AddPane(self.viewers[-1], aui.AuiPaneInfo().Floatable(False).Name('ZY').Caption("ZY").Left().Position(0).BestSize((self.doc.nz, self.doc.ny)))#.Dockable(False).Top())
             self.viewers[-1].setMyDoc(self.doc, self)
             self.viewers[-1].scale *= self.doc.pxlsiz[-3]/self.doc.pxlsiz[-2] # mag compensate
@@ -472,6 +484,7 @@ class ImagePanel(wx.Panel):
                                                  size=wx.Size(self.doc.nx, self.doc.nz),
                                                  useCropbox=self.useCropbox
                                                  ))
+            self.viewers[-1].dtype = self.dtype
             self._mgr.AddPane(self.viewers[-1], aui.AuiPaneInfo().Floatable(False).Name('XZ').Caption("XZ").BestSize((self.doc.nz, self.doc.ny)).CenterPane().Position(1))
             self.viewers[-1].setMyDoc(self.doc, self)
             self.viewers[-1].setAspectRatio(self.doc.pxlsiz[-3]/self.doc.pxlsiz[-1])
@@ -546,6 +559,15 @@ class ImagePanel(wx.Panel):
         # save
         Y.vSaveRGBviewport(v, fn, flipY=False)
 
+    def onCopyRegion(self, evt=None):
+        roi = self.getROI()
+        ws = [w for w, hist in enumerate(self.hist_toggleButton) if hist.GetValue()]
+        out = imgio.copyRegion(self.doc.fn, twzyx0=(0,0,roi[0][0],roi[0][1],roi[0][2]),twzyx1=(None,None,roi[1][0],roi[1][1],roi[1][2]),channel_ids=ws)
+
+        if evt:
+            frame = self.parent
+            main(out, useCropbox=True)
+
         
     def initHists(self):
         ''' Initialize the histogram/aligner panel, and a bunch of empty lists;
@@ -575,7 +597,8 @@ class ImagePanel(wx.Panel):
         
         self.hist_singleChannelMode = None
         self.hist_toggleID2col    = {}
-
+        self.gamma_cmbs = []
+        
         for i in range(self.doc.nw):
             wave = self.doc.wave[i]#mrcIO.getWaveFromHdr(self.doc.hdr, i)
             self.hist_show[i] = True
@@ -586,6 +609,9 @@ class ImagePanel(wx.Panel):
             self.hist_toggleButton[i].Bind(wx.EVT_RIGHT_DOWN, 
                                            lambda ev: self.OnHistToggleButton(ev, i=i, mode="r"))
             self.hist_toggleButton[i].SetValue( self.hist_show[i] )
+
+            choice = ['%.1f' % v for v in N.arange(0.4, 1.6, 0.2)]
+            self.gamma_cmbs.append(G.makeCombo(self.histsPanel, box, '', choices=choice, defVal='1.0', targetFunc=self.onGamma)[1])
 
             self.intensity_label[i] = G.makeTxt(self.histsPanel, box, ' '*32)
 
@@ -642,6 +668,9 @@ class ImagePanel(wx.Panel):
         self.roi_label0 = G.makeTxt(self.histsPanel, box, ' '*64)
         box = G.newSpaceV(sizer)
         self.roi_label1 = G.makeTxt(self.histsPanel, box, ' '*64)
+        if self.useCropbox:
+            box = G.newSpaceV(sizer)
+            copyRegionButton = G.makeButton(self.histsPanel, box, self.onCopyRegion, title='Copy Region', tip='')
 
         self.histsPanel.SetAutoLayout(1)
         self.histsPanel.SetupScrolling()
@@ -1049,6 +1078,60 @@ class ImagePanel(wx.Panel):
         return tuple(start), tuple(stop)
         #return [slice(*ss) for ss in zip(start, stop)]
 
+    def oncolmap(self, evt=None):
+        choice = self.colmapch.GetStringSelection()
+
+        for i, viewer in enumerate(self.viewers):
+            if choice == 'Grey':
+                viewer.cmone()
+                #colMap = N.empty(shape = (3,n), dtype = N.float32)
+                #colMap[:] = N.linspace(0,1,num=n,endpoint=True)
+            elif choice == 'log':
+                viewer.cmlog()
+            elif choice == 'spectrum3':
+                viewer.cmcol()
+            elif choice == 'blackbody':
+                viewer.cmblackbody()
+            elif choice == 'magma':
+                viewer.cmmagma()
+            elif choice == 'viridis':
+                viewer.cmviridis()
+           # elif choice == 'spectrum3':
+           #     viewer.cmwheel()
+            elif choice == 'min_max':
+                viewer.cmGrayMinMax()
+
+            self.updateHistColMap(i)
+
+    def updateHistColMap(self, i, w=0):
+        viewer = self.viewers[i]
+        hist = self.hist[w]#i]
+        colMap = viewer.colMap
+        hist.colMap = colMap
+        hist.m_histScaleChanged = 1
+        hist.m_imgChanged = True
+        hist.Refresh(0)
+
+    def onGamma(self, evt):
+        ## need to obtain value from evt
+        for w, cmb in enumerate(self.gamma_cmbs):
+            choice = cmb.GetValue()
+            try:
+                val = float(choice)
+            except TypeError:
+                return
+
+          #  hist = self.hist[w]
+            for i, v in enumerate(self.viewers):
+            #v = self.viewers[i]
+                if val != v.gamma[w]:
+                    v.gamma[w] = val
+                    v.setGamma(w)
+                    v.changeHistogramScaling()
+                    self.updateHistColMap(i, w=w)
+        
+
+    
 class MyFrame(wx.Frame):
 
     def __init__(self, title='ND viewer', parent=None, id=wx.ID_ANY, size=FRAMESIZE):

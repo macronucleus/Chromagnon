@@ -8,7 +8,7 @@ except ImportError:
 READABLE_FORMATS = WRITABLE_FORMATS = []
 # 'Image sequence. 0=ZTW, 1=WZT, 2=ZWT (idx = [2,1,0])
 
-class ArrayReader(generalIO.GeneralReader):
+class Reader(generalIO.Reader):
     def __init__(self, fn, mode='r', name='array'):
         """
         fn: array or reader
@@ -19,7 +19,7 @@ class ArrayReader(generalIO.GeneralReader):
             ff = fn.fn
         else:
             ff = name#'/test/test.tif'
-        generalIO.GeneralReader.__init__(self, ff, mode)
+        generalIO.Reader.__init__(self, ff, mode)
         self.fp = fn
         #self.filename = self.fn = name
         self.flip_required = False

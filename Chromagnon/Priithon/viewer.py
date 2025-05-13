@@ -651,7 +651,7 @@ class GLViewer(GLViewerCommon):
             elif not self.transferf:
                 # handle non gfx-card dtypes
                 if data.dtype.type in (N.float64,
-                                       N.int32, N.uint32,N.int64, N.uint64, N.int0):
+                                       N.int32, N.uint32,N.int64, N.uint64, int):#N.int0):
                     data = data.astype(N.float32)
                 
                 srange =  float(self.m_maxHistScale - self.m_minHistScale)

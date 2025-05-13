@@ -17,16 +17,13 @@ try:
     ## MEMO: "ImageJ does  not support non-contiguous data" means shape does not match
     WRITABLE_FORMATS = ('tif', 'tiff')
     tifversion = tifffile.__version__.split('.')
-    if int(tifversion[0]) > 2021 or (int(tifversion[0]) >= 2021 and int(tifversion[1]) >= 4):#11):
+    if int(tifversion[0]) > 2021 or (int(tifversion[0]) >= 2021 and int(tifversion[1]) >= 11):
         WRITABLE_FORMATS += ('ome.tif', 'ome.tiff')
         READABLE_FORMATS = WRITABLE_FORMATS + ('lsm',)
     else:
         READABLE_FORMATS = WRITABLE_FORMATS + ('ome.tif', 'ome.tiff', 'lsm')
 except ImportError:
     WRITABLE_FORMATS = READABLE_FORMATS = ()
-    class tifff:
-        def __init__():
-            pass
     
 
 IMAGEJ_METADATA_TYPES = ['Info', 'Labels', 'Ranges', 'LUTs', 'Plot', 'ROI', 'Overlays']
@@ -39,12 +36,12 @@ def _convertUnit(val, fromwhat='mm', towhat=u'\xb5'+'m'):
     factor = factors[fromwhat] - factors[towhat] or 0
     return float(val) * 10 ** factor
 
-class MultiTiffReader(generalIO.GeneralReader):
+class Reader(generalIO.Reader):
     def __init__(self, fn):
         """
         fn: file name
         """
-        generalIO.GeneralReader.__init__(self, fn)
+        generalIO.Reader.__init__(self, fn)
 
     def openFile(self):
         """
@@ -114,7 +111,6 @@ class MultiTiffReader(generalIO.GeneralReader):
                 waxis = axes.index('W')
                 nw = shape[waxis]
         waves = generalIO.makeWaves(nw)
-            
 
         
         p = self.fp.pages[0]
@@ -281,10 +277,12 @@ class MultiTiffReader(generalIO.GeneralReader):
                     waves[w] = generalIO.WAVE_START - 50
         
         elif 'waves' in self.metadata:
-            if type(self.metadata['waves']) == int:
-                waves = [self.metadata['waves']]
-            else:
+            if isinstance(self.metadata['waves'], six.string_types):#type(self.metadata['waves']) in (int, float):
                 waves = [eval(w) for w in self.metadata['waves'].split(',')]
+            else:
+                waves = [self.metadata['waves']]
+            #else:
+            #    waves = [eval(w) for w in self.metadata['waves'].split(',')]
         return waves
 
                                 
@@ -332,20 +330,20 @@ class MultiTiffReader(generalIO.GeneralReader):
         return arr
 
 
-class MultiTiffWriter(generalIO.GeneralWriter):
+class Writer(generalIO.Writer):
     def __init__(self, fn, mode=None, style='imagej', software='multitifIO.py', metadata={}):
         """
         mode is 'wb' whatever the value is...
         style: 'imagej', 'ome', ..., ('RGB' does not work yet)
         """
         self.style = style #imagej = imagej
-        self.metadata = metadata #{}
         self.software = software
         #self.ex_metadata = extra_metadata
         #self.extratags = ()
         self.init = False
 
-        generalIO.GeneralWriter.__init__(self, fn, mode)
+        generalIO.Writer.__init__(self, fn, mode)
+        self.metadata.update(metadata) #{}
 
         if self.style == 'RGB':
             self.axes += 'S'
@@ -361,7 +359,7 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         tifversion = tifffile.__version__.split('.')
         if int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
             self.fp = tifffile.TiffWriter(self.fn, software=self.software, imagej=imagej)#, ome=ome)#, bigtiff=not(imagej))
-        elif int(tifversion[0]) == 0 and int(tifversion[1]) == 15:
+        elif (int(tifversion[0]) == 0 and int(tifversion[1]) == 15) or (int(tifversion[0]) == 2019 and int(tifversion[1])==7):
             self.fp = tifffile.TiffWriter(self.fn, imagej=imagej)
         else:
             self.fp = tifffile.TiffWriter(self.fn, imagej=imagej, ome=ome)#, bigtiff=not(imagej))
@@ -379,21 +377,52 @@ class MultiTiffWriter(generalIO.GeneralWriter):
             if hasattr(self, 'nt') and hasattr(self, 'fp') and self.fp._storedshape:
                 shape = (self.nt,self.nz,self.nw,self.ny,self.nx)
                 if self.style == 'imagej':
+                   # if 'Channels' in self.metadata:
+                   #     self.metadata['channels'] = self.metadata.pop('Channels')
                     colormapped = self.fp._colormap is not None
                     isrgb = self.fp._storedshape[-1] in (3, 4)
-                    des = tifffile.tifffile.imagej_description(shape=shape, rgb=isrgb, colormaped=colormapped, **self.metadata)
+                    #des = tifffile.tifffile.imagej_description(shape=shape, rgb=isrgb, colormaped=colormapped, **self.metadata)
+                    des = tifffile.tifffile.imagej_description(shape, rgb=isrgb, colormaped=colormapped, **self.metadata)
+                    #print('writing metaata', self.metadata)
                 elif self.style == 'ome':
+                    #self.metadata['DimensionOrder'] = 'XY'
+                    if 'Channels' in self.metadata:
+                        self.metadata['Channel'] = self.metadata.pop('Channels')
                     if self.fp._subifdslevel < 0:
-                        datashape = self.makeShape(squeeze=True)
-                        storedshape = (N.product(shape[:3]), 1, 1, self.ny, self.nx, 1)
-                        self.fp._ome.addimage(
-                            self.dtype,
-                            datashape,
-                            storedshape,
-                            **self.metadata
-                            )
-                    des = self.fp._ome.tostring(declaration=True).encode()
+                        datashape = self.makeShape(squeeze=(False))#True)
+                        storedshape = (N.prod(shape[:3]), 1, 1, self.ny, self.nx, 1)
+                        #axes = self.metadata['Pixels']['DimensionOrder'][::-1]
+                        #axes = self.metadata['Pixels']['axes']
+                       # axes = self.metadata['axes']
+                       # print(self.metadata, datashape, axes)
 
+                        if hasattr(self.fp._ome, 'addimage'): # older versions
+                            self.fp._ome.addimage(
+                                self.dtype,
+                                datashape,
+                                storedshape,
+                              #  axes=axes,
+                                **self.metadata
+                                )
+                        else:
+                            self.fp._omexml.addimage(
+                                self.dtype,
+                                datashape,
+                                storedshape,
+                              #  axes=axes,
+                                **self.metadata
+                                )
+
+                        # when this error is raised:
+                        # OmeXmlError('metadata DimensionOrder does not match {axes!r}')
+                        # then edit tifffile.py
+                        # ax for ax in omedimorder if dimsizes[dimorder.index(ax)] >= 1
+                        # change '>' to '>='
+                        
+                    if hasattr(self.fp._ome, 'addimage'): # older versions
+                        des = self.fp._ome.tostring(declaration=True).encode()
+                    else:
+                        des = self.fp._omexml.tostring(declaration=True).encode()
 
                 self.fp.overwrite_description(des)
         
@@ -467,6 +496,9 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         elif i is not None:
             self.seekSec(i)
 
+        #print('in writesec walking', self.metadata)
+        self.metadata = walk(self.metadata, replace)
+
         if int(tifversion[0]) >= 2020:
             offset, sec = self.fp.write(arr, resolution=self.res, metadata=self.metadata, returnoffset=True, software=self.software, photometric=photometric, contiguous=True)
         elif int(tifversion[0]) == 0 and int(tifversion[1]) <= 14:
@@ -537,14 +569,33 @@ class MultiTiffWriter(generalIO.GeneralWriter):
         return metadata
 
     def makeOMEMetadata(self):
-        axes = self.makeDimensionStr(squeeze=True).replace('W', 'C')
-        dimension = self.makeDimensionStr(squeeze=False).replace('W', 'C')#[::-1]
-        # for compatibility to 2021.7.2
-        extrdims = ''.join([dstr for dstr in dimension if dstr not in axes])
-        dimension = axes[::-1] + extrdims[::-1]
+        if self.nt == 1 and self.nw==1:
+            self.imgSequence = 0
+        elif self.nt == 1 and self.nz == 1:
+            self.imgSequence = 1
+        elif self.nw == 1 and self.nz == 1:
+            self.imgSequence = 3
+        elif self.nt == 1:
+            if self.imgSequence == 0:
+                self.imgSequence = 2
+            elif self.imgSequence == 4:
+                self.imgSequence = 1
+        elif self.nw == 1:
+            if self.imgSequence == 2:
+                self.imgSequence = 0
+            elif self.imgSeuqnce == 5:
+                self.imgSeuqnce = 3
+        elif self.nz == 1:
+            if self.imgSequence == 1:
+                self.imgSequence = 4
+            elif self.imgSequence == 3:
+                self.imgSequence = 5
+
+        axes = self.makeDimensionStr(squeeze=False).replace('W', 'C')
+        dimension = self.makeDimensionStr(squeeze=False).replace('W', 'C')[::-1]
         
         metadata = {
-            'Pixels': {
+            #'Pixels': {
                     'axes': axes,
                     'Interleaved': False,
                     'Type': pixeltype_to_ome(self.dtype),
@@ -560,12 +611,13 @@ class MultiTiffWriter(generalIO.GeneralWriter):
                     'PhysicalSizeXUnit': u'\xb5'+'m',
                     'PhysicalSizeYUnit': u'\xb5'+'m',
                     'PhysicalSizeZUnit': u'\xb5'+'m',
-                }}
+                }#}
         channels = [{} for w in range(len(self.wave))]
         for w, wave in enumerate(self.wave):
             channels[w]['EmissionWavelength'] = wave
             channels[w]['EmissionWavelengthUnit'] = 'nm'
-        metadata['Pixels']['Channel']  = channels
+        #metadata['Pixels']['Channel']  = channels
+        metadata['Channels'] = channels
                 
         return metadata
     
@@ -718,9 +770,9 @@ def astype(value):
             return value
 
 def testit(fn, outfn='testImageJ.tif'):
-    r = MultiTiffReader(fn)
+    r = Reader(fn)
                 
-    ww = MultiTiffWriter(outfn, imagej=True)
+    ww = Writer(outfn, imagej=True)
     ww.setFromReader(r)
     for t in range(r.nt):
         for w in range(r.nw):
@@ -728,7 +780,7 @@ def testit(fn, outfn='testImageJ.tif'):
                 arr = r.getArr(t=t, w=w, z=z)
                 ww.writeArr(arr, t=t, w=w, z=z)
     ww.close()
-    rr = MultiTiffReader(outfn)
+    rr = Reader(outfn)
     return rr.asarray()
 
 
@@ -796,18 +848,17 @@ def walk(node, func):
         for key, item in node.items():
             if isinstance(item, (list, dict)):
                 item = walk(item, func)
-            elif isinstance(key, six.string_types) and u'\xb5' in key:
+            if isinstance(key, six.string_types):# and u'\xb5' in key:
                 key = func(key)
-            elif isinstance(item, six.string_types) and u'\xb5' in item:
+            if isinstance(item, six.string_types):# and u'\xb5' in item:
                 item = func(item)
-                #print(key, item)
             node2[key] = item
     elif isinstance(node, list):
         node2 = []
         for item in node:
             if isinstance(item, (list, dict)):
                 item = walk(item, func)
-            elif isinstance(item, six.string_types) and u'\xb5' in item:
+            elif isinstance(item, six.string_types):# and u'\xb5' in item:
                 item = func(item)
                 #print(key, item)
             node2.append(item)
@@ -823,4 +874,6 @@ def replace(st):
     import unicodedata
     st = st.replace(u'\xb5', u'u')
     st = unicodedata.normalize('NFKD', st)
+    st = st.encode('ascii', 'ignore').decode()
+    #print('in replace', st)
     return st

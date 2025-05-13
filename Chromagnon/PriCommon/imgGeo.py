@@ -14,7 +14,7 @@ def RotateXY(xy, r, center=(0.0, 0.0)):
         return xy
     x = xy[0] - center[0]
     y = xy[1] - center[1]
-    rd = N.math.radians(r)
+    rd = N.radians(r)
     sin = N.sin(rd)
     cos = N.cos(rd)
     xr = x * cos - y * sin
@@ -43,7 +43,8 @@ def rotate(a, r, center=None):
     sin = N.sin(rd)
     cos = N.cos(rd)
     try:
-        m = N.mat(((cos, sin), (-sin, cos)))
+        #m = N.mat(((cos, sin), (-sin, cos)))
+        m = N.asmatrix(((cos, sin), (-sin, cos)))
         ar = N.inner(a, m) + center
     except ValueError: # more than 2D
         y, x = a
@@ -279,7 +280,7 @@ def nearbyRegion(shape, pos, r=5, closest=True, adjustEdge=True):
         len(r)
         if len(r) < np:
             raise ValueError('must be len(r) >= len(pos)')
-        r = N.round_(r)
+        r = N.round(r)
     except (TypeError, ValueError):
         r = round(r)
         r = [r] * np
@@ -336,13 +337,23 @@ def lineIdx3D(pos0, pos1):
     # yx
     cos = dzyx[-1] / l
     sin = dzyx[-2] / l
-    xs = N.arange(pos0[-1], pos1[-1], cos) + 0.5
-    ys = N.arange(pos0[-2], pos1[-2], sin) + 0.5
-    size = xs.size or ys.size
+    if cos:
+        xs = N.arange(pos0[-1], pos1[-1], cos) + 0.5
+    else:
+        xs = []
+    if sin:
+        ys = N.arange(pos0[-2], pos1[-2], sin) + 0.5
+    else:
+        ys = []
+    size = len(xs) or len(ys) #xs.size or ys.size
     if not size and dzyx.size == 3: # no yx difference
         sin = dzyx[-3] / l
-        zs = N.arange(pos0[-3], pos1[-3], sin) + 0.5
-        zyx = N.zeros((dzyx.size, zs.size), N.uint16) # uint16 !
+        if sin:
+            zs = N.arange(pos0[-3], pos1[-3], sin) + 0.5
+        else:
+            zs = []
+        zyx = N.zeros((dzyx.size, len(zs)), N.uint16) # uint16 !
+        #zyx = N.zeros((dzyx.size, zs.size), N.uint16) # uint16 !
         zyx[0] = zs
         zyx[-2] = pos0[-2]
         zyx[-1] = pos0[-1]
@@ -351,11 +362,11 @@ def lineIdx3D(pos0, pos1):
     zyx = N.empty((dzyx.size, size), N.uint16) # uint16 !
     #zyx[-1] = xs
     #zyx[-2] = ys
-    if not xs.size:
+    if not len(xs):#.size:
         zyx[-1] = pos0[-1]
     else:
         zyx[-1] = xs
-    if not ys.size:
+    if not len(ys):#.size:
         zyx[-2] = pos0[-2]
     else:
         zyx[-2] = ys
@@ -363,8 +374,11 @@ def lineIdx3D(pos0, pos1):
     # z
     if dzyx.size == 3:
         sin = dzyx[-3] / l
-        zs = N.arange(pos0[-3], pos1[-3], sin) + 0.5
-        if zs.size:
+        if sin:
+            zs = N.arange(pos0[-3], pos1[-3], sin) + 0.5
+        else:
+            zs = [pos0[-3]]
+        if len(zs):#.size:
             zyx[-3] = zs
         else:
             zyx[-3] = pos0[-3]

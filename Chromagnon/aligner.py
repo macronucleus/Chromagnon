@@ -493,7 +493,7 @@ class Chromagnon(object):
                     #print(yx)
                     del ref, c
                 # create 2D projection image
-                xs = N.round_(self.refxs-ret[w,2]).astype(int)
+                xs = N.round(self.refxs-ret[w,2]).astype(int)
                 if xs.max() >= self.img.nx:
                     xsbool = (xs < self.img.nx)
                     xsinds = N.nonzero(xsbool)[0]
@@ -603,7 +603,7 @@ class Chromagnon(object):
                     ret[w,0] = yz[1] / zzoom + zshift
 
 
-                zs = N.round_(self.refzs-ret[w,0]).astype(int)
+                zs = N.round(self.refzs-ret[w,0]).astype(int)
                 if zs.max() >= self.img.nz:
                     zsbool = (zs < self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
@@ -737,7 +737,7 @@ class Chromagnon(object):
                 img = self.img.get3DArr(w=w, t=t)
                 #img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
 
-                zs = N.round_(self.refzs-self.alignParms[t,w,0]).astype(int)
+                zs = N.round(self.refzs-self.alignParms[t,w,0]).astype(int)
                 if zs.max() >= self.img.nz:
                     zsbool = (zs < self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
@@ -806,7 +806,7 @@ class Chromagnon(object):
             if w == self.refwave:
                 continue
 
-            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
+            tzs = N.round(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
             arr3D = self.get3DArr(w=w, t=0)
             var = (refvar + arr3D.var()) / 2.
             threshold = var * 0.1
@@ -856,7 +856,7 @@ class Chromagnon(object):
             if w == self.refwave:
                 continue
 
-            tzs = N.round_(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
+            tzs = N.round(N.arange(self.img.nz, dtype=N.float32)-self.alignParms[t,w,0]).astype(int)
             arr3D = self.get3DArr(w=w, t=0)
             var = (refvar + arr3D.var()) / 2.
             threshold = var * 0.1
@@ -1040,7 +1040,7 @@ class Chromagnon(object):
 
         self.cropSlice = tuple(slc) # future warning 20190604
 
-    def get3DArrayAligned(self, w=0, t=0):
+    def get3DArrayAligned(self, w=0, t=0, order=af.ORDER):
         """
         use self.setRegionCutOut() prior to calling this function if the img is to be cutout
         
@@ -1050,13 +1050,13 @@ class Chromagnon(object):
         """
         arr = self.img.get3DArr(w=w, t=t)
 
-        arr = af.applyShift(arr, self.alignParms[t,w])
+        arr = af.applyShift(arr, self.alignParms[t,w], order=order)
 
-        arr = arr[self.cropSlice]
+        arr = arr[tuple(self.cropSlice)]
         
         return arr
 
-    def get3DArrayRemapped(self, w=0, t=0):
+    def get3DArrayRemapped(self, w=0, t=0, order=af.ORDER):
         """
         use self.setRegionCutOut() prior to calling this function if the img is to be cutout
         
@@ -1070,7 +1070,7 @@ class Chromagnon(object):
         arr = self.img.get3DArr(w=w, t=t)
 
         #if self.mapyx is not None:
-        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w])
+        arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w], interp=order)#order=order)
         #else:
         #    arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
         arr = arr[self.cropSlice]
@@ -1115,14 +1115,14 @@ class Chromagnon(object):
                     #ret[w,1:3] = yx
                     del ref, c
                     print(yx)
-                    zs = N.round_(self.refxs-yx[-1]).astype(int)#ret[w,2]).astype(int)
+                    zs = N.round(self.refxs-yx[-1]).astype(int)#ret[w,2]).astype(int)
                 else:
-                    zs = N.round_(self.refxs-alignParms[w,2]).astype(int)
+                    zs = N.round(self.refxs-alignParms[w,2]).astype(int)
                 nz = self.img.nx
                 removeEdge=True
                 img = img.T
             else:
-                zs = N.round_(self.refzs-alignParms[w,0]).astype(int)
+                zs = N.round(self.refzs-alignParms[w,0]).astype(int)
                 nz = self.img.nz
                 removeEdge=False
                 
@@ -1177,7 +1177,7 @@ class Chromagnon(object):
             nz = self.cropSlice[-3].stop - self.cropSlice[-3].start
 
             des.setDim(nx, ny, nz)
-            if type(des) == imgio.mrcIO.MrcWriter:
+            if type(des) == imgio.mrcIO.Writer:
                 des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
                 des.doOnSetDim()
 
@@ -1186,7 +1186,7 @@ class Chromagnon(object):
             pass
 
         ##   --- extended header ----
-        if type(des) == imgio.mrcIO.MrcWriter:
+        if type(des) == imgio.mrcIO.Writer:
             nsecs = self.img.nsec#hdr.Num[-1]
             if hasattr(des.fp, 'extFloats') and des.fp.extFloats.shape[0] >= nsecs:
                 if self.cropSlice[-3].start is not None and self.cropSlice[-3].stop is not None:
@@ -1226,7 +1226,7 @@ class Chromagnon(object):
                         return
             return True
 
-    def saveAlignedImage(self, fn=None):
+    def saveAlignedImage(self, fn=None, order=af.ORDER):
         """
         save aligned image into a file
 
@@ -1255,13 +1255,13 @@ class Chromagnon(object):
                 if w == self.refwave and self.nt == 1:
                     self.echo('Copying reference image, t: %i, w: %i' % (t, w))
                     arr = self.img.get3DArr(w=w, t=t)
-                    arr = arr[self.cropSlice]
+                    arr = arr[tuple(self.cropSlice)]
                 elif (self.mapyx is None):# and self.microscopemap is None):
                     self.echo('Applying global transformation to the target image, t: %i, w: %i' % (t, w))
-                    arr = self.get3DArrayAligned(w=w, t=t)
+                    arr = self.get3DArrayAligned(w=w, t=t, order=order)
                 else:
                     self.echo('Remapping local alignment, t: %i, w: %i' % (t, w))
-                    arr = self.get3DArrayRemapped(w=w, t=t)
+                    arr = self.get3DArrayRemapped(w=w, t=t, order=order)
 
                 if min0:
                     arr = N.where(arr > 0, arr, 0)

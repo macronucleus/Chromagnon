@@ -137,7 +137,7 @@ class spv(spvCommon):
         if not isinstance(data, F.mockNDarray):
             data = N.asanyarray(data) # 20060720 - numpy arrays don't have ndim attribute
         # 20180308
-        if data.dtype.type in [bool, N.uint32, N.uint64]:
+        if data.dtype.type in [bool, N.uint32, N.uint64]:#N.bool, N.uint32, N.uint64]:
             data = data.astype(N.uint16)
         elif data.dtype.type in [N.int32, N.int64, ]:
             data = data.astype(N.int16)
@@ -639,6 +639,9 @@ class spv(spvCommon):
         for i in range( self.nColors ):        
             #CHECK mi,ma = U.mm( self.img[0] )
             self.hist[i].autoFit(amin=self.mmms[i][0], amax=self.mmms[i][1])
+
+    OnAutoHistScaleAll = OnAutoHistScale
+            
     def OnViewFFT(self, event=77777):
         from . import fftfuncs as F
         if self.data.dtype.type in (N.complex64, N.complex128):

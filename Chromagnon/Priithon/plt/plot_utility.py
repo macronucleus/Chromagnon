@@ -41,7 +41,7 @@ LEFT,RIGHT,TOP,BOTTOM = 0,1,2,3 # used by same_as() method
 #20060726 TYPE = int32 # all values in a box_object are forced to be integers
 #20060726              # might change this later when we've looked at round off
 #20060726              # issues more thoroughly.
-TYPE=int0 # '<i8' on 64 bit PC
+TYPE=intp # int0 # '<i8' on 64 bit PC
 
 class box_object:
     """ Helpful for laying out rectangles.

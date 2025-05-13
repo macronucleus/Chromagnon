@@ -8,10 +8,14 @@ try:
 except ImportError:
     import generalIO, mrcIO, multitifIO
 
+COMMON=True
 try:
     from ..common import fntools, commonfuncs
-except (ValueError, ImportError):    
-    from common import fntools, commonfuncs
+except (ValueError, ImportError):
+    try:
+        from common import fntools, commonfuncs
+    except  (ValueError, ImportError):
+        COMMON=False
     
 import numpy as N
 
@@ -91,7 +95,7 @@ try:
         raise ValueError('pixeltype %s was not found' % pixeltype)
 
 except:
-    if not commonfuncs.main_is_frozen() and DO_WARN:
+    if COMMON and not commonfuncs.main_is_frozen() and DO_WARN:
         import traceback, warnings
         #traceback.print_exc()
         errs = traceback.format_exc()
@@ -587,7 +591,7 @@ class AbstractReader(object):
 #### ============== Reader =========================
 
         
-class BioformatsReader(AbstractReader, generalIO.GeneralReader):
+class Reader(AbstractReader, generalIO.Reader):
     def __init__(self, fn):
         """
         fn: file name
@@ -597,7 +601,7 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
 
         AbstractReader.__init__(self)
         
-        generalIO.GeneralReader.__init__(self, fn)
+        generalIO.Reader.__init__(self, fn)
         # -> openFile() -> readHeader() -> organize() -> setSecSize() -> doOnSetDim()
         
     def close(self):
@@ -791,13 +795,13 @@ class BioformatsReader(AbstractReader, generalIO.GeneralReader):
             t = ii - ((w+1) * self.nt)
         return t, z, w
 
-class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
+class Writer(AbstractReader, generalIO.Writer):
     def __init__(self, fn):
         """
         fn: file name (must be 'ome.tiff' for OME-TIFF)
         """
         AbstractReader.__init__(self)
-        generalIO.GeneralWriter.__init__(self, fn)
+        generalIO.Writer.__init__(self, fn)
         # -> openFile()
 
     def openFile(self):
@@ -810,7 +814,10 @@ class BioformatsWriter(AbstractReader, generalIO.GeneralWriter):
                     os.remove(self.fn)
                     removed = True
                 except OSError:
-                    self.fn = fntools.nextFN(self.fn)
+                    if COMMON:
+                        self.fn = fntools.nextFN(self.fn)
+                    else:
+                        raise RuntimeError('File exists %s' % self.fn)
                     i += 1
                 if i > 10:
                     raise RuntimeError('too many iteration to overwrite the last filename %s' % self.fn)

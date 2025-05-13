@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
 try:
-    from ..Priithon.all import N, U, Y, F, Mrc
+    from Priithon.all import N, U, Y, F
 except (ValueError, ImportError):
-    from Priithon.all import N, U, Y, F, Mrc
+    from ..Priithon.all import N, U, Y, F
 from scipy import optimize
 try:
     from . import imgFit
@@ -120,7 +121,7 @@ forceSecondPeak=None, acceptOrigin=True, maskSigmaFact=1., removeY=None, removeX
         else:
             arr = arr_sorbel(arr, mask=1)
     
-        if N.sometrue(shapeA < shapeM):
+        if N.any(shapeA < shapeM): #sometrue(shapeA < shapeM):
             arr = paddingMed(arr, shapeM)
 
         if normalize:
@@ -349,7 +350,7 @@ def pointsCutOutND(arr, posList, windowSize=100, sectWise=None, interpolate=True
         ori = pos - (windowSize / 2.) # float value
         oidx = N.ceil(ori) # idx
         subpxl = oidx - ori # subpixel mod
-        if interpolate and N.sometrue(subpxl): # comit to make shift
+        if interpolate and N.any(subpxl): #sometrue(subpxl): # comit to make shift
             SHIFT = 1
         else:
             SHIFT = 0
@@ -448,7 +449,7 @@ def pointsCutOut3D(arr, posList, windowSize=100, d2=None, interpolate=True, remo
         # calculate idx
         dif = pos +0.5 - halfWin[-ndim_pos:]
 
-        dif = N.round_(dif)
+        dif = N.round(dif)
         dif = dif.astype(N.int)
         starts = dif - margin
         starts = N.where(starts < 0, 0, starts)
@@ -510,7 +511,7 @@ def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
         shift = 0#[0] * len(shapeS)
     shapeL = shape#N.add(shapeS, center+shift)
     #start, stop = (shapeL - shapeS)/2., (shapeL + shapeS)/2.
-    start = N.round_((shapeL - shapeS)/2.).astype(N.int)
+    start = N.round((shapeL - shapeS)/2.).astype(N.int)
     stop = shapeS + start
     slc = [slice(start[d], stop[d], None) for d in range(img.ndim)]
 
@@ -520,7 +521,7 @@ def paddingValue(img, shape, value=0, shift=None, smooth=0, interpolate=True):
     # shift if necessary
     if interpolate:
         subpx_shift = start % 1 # should be 0.5 or 0
-        if N.sometrue(subpx_shift):
+        if N.any(subpx_shift): #sometrue(subpx_shift):
             img = U.nd.shift(img, subpx_shift)
     # padding
     canvas[tuple(slc)] = img # future warning 20190604
@@ -619,7 +620,7 @@ def paddingFourier(arr, shape, value=0, interpolate=True):
     shapeL = N.asarray(shape)
     halfS = shapeS / 2.
     subpx_shift = halfS % 1
-    if interpolate and N.sometrue(subpx_shift):
+    if interpolate and N.any(subpx_shift): #sometrue(subpx_shift):
         arr = U.nd.shift(arr, subpx_shift)
     halfS = [int(s) for s in halfS]
 
@@ -684,9 +685,9 @@ def evenShapeArr(a):
     #    sy += 1
     #shapeM = N.array([sy, sx])
     
-    if N.sometrue(shapeA < shapeM):
+    if N.any(shapeA < shapeM): #sometrue(shapeA < shapeM):
         a = paddingMed(a, shapeM)
-    elif N.sometrue(shapeA > shapeM):
+    elif N.any(shapeA > shapeM): #sometrue(shapeA > shapeM):
         a = cutOutCenter(a, shapeM, interpolate=False)
     return a
 
@@ -884,7 +885,7 @@ def findMaxWithGFit(img, sigma=0.5, win=11, init_pos=None):
     if init_pos is None:
         vzyx = U.findMax(img)
     else:
-        v = img[init_pos]
+        v = img[tuple(init_pos)]
         vzyx = [v] + list(init_pos)
     ndim = img.ndim
     try:
@@ -954,7 +955,7 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
         else:
             v = ret[1]
             zyx = ret[2:2+ndim]
-            if N.any(N.abs(zyx - vzyx[1:]) > win/2.):#zyx < 0 or zyx > img.shape or ):
+            if N.any(N.abs(zyx - vzyx[-ndim:]) > win/2.):#zyx < 0 or zyx > img.shape or ):
                 mask_value(img, vzyx[-ndim:], r=mask_npxls, value=img.min())
                 poses.append(list(vzyx)[0:1] + [vzyx[-ndim:]] + [sigma_peak])
             else:
@@ -1164,7 +1165,7 @@ def centerOfMass(img, yx, window=5):
     # prepare small image
     s = N.array([window,window])
     c = s/2.
-    yx = N.round_(yx)
+    yx = N.round(yx)
     yx -= c
     yi, xi = N.indices(s)
     yi += yx[0]

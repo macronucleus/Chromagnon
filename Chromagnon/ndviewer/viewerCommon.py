@@ -93,6 +93,8 @@ class GLViewerCommon(wxgl.GLCanvas):
         #wx.EVT_MENU(self, Menu_ZoomOut, self.OnZoomOut)
         #wx.EVT_MENU(self, Menu_ZoomIn, self.OnZoomIn)
 
+        
+        dontneed="""
         self.Bind(wx.EVT_MENU, self.On51, id=1051) # left key
         self.Bind(wx.EVT_MENU, self.On52, id=1052) # right key
         self.Bind(wx.EVT_MENU, self.On53, id=1053) # up key
@@ -100,7 +102,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         #wx.EVT_MENU(self, 1051, self.On51)  # left key
         #wx.EVT_MENU(self, 1052, self.On52)  # right key
         #wx.EVT_MENU(self, 1053, self.On53)  # up key
-        #wx.EVT_MENU(self, 1054, self.On54)  # down key
+        #wx.EVT_MENU(self, 1054, self.On54)  # down key"""
         
 
         #wx.EVT_MENU(self, Menu_grid, self.setPixelGrid)  # for wxAcceleratorTable
@@ -126,10 +128,12 @@ class GLViewerCommon(wxgl.GLCanvas):
             #(wx.ACCEL_NORMAL, wx.WXK_NEXT, Menu_ZoomOut),  
             #(wx.ACCEL_NORMAL, wx.WXK_PRIOR,Menu_ZoomIn),   
 
-            (wx.ACCEL_CTRL, wx.WXK_LEFT, 1051),
-            (wx.ACCEL_CTRL, wx.WXK_RIGHT,1052),
-            (wx.ACCEL_CTRL, wx.WXK_UP,   1053),
-            (wx.ACCEL_CTRL, wx.WXK_DOWN, 1054),
+           # (wx.ACCEL_CTRL, wx.WXK_LEFT, 1051),
+           # (wx.ACCEL_CTRL, wx.WXK_RIGHT,1052),
+           # (wx.ACCEL_CTRL, wx.WXK_UP,   1053),
+           # (wx.ACCEL_CTRL, wx.WXK_DOWN, 1054),
+
+           # (wx.ACCEL_CTRL, wx.MOD_CMD | 'c', 1051),
 
 
             (wx.ACCEL_ALT, ord('0'), Menu_ZoomReset),
@@ -505,7 +509,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         fac = 1.189207115002721
         self.zoom(fac, absolute=False)
 
-
+    dontneed="""
     def On51(self, event):
         n= self.pic_nx / 4
         if self.originLeftBottom == 8:
@@ -530,7 +534,7 @@ class GLViewerCommon(wxgl.GLCanvas):
         self.y0 += dy
         
         self.zoomChanged = True
-        self.Refresh(0)
+        self.Refresh(0)"""
 
 
 
@@ -575,10 +579,10 @@ class GLViewerCommon(wxgl.GLCanvas):
 
 
     ## don't need
-#     def OnSaveClipboard(self, event=None):
-#         import usefulX2 as Y
-#         Y.vCopyToClipboard(self, clip=1)
-#         Y.shellMessage("### screenshot saved to clipboard'\n")
+    def OnSaveClipboard(self, event=None):
+         import usefulX2 as Y
+         Y.vCopyToClipboard(self, clip=1)
+         Y.shellMessage("### screenshot saved to clipboard'\n")
 
     ## don't need
     def OnSaveScreenShort(self, event=None):
@@ -703,8 +707,11 @@ set image aspect ratio (y/x factor for display)
             if copy == 0 returns non-contiguous array!!!
 
         '''
+        import sys, platform
+        
         self.zoomChanged = True
         self.Refresh(0)
+        wx.YieldIfNeeded()
         
         self.SetCurrent(self.context)
         glPixelStorei(GL_PACK_ALIGNMENT, 1)
@@ -728,27 +735,38 @@ set image aspect ratio (y/x factor for display)
         glPixelTransferf(GL_GREEN_BIAS, 0)
         glPixelTransferf(GL_BLUE_BIAS,  0)
 
-        b=glReadPixels(0,0, self.w, self.h,
+        ver = wx.version()
+        major, minor = ver.split('.')[:2]
+        if int(major) >= 4 and int(minor) >= 1:
+            cs = self.GetContentScaleFactor()
+        else:
+            cs = 1
+
+        size = self.GetClientSize()
+        width = int(size.width * cs + .5)
+        height = int(size.height * cs + .5)
+
+        b = glReadPixels(0, 0, width, height, 
                        GL_RGB,GL_UNSIGNED_BYTE)
-        
-        bb=N.ndarray(buffer=b, shape=(self.h,self.w,3),
-                   dtype=N.uint8) #, aligned=1)
+
+        bb=N.ndarray(buffer=b, shape=(height,width,3),
+                   dtype=N.uint8)
 
         cc = N.transpose(bb, (2,0,1))
 
         if clip:
-            x0,y0, s,a = int(self.x0), int(self.y0),self.scale,self.aspectRatio
-            if hasattr(self, "m_imgArr"):
+            x0,y0, s,a = int(self.x0*cs+.5), int(self.y0*cs+.5),self.scale,self.aspectRatio
+            if hasattr(self, "imgArr"):
                 ny,nx = self.imgArr.shape
             else:
                 ny,nx = self.imgList[0][2].shape
-            nx,ny = int(nx*s +.5), int(ny*s*a + .5)
+            nx,ny = int(nx*cs*s +.5), int(ny*cs*s*a + .5)
             x1,y1 = x0+ nx, y0+ny
 
-            x0 = N.clip(x0, 0, self.w)
-            x1 = N.clip(x1, 0, self.w)
-            y0 = N.clip(y0, 0, self.h)
-            y1 = N.clip(y1, 0, self.h)
+            x0 = N.clip(x0, 0, int(self.w*cs+.5))
+            x1 = N.clip(x1, 0, int(self.w*cs+.5))
+            y0 = N.clip(y0, 0, int(self.h*cs+.5))
+            y1 = N.clip(y1, 0, int(self.h*cs+.5))
             nx,ny = x1-x0, y1-y0
             cc=cc[:,y0:y1,x0:x1]
         #else:

@@ -46,6 +46,8 @@ MAX_SHIFT_LOCAL = 2#4#2 # pixel
 QUADRATIC_AREA=['Right-Top', 'Left-Top', 'Left-Bottom', 'Right-Bottom']
 IF_FAILED=['auto', 'force_logpolar', 'force_simplex', 'terminate']
 
+ORDER=imgResample.ORDER
+
 
 def prep2D(a3d, zs=None, removeEdge=True):
     """
@@ -482,8 +484,8 @@ def iterationXcor(a2d, ref, maxErr=0.01, niter=20, phaseContrast=True, initguess
             shiftZYX = cutoutAlign.getShift([0]+list(yxs)+[0,1,1], [0]+list(shape))
             maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
             maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-            slc = [slice(int(shiftZYX[2]), int(shiftZYX[3])),
-                   slice(int(shiftZYX[4]), int(shiftZYX[5]))]
+            slc = tuple([slice(int(shiftZYX[2]), int(shiftZYX[3])),
+                   slice(int(shiftZYX[4]), int(shiftZYX[5]))])
             b = b[slc]
             c = ref[slc]
 
@@ -565,8 +567,8 @@ def _compCost(yxrm, a, b):
     shiftZYX = cutoutAlign.getShift([0]+list(yxrm), [0]+list(shape))
     maxcutY = max(shiftZYX[2], shape[0]-shiftZYX[3])
     maxcutX = max(shiftZYX[4], shape[1]-shiftZYX[5])
-    slc = [slice(int(maxcutY), int(shape[0]-maxcutY)), # VisibleDeprecationWarning 20161216
-           slice(int(maxcutX), int(shape[1]-maxcutX))]
+    slc = tuple([slice(int(maxcutY), int(shape[0]-maxcutY)), # VisibleDeprecationWarning 20161216
+           slice(int(maxcutX), int(shape[1]-maxcutX))])
     a = a[slc]
     b = b[slc]
 
@@ -671,7 +673,7 @@ def findBestRefZs(ref, sigma=0.5):
     return ids
 
 
-def applyShift(arr, zyxrm, dyx=(0,0)):
+def applyShift(arr, zyxrm, dyx=(0,0), order=ORDER):
     """
     zyxrm: [tz,ty,tx,r,mz,my,mx]
     dyx: shift from the center of rotation & magnification
@@ -688,7 +690,7 @@ def applyShift(arr, zyxrm, dyx=(0,0)):
                 zyxrm[-3] = 1
             zmagidx = -2
 
-        arr = imgResample.trans3D_affine(arr, zyxrm[:3], zyxrm[3], zyxrm[zmagidx:], dyx)
+        arr = imgResample.trans3D_affine(arr, zyxrm[:3], zyxrm[3], zyxrm[zmagidx:], dyx, order=order)
 
     return arr
 
@@ -799,7 +801,7 @@ def trans3D_affineVertical(img, affine):
     else:
         return img
 
-def remapWithAffine(img, mapzyx, affine, interp=2):
+def remapWithAffine(img, mapzyx, affine, interp=imgResample.ORDER):
     """
     move alongZ then do remapping in 2D
     
@@ -838,7 +840,7 @@ def remapWithAffine(img, mapzyx, affine, interp=2):
             mapy, mapx = mapzyx
 
         if do or mapy.max() or mapx.max():
-            arr2[z] = imgResample.remap(a, ret[0]+mapy, ret[1]+mapx)
+            arr2[z] = imgResample.remap(a, ret[0]+mapy, ret[1]+mapx, order=interp)
         else:
             arr2[z] = a
     return arr2

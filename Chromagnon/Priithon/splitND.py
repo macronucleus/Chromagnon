@@ -627,6 +627,7 @@ class spv(spvCommon):
         ### size = (400,400)
         if size is None:
             height,width = self.data.shape[-2:] #20051128 self.img.shape
+            height += 40 # added 20240606
             if height//2 == (width-1):  ## real_fft2d
                 width = (width-1)*2
             if width>600 or height>600:
@@ -659,7 +660,7 @@ class spv(spvCommon):
         [si.GetWindow().Destroy() for si in boxSizer.GetChildren()] # needed with Y.viewInViewer
         self.zzslider = [None]*self.zndim
         for i in range(self.zndim-1,-1,-1):
-            self.zzslider[i] = wx.Slider(parent, 1001+i, self.zsec[i], 0, self.zshape[i]-1,
+            self.zzslider[i] = wx.Slider(parent, 1001+i, self.zsec[i], 0, (self.zshape[i]-1 or 1),
                                wx.DefaultPosition, wx.DefaultSize,
                                #wx.SL_VERTICAL
                                wx.SL_HORIZONTAL
@@ -720,6 +721,12 @@ class spv(spvCommon):
         from . import useful as U
         mi,ma,me,ss = U.mmms( self.img )
         self.hist.autoFit(amin=mi, amax=ma)
+
+    def OnAutoHistScaleAll(self, event=77777):
+        from . import useful as U
+        mi,ma,me,ss = U.mmms( self.data )
+        self.hist.autoFit(amin=mi, amax=ma)
+        
     def OnViewFFT(self, event=77777):
         from . import fftfuncs as F
         if self.data.dtype.type in (N.complex64, N.complex128):

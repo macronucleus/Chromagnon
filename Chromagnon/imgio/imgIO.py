@@ -31,7 +31,7 @@ def getHandle(fn):
     elif backend == 'wx' and not fn.endswith(('tiff', 'tif')):
         fp = wx.Image(fn)
     elif backend == 'wx' and fn.endswith(('tiff', 'tif')):
-        fp = multitifIO.MultiTiffReader(fn)
+        fp = multitifIO.Reader(fn)
     return fp
     
 def load(fn):
@@ -169,7 +169,7 @@ def save(arr, outfn, rescaleTo8bit=True, rgbOrder='rgba'):
         img = wx.ImageFromBuffer(arr.shape[-2],arr.shape[-3], N.ascontiguousarray(arr))
         img.SaveFile(outfn)
     elif backend == 'wx' and outfn.endswith(('tif', 'tiff')):
-        fp = multitifIO.MultiTiffWriter(outfn)
+        fp = multitifIO.Writer(outfn)
         fp.setDim(nx=nx, ny=ny, nz=1, nt=1, nw=nc, dtype=arr.dtype)
         waves = fp.makeWaves()
         fp.setDim(wave=waves)
@@ -219,7 +219,7 @@ def _getImgMode(im):
 
         return t,cols, ny,nx, isSwapped
     elif backend == 'wx':
-        if type(im) == multitifIO.MultiTiffReader:
+        if type(im) == multitifIO.Reader:
             return im.dtype, 1, im.ny, im.nx, None
         else:
             nx = im.GetWidth()

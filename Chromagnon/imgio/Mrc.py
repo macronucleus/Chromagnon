@@ -158,7 +158,8 @@ class Mrc:
         #self.extHdrArray.dtype = type_descr
         self.extHdrArray = N.recarray(shape=nz, dtype=type_descr, buf=self.e)
         if self.isByteSwapped:
-            self.extHdrArray = self.extHdrArray.newbyteorder()
+            #self.extHdrArray = self.extHdrArray.newbyteorder()
+            self.extHdrArray = self.extHdrArray.view(self.extHdrArray.dtype.newbyteorder())
         
         self.extInts   = self.extHdrArray.field('int')
         self.extFloats = self.extHdrArray.field('float')
@@ -186,7 +187,8 @@ class Mrc:
         self.data.shape = shape
             
         if self.isByteSwapped:
-            self.data = self.data.newbyteorder()
+            #self.data = self.data.newbyteorder()
+            self.data = self.data.view(self.data.dtype.newbyteorder())
 
     def setTitle(self, s, i=-1):
         """set title i (i==-1 means "append") to s"""
@@ -565,7 +567,7 @@ class Mrc2:
                                              shape=nSecs  )
 
             if self._fileIsByteSwapped:
-                self._extHdrArray = self._extHdrArray.newbyteorder()
+                self._extHdrArray = self._extHdrArray.view(self._extHdrArray.dtype.newbyteorder())
 
             self.extInts   = self._extHdrArray.field('int')
             self.extFloats = self._extHdrArray.field('float')
@@ -577,7 +579,8 @@ class Mrc2:
         self._shape = (nsecs, ny,nx) # todo: wavelenths , times
         self._shape2d = self._shape[-2:]
         self._dtype  = MrcMode2dtype( self.hdr.PixelType[0] )
-        self._secByteSize = N.nbytes[self._dtype] * N.prod( self._shape2d )
+        #self._secByteSize = N.nbytes[self._dtype] * N.prod( self._shape2d )
+        self._secByteSize = N.dtype(self._dtype.__name__).itemsize * N.prod( self._shape2d )
         
     def setHdrForShapeType(self, shape, type ):
         mrcmode = dtype2MrcMode(type)
@@ -1109,9 +1112,15 @@ def setTitle(hdr, s, i=-1):
     if i < 0:
         i = n
     if i>9:
-        raise ValueError("Mrc only support up to 10 titles (0<=i<10)")
+        import warnings
+        warnings.warn("Mrc only support title up to 80 characters", UserWarning)
+        return
+        #raise ValueError("Mrc only support up to 10 titles (0<=i<10)")
     if len(s) > 80:
-        raise ValueError("Mrc only support title up to 80 characters")
+        import warnings
+        warnings.warn("Mrc only support title up to 80 characters", UserWarning)
+        return
+        #raise ValueError("Mrc only support title up to 80 characters")
     if i>=n:
         hdr.NumTitles = i+1
 

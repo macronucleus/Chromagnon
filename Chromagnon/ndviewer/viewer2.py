@@ -31,6 +31,11 @@ class GLViewer(GLViewerCommon):
         self.vclose = False
         self.hclose = False
         self.myViewManager = weakref.proxy(parent.parent)
+
+        self.gamma = [1]
+        self._lastGamma_set = None
+        self.colMap = None
+        self.colMap_menuIdx = 0
         
         self.imgList = [] # each elem.:
         # 0       1        2       3            4     5   6 7 8   9, 10,11, 12,13,14
@@ -81,6 +86,7 @@ class GLViewer(GLViewerCommon):
 
     def setMyDoc(self, doc, parent):
         self.mydoc = weakref.proxy(doc)
+        self.gamma = [1 for w in range(self.mydoc.nw)]
         #self.myViewManager = weakref.proxy(parent)
         #self.setLeftDown()
 
@@ -215,19 +221,24 @@ class GLViewer(GLViewerCommon):
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST)
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST)
 
-        if img.dtype.type in (N.uint8, N.bool_):
+        if self.dtype:
+            dtype = self.dtype
+            img = img.astype(dtype)
+        else:
+            dtype = img.dtype.type
+        if dtype in (N.uint8, N.bool_):
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
                          GL_LUMINANCE,GL_UNSIGNED_BYTE, None)
-        elif img.dtype.type == N.int16:
+        elif dtype == N.int16:
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
                          GL_LUMINANCE,GL_SHORT, None)
-        elif img.dtype.type == N.float32:
+        elif dtype == N.float32:
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
                          GL_LUMINANCE,GL_FLOAT, None)
-        elif img.dtype.type == N.uint16:
+        elif dtype == N.uint16:
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
                          GL_LUMINANCE,GL_UNSIGNED_SHORT, None)
-        elif img.dtype.type in (N.float64,
+        elif dtype in (N.float64,
                                 N.int32, N.uint32, N.int64, N.uint64,):
                                 #N.complex64, N.complex128):
             glTexImage2D(GL_TEXTURE_2D,0,  GL_RGB, tex_nx,tex_ny, 0, 
@@ -366,7 +377,17 @@ class GLViewer(GLViewerCommon):
         glPixelTransferf(GL_GREEN_BIAS, fBias)
         glPixelTransferf(GL_BLUE_BIAS,  fBias)
 
-        glPixelTransferf(GL_MAP_COLOR, False)
+        #glPixelTransferf(GL_MAP_COLOR, False) # 20240621 changed to i
+        if self.colMap is not None:
+            glPixelTransferi(GL_MAP_COLOR, True)
+            # this part may be different depending on GL versions
+            # here is __version__ = 3.0.2 on mac 10.7 py2.6
+            mapsize = len(self.colMap[0])
+            glPixelMapfv(GL_PIXEL_MAP_R_TO_R, mapsize, self.colMap[0] )
+            glPixelMapfv(GL_PIXEL_MAP_G_TO_G, mapsize, self.colMap[1] )
+            glPixelMapfv(GL_PIXEL_MAP_B_TO_B, mapsize, self.colMap[2] )
+        else:
+            glPixelTransferi(GL_MAP_COLOR, False)
 
 
     ## these 3 calls are for graphic objects, like lines, circles, crosses, etc.
@@ -728,6 +749,8 @@ class GLViewer(GLViewerCommon):
             self.Refresh(0)
         
     def setImage(self, i, imgArr, refreshNow=1):
+        if self.dtype:
+            imgArr = imgArr.astype(self.dtype)
         if self.imgList[i][2].shape != imgArr.shape:
             # in this case we 
             #  1. do "parts of" delImage
@@ -984,7 +1007,10 @@ class GLViewer(GLViewerCommon):
                 xy_t = "Outside of image"
             parent = self.GetParent()
             parent.intensity_label[wi].SetLabel(t)
-        parent.xy_label.SetLabel(xy_t)
+        try:
+            parent.xy_label.SetLabel(xy_t)
+        except AttributeError:
+            pass
 
         roi0 = 'ROI start (x,y,z):  %i %i %i' % tuple(self.mydoc.roi_start[::-1])
         roi1 = 'ROI size  (x,y,z):  %i %i %i' % tuple(self.mydoc.roi_size[::-1])
@@ -1022,8 +1048,10 @@ class GLViewer(GLViewerCommon):
         if ev.Leaving():
             ## leaving trigger  event - bug !!
             parent = self.GetParent()
-            [l.SetLabel('') for l in parent.intensity_label]
-
+            try:
+                [l.SetLabel('') for l in parent.intensity_label]
+            except AttributeError:
+                pass
             return
         
         if midButt or (ev.LeftDown() and not self.dragSide):
@@ -1135,3 +1163,189 @@ class GLViewer(GLViewerCommon):
         #self.dragSize = 0   ## to prevent the next mouse click from changing slicing lines abruptly
         event.Skip()
 
+    ### ---------- color map ----------
+    colnames= {
+        "white" : (255, 255, 255),
+        "red" : (255, 0, 0),
+        "yellow" : (255, 255, 128),
+        "green" : (0, 255, 0),
+        "cyan" : (0, 255, 255),
+        "blue" : (0, 0, 255),
+        "magenta" : (255, 0, 255),
+        "black" : (0, 0, 0),
+        "grey" : (128, 128, 128),
+        "gray" : (128, 128, 128),
+        "orange" : (255, 128, 0),
+        "violet" : (128, 0, 255),
+        "darkred" : (128, 0, 0),
+        "darkgreen" : (0, 128, 0),
+        "darkblue" : (0, 0, 128),
+        }
+    
+    grey = ["black", "white"]
+    #spectrum = ["darkred", "red", "orange", "yellow", "green", "blue",
+    #            "darkblue", "violet"]
+    blackbody = ["black", "darkred", "orange", "yellow", "white"]
+        
+    magma = ["black","violet", "orange", "white"]#"magenta", "orange", "white"] # rather it is plasma
+    viridis = ["violet", 'darkblue', 'green', 'yellow']
+  #  redgreen = ["red", "darkred", "black", "darkgreen", "green"]
+  #  greenred = ["green", "darkgreen", "black", "darkred", "red"]
+    #twocolorarray = ["green", "yellow", "red"]
+
+    #spectrum2 = ["darkred", "red", "orange", "255:255:0", "green", "cyan", "blue",
+     #            "darkblue", "violet"]
+    spectrum3 = ["darkred", "red", "orange", "255:255:0", "green", "cyan", "blue",
+                 "darkblue", "violet", "white"] # , "200:200:200"
+    #spectrum4 = ["black", "darkred", "red", "orange", "255:255:0", "green", "cyan", "blue",
+     #            "darkblue", "violet", "white"] # , "200:200:200"
+        
+
+    def cms(self,colseq=spectrum3, reverse=0):
+
+        import re
+        col_regex = re.compile(r'(\d+):(\d+):(\d+)')
+        def s2c(s):
+            mat = col_regex.match(s)
+            if mat:
+                return N.array( list(map(int, mat.groups())),dtype=N.float32 ) / 255.
+            else:
+                return N.array( self.colnames[s], dtype=N.float32 ) / 255.
+
+        if reverse:
+            colseq = colseq[:]
+            colseq.reverse()
+        self.cm_size = 256 ###### non omx
+        self.colMap = N.zeros(shape=(3, self.cm_size), dtype=N.float32)
+        n = len(colseq)
+        #  print n
+        c = 0
+        acc = s2c( colseq[0] )
+        # print acc
+        for i in range( 0, n-1 ):
+            rgb0 = s2c( colseq[i] )
+            rgb1 = s2c( colseq[i+1] )
+            delta = rgb1 - rgb0
+
+            # print "===> ", i, colseq[i], colseq[i+1], "  ", rgb0, rgb1, "   d: ", delta
+
+            sub_n_f = self.cm_size / (n-1.0)
+            sub_n   = int(self.cm_size / (n-1))
+            # print "*****    ", c, "  ", i*sub_n_f, " ", i*sub_n,  " ++++ ", int( i*sub_n_f+.5 )
+
+            if int( i*sub_n_f+.5 ) > c:
+                sub_n += 1             # this correct rounding - to get
+                #              correct total number of entries
+            delta_step = delta / sub_n
+            for i in range(sub_n):
+                # print c, acc
+                self.colMap[:, c] = acc
+                
+                c+=1
+                acc += delta_step
+        if(c < self.cm_size):
+            #  print c, acc
+            self.colMap[:, c] = acc
+            #      else:
+            #          print "** debug ** c == self.cm_size ..."
+        self.original_colMap = self.colMap.copy()
+        self.setGamma()
+
+    def setGamma(self, w=0):
+        if not hasattr(self, 'original_colMap') or self.colMap is None:
+            self.cmgray(self.gamma[w])
+            return
+        #else:
+        #    self.original_colMap = self.colMap.copy()
+        if self.gamma[w] != 1:
+            if self.original_colMap.min() > 0:
+                self.colMap[:] = self.original_colMap ** self.gamma[w]
+            else:
+                self.colMap[:] = N.clip(self.original_colMap, 0, None) ** self.gamma[w]
+
+    def cmgray(self, gamma=1):
+        """set col map to gray"""
+        if gamma == 1:
+            n = self.cm_size = 256 #20070209 512
+            self.colMap = N.empty(shape = (3,n), dtype = N.float32)
+            self.colMap[:] = N.linspace(0,1,num=n,endpoint=True)
+        else:
+            n = self.cm_size = 256 #20070209 512
+            gamma = float(gamma)
+            wmax = 0 + (1 - 0) * ((n - 0) / (1 - 0)) ** gamma
+            self.colMap = N.empty(shape = (3,n), dtype = N.float32)
+            self.colMap[:] = \
+                  (0 + (1 - 0) * ((N.arange(n) - 0) / (1 - 0)) **gamma) / wmax
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+
+    def loadColMap(self, name='magma'):
+        try:
+            raise ImportError
+            from matplotlib import pyplot as P
+            self.colMap = N.array(P.cm.get_cmap(name).colors).T
+        except ImportError:
+            try:
+                import os
+                self.colMap = N.load(os.path.join(os.path.dirname(__file__), '%s.npy' % name))
+            except:
+                pass
+        self.original_colMap = self.colMap.copy()
+        self.setGamma()
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+    
+    def cmgrey(self, reverse=0):
+        self.cms(self.grey, reverse)
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+    def cmcol(self, reverse=0):
+        self.cms(self.spectrum3, reverse)
+        self.changeHistogramScaling()
+        self.updateHistColMap()        
+    def cmblackbody(self, reverse=0):
+        self.cms(self.blackbody, reverse)
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+    def cmmagma(self, reverse=0):
+        self.loadColMap(name='magma')
+        
+    def cmviridis(self, reverse=0):
+        self.loadColMap(name='viridis')
+
+    def cmnone(self):
+        self.colMap = None
+        self.changeHistogramScaling(0,0)
+        self.updateHistColMap()
+
+    def cmGrayMinMax(self, minCol=(0,0,255), maxCol=(255,0,0)):
+        """
+        set col map to gray,
+        set first entry to minCol, last entry to maxCol
+        """
+        n = self.cm_size = 256 #20070209 512
+        self.colMap = N.empty(shape = (3,n), dtype = N.float32)
+        self.colMap[:] = N.linspace(0,1,num=n,endpoint=True)
+        self.colMap[:,0] = minCol
+        self.colMap[:,-1] = maxCol
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+    def cmlog(self):
+        n = self.cm_size = 256 # otherwise Erik's Mac chookes #  512
+        self.colMap = N.empty(shape = (3,n), dtype = N.float32)
+        self.colMap[:] = 1. - N.log10(N.linspace(1./n,1., num=n, endpoint=True)) / N.log10(1./n)
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+        
+                
+    def cmblackbody(self, reverse=0):
+        self.cms(self.blackbody, reverse)
+        self.changeHistogramScaling()
+        self.updateHistColMap()
+
+    def updateHistColMap(self):
+        pass
+        #self.my_hist.colMap = self.colMap
+        #self.my_hist.m_histScaleChanged = 1
+        #self.my_hist.m_imgChanged = True
+        #self.my_hist.Refresh(0)

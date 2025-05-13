@@ -80,7 +80,7 @@ def dtypeBigEnough(a):
     return dtype of a but at least N.int16
     """
     d = a.dtype
-    if d in (N.bool, N.uint8, N.int8):
+    if d in (bool, N.uint8, N.int8):
         return N.int16
     else:
         return d

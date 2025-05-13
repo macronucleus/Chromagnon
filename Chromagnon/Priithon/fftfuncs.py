@@ -16,7 +16,7 @@ def __fromfunction(f, s, t):
     a = N.fromfunction(f,s)
     if isinstance(t, six.string_types):
         tname = t
-    elif hasintance(t, 'name'):
+    elif hasattr(t, 'name'):#hasintance(t, 'name'):
         tname = t.name
     else:
         raise ValueError('data type %s not understood' % t)
@@ -97,7 +97,7 @@ def copyPadded(a,b, pad=0):
     ######## print
     dS = N.subtract(b.shape, a.shape)
     # if padding wanted and if NOT all UN-padding
-    if pad is not None and not N.alltrue( dS <= 0 ):
+    if pad is not None and not N.all( dS <= 0):#N.alltrue( dS <= 0 ):
         b[:] = pad #HACK - because not very efficient !?
        
     for i in range(a.ndim):
@@ -284,7 +284,7 @@ def radialPhiArr(shape, func, orig=None, dtype='float32'):
     """
     shape = _normalize_shape(shape)
     if orig is None:
-        orig = (N.array(shape, dtype=N.float)-1) / 2.
+        orig = (N.array(shape, dtype=float)-1) / 2.
     else:
         try:
             oo = float(orig)
@@ -327,7 +327,7 @@ def radialArr(shape, func, orig=None, wrap=False, dtype='float32'):
         shape = (shape,)
 
     if orig is None:
-        orig = (N.array(shape, dtype=N.float)-1) / 2.
+        orig = (N.array(shape, dtype=float)-1) / 2.
     else:
         try:
             oo = float(orig)
@@ -398,7 +398,7 @@ def maxNormRadialArr(shape, func, orig=None, wrap=0, dtype='float32'):
        """
     shape = _normalize_shape(shape)
     if orig is None:
-        orig = (N.array(shape, dtype=N.float)-1) / 2.
+        orig = (N.array(shape, dtype=float)-1) / 2.
     else:
         try:
             oo = float(orig)
@@ -700,6 +700,19 @@ def testImgR(shape=defshape, dtype='float32'):
     
     return a
 
+def testImgX(shape=defshape, dtype='float32'):
+    """
+    a symmetric test image
+    """
+    a = zeroArr(dtype, shape)
+    cy,cx = N.divide(shape[-2:], 2)
+
+    a[...,int(cy),:] = 1
+    a[...,int(cx)] = 1
+    return a
+    
+    
+
 def rampArr(shape=defshape, axis=-1, start=0,stop=None, dtype=None):
     """
     return arr with values increasing along `axis`
@@ -891,7 +904,7 @@ def fourierShiftArr(shape=defshape, delta=None, meantForRealFFT=False, dtype='fl
 #  irfft1d  = FFT.inverse_real_fft
 
 
-def fft(a, minCdtype=fftw.CTYPE):
+def fft(a, axes=None, minCdtype=fftw.CTYPE):
     """
     calculate nd fourier transform
     performs full, i.e. non-real, fft
@@ -903,8 +916,8 @@ def fft(a, minCdtype=fftw.CTYPE):
     if a.dtype.type not in fftw.CTYPES:
         a = N.asarray(a, minCdtype)
 
-    return fftw.fft(a)
-def ifft(af, minCdtype=fftw.CTYPE):#normalize=True, minCdtype=fftw.CTYPE):
+    return fftw.fft(a, axes=axes)
+def ifft(af, axes=None, minCdtype=fftw.CTYPE):#normalize=True, minCdtype=fftw.CTYPE):
     """
     calculate nd inverse fourier transform
     performs full, i.e. non-real, ifft
@@ -922,7 +935,7 @@ def ifft(af, minCdtype=fftw.CTYPE):#normalize=True, minCdtype=fftw.CTYPE):
     if af.dtype.type not in fftw.CTYPES:
         af = N.asarray(af, minCdtype)
 
-    return fftw.ifft(af)#, normalize=normalize)
+    return fftw.ifft(af, axes=axes)#, normalize=normalize)
 
 def fft2d(a):#, minCdtype=fftw.CTYPE):
     func = fft
@@ -950,17 +963,17 @@ def _process2d(func, a, minCdtype=fftw.CTYPE):
 def _process2d_parallel(a, aDtype, func):
     return func(N.asarray(a, aDtype))
 
-def sfft(a):
+def sfft(a, axes=None):
     """
     center shifted full fft
     """
-    return N.fft.fftshift(fft(N.fft.ifftshift(a)))
+    return N.fft.fftshift(fft(N.fft.ifftshift(a), axes=axes))
 
-def isfft(af):
+def isfft(af, axes=None):
     """
     center shifted full ifft
     """
-    return N.fft.fftshift(ifft(N.fft.ifftshift(af)))
+    return N.fft.fftshift(ifft(N.fft.ifftshift(af), axes=axes))
 
 def sfft2d(a):
     func = sfft
@@ -970,7 +983,7 @@ def isfft2d(a):
     func = isfft
     return _process2d(func, a)
 
-def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
+def rfft(a, axes=None, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
     calculate nd fourier transform
     performs real- fft, i.e. the return array has shape with last dim halfed+1
@@ -989,11 +1002,9 @@ def rfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     if a.dtype.type not in fftw.RTYPES:
         a = N.asarray(a, minFdtype)
 
+    return fftw.rfft(a, axes=axes, nthreads=nthreads)
 
-    
-
-    return fftw.rfft(a, nthreads=nthreads)
-def irfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
+def irfft(af, axes=None, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
     """
     calculate nd inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -1011,9 +1022,9 @@ def irfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdty
     if af.dtype.type not in fftw.CTYPES:
         af = N.asarray(af, minCdtype)
 
-    return fftw.irfft(af, nthreads=nthreads)
+    return fftw.irfft(af, axes=axes, nthreads=nthreads)
 
-def rsfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
+def rsfft(a, axes=None, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
     calculate nd fourier transform
     performs real- fft, i.e. the return array has shape with last dim halfed+1
@@ -1026,8 +1037,9 @@ def rsfft(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     if a.dtype.type not in fftw.RTYPES:
         a = N.asarray(a, minFdtype)
 
-    return fftw.rfft(N.fft.ifftshift(a), nthreads=nthreads)
-def irsfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
+    return fftw.rfft(N.fft.ifftshift(a), axes=axes, nthreads=nthreads)
+
+def irsfft(af, axes=None, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):
     """
     calculate nd inverse fourier transform
     performs real- ifft, i.e. the input array has shape with last dim halfed+1
@@ -1046,7 +1058,7 @@ def irsfft(af, minCdtype=fftw.CTYPE, nthreads=fftw.ncpu):#normalize=True, minCdt
     if af.dtype.type not in fftw.CTYPES:
         af = N.asarray(af, minCdtype)
 
-    return N.fft.fftshift(fftw.irfft(af, nthreads=nthreads))
+    return N.fft.fftshift(fftw.irfft(af, axes=axes, nthreads=nthreads))
 
 def rfft2d(a, minFdtype=fftw.RTYPE, nthreads=fftw.ncpu):
     """
@@ -1355,7 +1367,7 @@ def convolve(a,b, conj=0, killDC=0, minFdtype='float32'):
 
 
 def drawLine(a, p0, p1, val=1., includeLast=True):
-    p = N.asarray(p0, N.float)
+    p = N.asarray(p0, float)
     p1= N.asarray(p1)
     delta = p1-p
     steppingAxis = delta.argmax()
@@ -1376,7 +1388,7 @@ def drawHexPattern2d(a, d=20, sizeYX=None, yx0=(0,0), val=1):
     grid strats at corner pixel yx0
     """
     if sizeYX is None:
-        sizeYX = N.array(a.shape, dtype=N.float) - yx0
+        sizeYX = N.array(a.shape, dtype=float) - yx0
         
     for i in range(int(float(sizeYX[1])/d)):
         for j in range(int(sizeYX[0]/(3.**.5/2 * d))):

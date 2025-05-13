@@ -185,11 +185,12 @@ class FFTManager(object):
         return a
 
     ### -----fftw -----
-    def _fftw(self, a, func, nthreads=ncpu):
+    def _fftw(self, a, func, axes=None, nthreads=ncpu):
         if 0 in a.shape:
             raise ValueError('This array cannot be transformed, shape: %s' % str(a.shape))
 
-        axes = [i - a.ndim for i in range(a.ndim)]
+        if axes is None:
+            axes = [i - a.ndim for i in range(a.ndim)]
         af = pyfftw.empty_aligned(a.shape, dtype=a.dtype.type.__name__)
         plan = func(af, axes=axes, threads=nthreads)
         af[:] = a[:]
@@ -205,7 +206,7 @@ class FFTManager(object):
 
     # ---- fft funcs ----------
     
-    def rfft(self, a, nthreads=ncpu):
+    def rfft(self, a, axes=None, nthreads=ncpu):
         a = self.check_array(a, RTYPES, RTYPE)
         
         if SCIK and self.is_gpu_memory_enough(a):
@@ -241,13 +242,13 @@ class FFTManager(object):
         elif FFTW:
             func = pyfftw.builders.rfftn
 
-            af = self._fftw(a, func, nthreads)
+            af = self._fftw(a, func, axes, nthreads)
         else:
-            af = N.fft.rfftn(a)
+            af = N.fft.rfftn(a, axes=axes)
 
         return af
         
-    def irfft(self, a, nthreads=0):
+    def irfft(self, a, axes=None, nthreads=0):
         a = self.check_array(a, CTYPES, CTYPE)
         
         if SCIK and is_memory_enough(a):
@@ -261,47 +262,47 @@ class FFTManager(object):
         elif FFTW:
             func = pyfftw.builders.irfftn
                 
-            af = self._fftw(a, func, nthreads=nthreads)
+            af = self._fftw(a, func, axes=axes, nthreads=nthreads)
 
         else:
-            af = N.fft.irfftn(a)
+            af = N.fft.irfftn(a, axes=axes)
 
         return af
 
-    def fft(self, a, nthreads=ncpu):
+    def fft(self, a, axes=None, nthreads=ncpu):
         a = self.check_array(a, CTYPES, CTYPE)
         
         if FFTW:
             func = pyfftw.builders.fftn
 
-            af = self._fftw(a, func, nthreads)
+            af = self._fftw(a, func, axes=axes, nthreads=nthreads)
         else:
-            af = N.fft.fftn(a)
+            af = N.fft.fftn(a, axes=axes)
             
         return af
 
-    def ifft(self, a, nthreads=ncpu):
+    def ifft(self, a, axes=None, nthreads=ncpu):
         a = self.check_array(a, CTYPES, CTYPE)
         
         if FFTW:
             func = pyfftw.builders.ifftn
         
-            af = self._fftw(a, func, nthreads=nthreads)
+            af = self._fftw(a, func, axes=axes, nthreads=nthreads)
         else:
-            af = N.fft.ifftn(a)
+            af = N.fft.ifftn(a, axes=axes)
             
         return af
 
 man = FFTManager()
 
-def rfft(a, nthreads=ncpu):
-    return man.rfft(a, nthreads)
+def rfft(a, axes=None, nthreads=ncpu):
+    return man.rfft(a, axes, nthreads)
 
-def irfft(a, nthreads=ncpu):
-    return man.irfft(a, nthreads)
+def irfft(a, axes=None, nthreads=ncpu):
+    return man.irfft(a, axes, nthreads)
 
-def fft(a, nthreads=ncpu):
-    return man.fft(a, nthreads)
+def fft(a, axes=None, nthreads=ncpu):
+    return man.fft(a, axes, nthreads)
 
-def ifft(a, nthreads=ncpu):
-    return man.ifft(a, nthreads)
+def ifft(a, axes=None, nthreads=ncpu):
+    return man.ifft(a, axes, nthreads)

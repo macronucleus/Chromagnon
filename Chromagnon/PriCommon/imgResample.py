@@ -1,9 +1,10 @@
 try:
-    from ..Priithon.all import U, N
-except (ValueError, ImportError):
     from Priithon.all import U, N
+    from common import ppro26 as ppro
+except (ValueError, ImportError):
+    from ..Priithon.all import U, N
+    from ..common import ppro26 as ppro
 
-from . import ppro26 as ppro
 NCPU = ppro.NCPU
 
 import scipy.ndimage.interpolation as ndii
@@ -24,6 +25,9 @@ METHODS = {'0nearest': 0,
 ORDER=3
 
 def trans3D(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, method='a', ncpu=NCPU):#, **splinekwds):
+    """
+    
+    """
     order = METHODS.get(method, 3)
     if order == 1:
         func = trans3D_bilinear
@@ -64,7 +68,7 @@ def trans3D_affine(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, ncpu=NCPU
         if len(dzyx) < ndim:
             dzyx = (0,)*(ndim-len(dzyx)) + tuple(dzyx)
 
-    dzyx = N.asarray(dzyx)
+    dzyx = N.asarray(dzyx) -0.5 # -0.5 added for magnification from the center 20240508
 
     magz = 1
     try:
@@ -112,7 +116,7 @@ def trans3D_affine(arr, tzyx=(0,0,0), r=0, mag=1, dzyx=(0,0,0), rzy=0, ncpu=NCPU
 
         arr = canvas
 
-    if dtype in (int, N.uint8, N.uint16, N.uint32):
+    if dtype in (N.uint8, N.uint16, N.uint32, N.int64): #N.int, N.uint8, N.uint16, N.uint32):
         arr = N.where(arr < 0, 0, arr)
         
     return arr.astype(dtype)
@@ -145,8 +149,8 @@ def getOffset(shape, invmat, ty, tx, start=0):
 
 def affine_transform(arr, invmat, offset=0.0, order=ORDER):
     return U.nd.affine_transform(arr, invmat, offset,
-                               #output=N.float32, cval=arr.min(), order=order)
-                               output=N.float32, cval=0, order=order)
+                               output=N.float32, cval=arr.min(), order=order)
+                               #output=N.float32, cval=0, order=order)
 
 
 # 
