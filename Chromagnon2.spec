@@ -57,8 +57,6 @@ if sys.platform.startswith('win'):
     code=os.path.abspath(os.path.join('Z:', 'py'))
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
 
-    os.environ['JDK_HOME'] = os.environ['JAVA_HOME']
-    rtm = [os.path.join(code, 'Chromagnon', 'runtime_hook.py')]
 
     suffix = 'Win' + ex_suffix
 else: # mac + linux
@@ -100,6 +98,7 @@ pip = True #
 if pip:
     try:
         import javabridge,  bioformats
+        os.environ['JDK_HOME'] = os.environ['JAVA_HOME']
         jv = os.path.dirname(javabridge.__file__)
         bf = os.path.dirname(os.path.dirname(bioformats.__file__))
         datas = [(os.path.join(jv, 'jars', '*'), os.path.join('javabridge', 'jars')), (os.path.join(bf, 'bioformats', 'jars', '*'), os.path.join('bioformats', 'jars'))]
