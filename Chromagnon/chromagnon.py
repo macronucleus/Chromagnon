@@ -785,7 +785,8 @@ def command_line():
                 options.microscope_calib,
                 not(options.donotRot4Time), # dorot4time
                 not(options.donotZ),# doZ
-                      (ref_is_temp, fns_is_temp)] 
+                      (ref_is_temp, fns_is_temp),
+                     af.ORDER] 
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()

@@ -118,6 +118,7 @@ a = Analysis([prog],
              pathex=[code],
              datas = datas,
             # runtime_hooks = rtm,
+            # hiddenimports is required for intel mac
             # hiddenimports=['numpy', 'numpy.core._multiarray_umath', 'scipy._lib.array_api_compat.numpy.fft', 'scipy.special._special_ufuncs'],
             excludes=['pylab', 'Tkinter', 'matplotlib', 'pdb', 'pyqt5', 'pyqtgraph', 'pytz', 'openjdk'])
 
