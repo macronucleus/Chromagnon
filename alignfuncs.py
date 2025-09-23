@@ -311,6 +311,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
     if initguess is None or N.any(initguess[:2] == 0):
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
+        print('initial guess is:', yx)
     else:
         #print('in iteration, initial guess is', initguess)
         if echofunc:
@@ -418,7 +419,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
             echofunc('Iteration %2d %s' % (i+1, ret), skip_notify=True)
         errs = errPxl(ll, center)
         if echofunc and i > 0:
-            echofunc('Iteration %i: Difference from the previous iteration=%.5f nm' % (i, N.average(errs)), doprint=False)
+            echofunc('Iteration %i: Difference from the previous iteration=%.5f px' % (i+1, N.average(errs)), doprint=False)
         try:
             if len(maxErr) ==2:
                 if N.all(errs[:2] < maxErr) and N.all(errs[2] < N.mean(maxErr)) and N.all(errs[3:] < maxErr):
