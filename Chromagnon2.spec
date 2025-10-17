@@ -66,10 +66,10 @@ if sys.platform.startswith('win'):
     site=os.path.join(conda, 'Lib', 'site-packages')
     libbin = os.path.join(conda, 'Library', 'bin')
 
-    #code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
-    code=os.path.join('Z:', 'codes', 'py')
+    code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
+    #code=os.path.join('Z:', 'codes', 'py')
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
-    print(code)
+    #print(code)
 
     suffix = 'Win' + ex_suffix
 else: # mac + linux
@@ -94,7 +94,7 @@ else: # mac + linux
     
 # ------ chromagnon version
 if sys.platform.startswith(('win', 'darwin')):
-    print(code)
+    #print(code)
     with open(os.path.join(code, 'Chromagnon', 'version.py')) as h:
         line = next(h)
         cversion = line.split()[-1][1:-1].replace('.', '')
