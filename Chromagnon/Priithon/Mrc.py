@@ -1004,7 +1004,7 @@ def init_simple(hdr, mode, nxOrShape, ny=None, nz=None):
     hdr.type= 0
     hdr.nspg= 0
     hdr.next= 0
-    hdr.dvid= 0xc0a0  # CHECK - should "priithon" get it own ID !?
+    hdr.dvid= -16224 #0xc0a0  # CHECK - should "priithon" get it own ID !?
     #20090402 hdr.blank= 0 #CHECK Hans: add ntst to record time domain offset
     hdr.nblank=0   #20090402
     hdr.ntst=0     #20090402

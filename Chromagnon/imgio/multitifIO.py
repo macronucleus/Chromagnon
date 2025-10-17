@@ -748,7 +748,8 @@ def xml2dict(xml, sanitize=True, prefix=None):
 
     return etree2dict(etree.fromstring(xml))
 
-tifff.xml2dict = xml2dict
+if READABLE_FORMATS:
+    tifff.xml2dict = xml2dict
 
 
 def astype(value):

@@ -427,7 +427,7 @@ class GLViewer(GLViewerCommon):
         glPixelStorei(GL_UNPACK_ALIGNMENT, img.itemsize)
         glPixelStorei(GL_UNPACK_SWAP_BYTES, not img.dtype.isnative)
 
-        imgString = img.tostring()
+        imgString = img.tobytes() #tostring()
       
         pic_ny,pic_nx = img.shape
 

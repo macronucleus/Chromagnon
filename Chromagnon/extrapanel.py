@@ -119,10 +119,12 @@ class ExtraDialog(wx.Dialog):
 
         self.calibfn = self.parent.extra_parms.get('calibfn', '')
         self.makeCalibChoice(box)
-        self.calibfn_dirlabel = G.makeTxt(self, box, os.path.dirname(self.calibfn))
-        self.calibfn_baselabel = G.makeTxt(self, box, os.path.basename(self.calibfn))
+        txt = os.path.dirname(self.calibfn) or '  '*45
+        self.calibfn_dirlabel = G.makeTxt(self, box, txt)
+        txt = os.path.basename(self.calibfn) or '  '*45
+        self.calibfn_baselabel = G.makeTxt(self, box, txt)
 
-        calibClearButton = G.makeButton(self, box, self.OnClearCalib, title='Erace selected', tip='')
+        calibClearButton = G.makeButton(self, box, self.OnClearCalib, title='Erase selected', tip='')
         
         # -------- OK and Cancel -----------
         btnsizer = wx.StdDialogButtonSizer()
@@ -135,7 +137,7 @@ class ExtraDialog(wx.Dialog):
         btnsizer.AddButton(btn)
         btnsizer.Realize()
 
-        sizer.Add(btnsizer, 0)#, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        sizer.Add(btnsizer, 0)#, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5) # Github Issue #35
 
         sizer.Fit(self)
 
@@ -185,7 +187,8 @@ class ExtraDialog(wx.Dialog):
         name = self.calib_choice.GetStringSelection()
         if name and name != self.calib_new:
             C.deleteConfig('calib_'+name)
-            self.calibfn_label.SetLabel('')
+            self.calibfn_dirlabel.SetLabel('')
+            self.calibfn_baselabel.SetLabel('')
             self.calibfn = ''
             self.makeCalibChoice()
             old="""
@@ -312,7 +315,7 @@ class CalibrationDialog(wx.Dialog):
         btnsizer.AddButton(btn)
         btnsizer.Realize()
 
-        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        sizer.Add(btnsizer, 0)#, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
 
         sizer.Fit(self)
 
@@ -326,10 +329,9 @@ class CalibrationDialog(wx.Dialog):
         dlg = G.FileSelectorDialog(self, dd, wildcard='*.chromagnon.tif', multiple=False)
         if dlg.ShowModal() == wx.ID_OK:
             self.calibfn = dlg.GetPath()
+            self.listCalib.clearAll()
+            self.listCalib.addFile(self.calibfn)
         dlg.Destroy()
-
-        self.listCalib.clearAll()
-        self.listCalib.addFile(self.calibfn)
 
     def OnclearSelected(self, evt=None):
         #print(self.listCalib.columnkeys)

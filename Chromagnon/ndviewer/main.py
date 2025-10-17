@@ -94,13 +94,12 @@ class ImagePanel(wx.Panel):
             self.doc.zlast = 0
             self.addImageXY()
 
-        #self.zshape= self.doc.shape[:-2]
-
             
     def __del__(self):
+        print('caled')
         self._mgr.UnInit()
         self.doOnClose()
-
+        
     def doOnClose(self):
         pass
             
@@ -560,9 +559,13 @@ class ImagePanel(wx.Panel):
         Y.vSaveRGBviewport(v, fn, flipY=False)
 
     def onCopyRegion(self, evt=None):
-        roi = self.getROI()
-        ws = [w for w, hist in enumerate(self.hist_toggleButton) if hist.GetValue()]
-        out = imgio.copyRegion(self.doc.fn, twzyx0=(0,0,roi[0][0],roi[0][1],roi[0][2]),twzyx1=(None,None,roi[1][0],roi[1][1],roi[1][2]),channel_ids=ws)
+
+        if self.doc.fn == 'array':
+            out = self.doc.arr_with_header(useROI=True)
+        else:
+            roi = self.getROI()
+            ws = [w for w, hist in enumerate(self.hist_toggleButton) if hist.GetValue()]
+            out = imgio.copyRegion(self.doc.fn, twzyx0=(0,0,roi[0][0],roi[0][1],roi[0][2]),twzyx1=(None,None,roi[1][0],roi[1][1],roi[1][2]),channel_ids=ws)
 
         if evt:
             frame = self.parent
@@ -1069,15 +1072,23 @@ class ImagePanel(wx.Panel):
 
         return retSlice
 
-    def getROI(self):
+    def getROI(self, return_as_slice=False):
         """
         return (z0,y0,x0), (z1,y1,x1)
         """
         start = self.doc.roi_start
         stop = self.doc.roi_start + self.doc.roi_size
-        return tuple(start), tuple(stop)
-        #return [slice(*ss) for ss in zip(start, stop)]
+        if return_as_slice:
+            return tuple([slice(*ss) for ss in zip(start, stop)])
+        else:
+            return tuple(start), tuple(stop)
 
+    def getROIarray(self):
+        """
+        return array
+        """
+        return self.doc.arr_with_header(useROI=True)
+    
     def oncolmap(self, evt=None):
         choice = self.colmapch.GetStringSelection()
 
@@ -1171,6 +1182,8 @@ class MyFrame(wx.Frame):
     def onclose(self, evt=None):
         global viewers
         viewers[self.vid] = None
+
+        self.auiManager.UnInit()
 
         if evt:
             evt.GetEventObject().Destroy()

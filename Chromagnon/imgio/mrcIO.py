@@ -153,6 +153,17 @@ class Reader(generalIO.Reader):
         
         return a '''
 
+    def getTimeStamp(self, acq_order='tzw'):
+        """
+        acq_order: acquisition order string
+
+        return as an array with dimension specified by acq_order
+        """
+        tt = self.fp.extFloats[:self.hdr.Num[-1],1]
+        order = [self.__dict__['n%s' % o] for o in acq_order]
+        tt = tt.reshape(order)
+        return N.squeeze(tt)
+
 
 class Writer(generalIO.Writer):
     def __init__(self, outfn, hdr=None, extInts=None, extFloats=None, metadata={}):
@@ -195,7 +206,8 @@ class Writer(generalIO.Writer):
         self.hdr.ImgSequence = self.imgSequence
         self.hdr.wave[:self.nw] = self.wave[:self.nw]
         self.hdr.d[:] = self.pxlsiz[::-1]
-        self.hdr.LensNum = findLens(self.mag, self.na)
+        if self.hdr.LensNum[0] == 0 and self.mag and self.na:
+            self.hdr.LensNum[0] = findLens(self.mag, self.na)
 
         self.writeHeader(self.hdr)
 
@@ -231,7 +243,7 @@ class Writer(generalIO.Writer):
                     self.hdr.__setattr__('mmm1', [mi, ma, me])
                 else:
                     self.hdr.__setattr__('mm%i' % (w+1), [mi, ma])
-        
+                    
     def setDimFromMrcHdr(self, hdr):
         """
         set dimensions using a Mrc header
@@ -243,6 +255,9 @@ class Writer(generalIO.Writer):
             raise ValueError('number of Z is less than 1 (nt: %i, nw: %i)' % (int(hdr.NumWaves[0]), int(hdr.NumTimes[0])))
         dtype = Mrc.MrcMode2dtype(hdr.PixelType[0])
 
+        # objective
+        self.mag, self.na, self.n1 = LENS_ID.get(int(hdr.LensNum), (generalIO.MAG, generalIO.NA, generalIO.N1))
+        
         self.setDim(hdr.Num[0], hdr.Num[1], nz, hdr.NumTimes[0], hdr.NumWaves[0], dtype, hdr.wave, hdr.ImgSequence[0])
 
     def setExtHdr(self, extInts=None, extFloats=None):
@@ -441,6 +456,7 @@ def makeHdr_like(hdrSrc):
     hdr.NumWaves = hdrSrc.NumWaves[0]
     hdr.NumIntegers = hdrSrc.NumIntegers[0]
     hdr.NumFloats = hdrSrc.NumFloats[0]
+    hdr.LensNum = hdrSrc.LensNum
     return hdr
 
 def makeHdrFromRdr(rdr):

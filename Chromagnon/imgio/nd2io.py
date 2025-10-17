@@ -49,6 +49,7 @@ class Reader(generalIO.Reader):
         
         dtype = self.fp.dtype
         wave = [cc.channel.emissionLambdaNm for cc in self.fp.metadata.channels]
+        print(wave)
         imgseqstr = ''.join(self.fp.sizes.keys()) # ordered
         if 'C' in imgseqstr[-3:]:
             self.axes = imgseqstr[-3:]

@@ -36,7 +36,7 @@ def main():
 
         def OnInit(self):
             import wx,sys
-            from wx.py import shell
+            #from wx.py import shell
             from Priithon import shell
             introText=' !!! Welcome to Priithon !!! \n'
             #self.frame = shell.ShellFrame(

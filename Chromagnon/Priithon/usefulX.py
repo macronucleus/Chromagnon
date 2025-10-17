@@ -2239,7 +2239,15 @@ def vReplicateLineProfile(id0=-2, id1=-1, abscissa='line', s='+-', hold=1):
             except:
                 raise #print "line profile bug:", len(xs), len(ys)
 
+
+
+    def fg():
+        x0,y0,x1,y1 = poly
+        glLine(x0,y0,x1,y1, PriConfig.defaultGfxColor)
+            
     f(poly, v)
+
+    v.viewer.updateGlList(fg )
 
 
 def vLeftClickLineMeasure(id=-1, roundCoords2int=False):

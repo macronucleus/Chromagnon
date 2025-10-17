@@ -728,14 +728,18 @@ def command_line():
 
         nts = []
         nws = []
+        ref_is_csv = False
         for fn in refs:
-            h = imgio.Reader(fn)
-            nts.append(h.nt)
-            nws.append(h.nw)
-            h.close()
+            if chromformat.is_chromagnon(fn):
+                ref_is_csv = True
+            else:
+                h = imgio.Reader(fn)
+                nts.append(h.nt)
+                nws.append(h.nw)
+                h.close()
 
         ref_is_temp = False
-        if len(refs) > 1 and all([nt == 1 for nt in nts]) and all([nw == 1 for nw in nws]):
+        if not ref_is_csv and len(refs) > 1 and all([nt == 1 for nt in nts]) and all([nw == 1 for nw in nws]):
             print('combine refs')
             refs = af.combineWavelength(refs)
             ref_is_temp = True

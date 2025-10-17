@@ -673,7 +673,7 @@ class GLViewer(GLViewerCommon):
                     f     =  maxValueWhite / srange
 
             imgType = data.dtype.type
-            dataString = data.tostring()            
+            dataString = data.tobytes() #tostring()            
             itSize = data.itemsize
             
             glPixelStorei(GL_UNPACK_SWAP_BYTES, not data.dtype.isnative)

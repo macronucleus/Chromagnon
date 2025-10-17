@@ -91,6 +91,7 @@ def _switch(fn, read=True, *args, **kwds):
     #--- interplete ---
     # filename or fileseries
     if isinstance(fn, six.string_types):
+        ext = ''
         if (read and os.path.isfile(fn)) or not read:
             ext = os.path.splitext(fn)[1].replace(os.path.extsep, '')
         elif os.path.isdir(fn):
@@ -101,7 +102,7 @@ def _switch(fn, read=True, *args, **kwds):
                 raise ValueError('The input file name %s was not understood' % fn)
             
     # arrayIO
-    elif 'ndarray' == type(fn).__name__:
+    elif 'ndarray' in type(fn).__name__:
         return _modules['arr'].__getattribute__('Reader')(fn, *args, **kwds)
     # Reader or Writer 
     elif 'Reader' in type(fn).__name__ or 'Writer' in type(fn).__name__:
@@ -116,16 +117,16 @@ def _switch(fn, read=True, *args, **kwds):
     # seq
     if (not isinstance(fn, six.string_types) and hasattr(fn, '__iter__')) or (read and not os.path.isfile(fn)):
 
-        fns = [ff for ff in fn if os.path.splitext(ff)[1].replace(os.path.extsep, '') in formats['seq']]
+        fns = [ff for ff in fn if os.path.splitext(ff)[1].replace(os.path.extsep, '') in _formats(read, 'seq')]
         if os.path.commonprefix(fns):
             return _klass(read, 'seq', fns, *args, **kwds)
         else:
             raise ValueError('The directory or file names does not seem to contain image series')
 
     # ome.tif is written by BioformatsWriter
-    elif fn.endswith('ome.tif') and not read:
-        import tifffile
-        tifversion = tifffile.__version__.split('.')
+    elif fn.endswith('ome.tif') and not read and multitifIO.READABLE_FORMATS:
+        #import tifffile
+        tifversion = multitifIO.tifffile.__version__.split('.')
         if (int(tifversion[0]) == 2020 and int(tifversion[1]) >= 11) or int(tifversion[0]) > 2020:
             kwds2 = kwds.copy()
             kwds2['style'] = 'ome'
@@ -213,9 +214,9 @@ def _switch_0ld(fn, read=True, *args, **kwds):
             raise ValueError('The directory does not seem to contain image series')
 
     # ome.tif is written by BioformatsWriter
-    elif fn.endswith('ome.tif') and not read:
-        import tifffile
-        tifversion = tifffile.__version__.split('.')
+    elif fn.endswith('ome.tif') and not read and multitifIO.READABLE_FORMATS:
+        #import tifffile
+        tifversion = multitifIO.tifffile.__version__.split('.')
         if (int(tifversion[0]) == 2020 and int(tifversion[1]) >= 11) or int(tifversion[0]) > 2020:
             return klasses['tif'](fn, style='ome', *args, **kwds)
         else:
@@ -319,7 +320,7 @@ def save(arr, outfn, dimorder='twzyx', wave=[], pzyx=[.1,.1,.1], metadata={}):
         arr = arr.astype(N.complex64)
 
     # more than 5 dimension is saved in a tifffle
-    if arr.ndim > 5:
+    if arr.ndim > 5 and multitifIO.WRITABLE_FORMATS:
         if ext != '.tif':
             raise ValueError('dimension of %i can only be saved in tif format' % arr.ndim)
         multitifIO.tifffile.imsave(outfn, arr, metadata={'wave': wave}.update(metadata))

@@ -57,8 +57,9 @@ class Reader(generalIO.Reader):
         fns = [os.path.basename(fn) for fn in self.fns]
         nztw = []
         name = []
+        pat0 = '[_-]%s[0-9]+'
         for ds in ['[zZ]', '[tT]', '[wcWC]']:
-            pat = re.compile('_%s[0-9]+' % ds)
+            pat = re.compile(pat0 % ds)
             ndim = pat.findall(fns[0])
             if ndim:
                 nn = len(set([pat.findall(fn)[-1][2:] for fn in fns]))
@@ -75,7 +76,7 @@ class Reader(generalIO.Reader):
         if len(name) == 1:
             imgseq = 0
         elif len(name) == 2:
-            patstr = '_%s[0-9]+_%s[0-9]+'
+            patstr = pat0 * 2
             table = {0: [('[wcWC]','[tT]'), ('[wcWC]', '[zZ]'), ('[tT]', '[zZ]')],
                      1: [('[tT]', '[wcWC]'), ('[zZ]', '[wcWC]')],
                      3: [('[zZ]', '[tT]')]}
@@ -86,7 +87,7 @@ class Reader(generalIO.Reader):
                         imgseq = _imgseq
                         break
         elif len(name) == 3:
-            patstr = '_%s[0-9]+_%s[0-9]+_%s[0-9]+'
+            patstr = pat0 * 3 #'[_-]%s[0-9]+_%s[0-9]+_%s[0-9]+'
             pats = [seq for seq in [('[zZ]', '[tT]', '[wcWC]'), ('[wcWC]', '[zZ]', '[tT]'), ('[zZ]', '[wcWC]', '[tT]')]]
             for imgseq, st in enumerate(pats):
                 pat = re.compile(patstr % tuple(st))
@@ -115,13 +116,13 @@ class Reader(generalIO.Reader):
             dname = 'twz'
         elif dname == 3:
             dname = 'tzw'
-        name = [s for s in dname if s in name]
+        name = ['[%s%s]' % (s.lower(),s.upper()) for s in dname if s in name]
 
         num = []
         for fn in self.fns:
             ndims = []
             for n in name:
-                pat = re.compile('_%s[0-9]+' % n)
+                pat = re.compile(pat0 % n) #'_%s[0-9]+' % n)
                 nd = int(pat.findall(fn)[-1][2:])
                 ndims.append(nd)
             num.append((ndims, fn))

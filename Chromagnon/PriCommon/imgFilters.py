@@ -73,7 +73,11 @@ def arr_edgeFilter(img, sigma=1.5):
     return ff 
 
 
-        
+def arr_GaussianFilter3D(img, sigma=1):
+    g = gaussianArrND(img.shape, sigma)
+    gf = F.sfft(g)
+    af = F.sfft(img)
+    return F.isfft(af * gf)
 
 # cross-correlation
 
@@ -977,6 +981,28 @@ def findMaxWithGFitAll(img, thre=0, sigma_peak=0.5, npts=100, win=11, mask_npxls
         
     return poses#, img
 
+def savePeaks(poses, outfn, pxlsiz=None):
+    import csv
+    if pxlsiz is None:
+        unit = 'px'
+    else:
+        unit = 'um'
+
+    with open(outfn, 'w') as w:
+        wtr = csv.writer(w)
+        wtr.writerow(['No', 'peak intensity', 'Z (px)', 'Y (px)', 'X (px)', 'FWHM Z(%s)' % unit, 'FWHM Y(%s)'  % unit, 'FWHM X(%s)' % unit])
+        for i, pos in enumerate(poses):
+            v, pos, sigma = pos
+            if type(sigma) == tuple:
+                continue
+            else:
+                fwhm = U.FWHM_s(sigma)
+            if pxlsiz is not None:
+                fwhm *= pxlsiz
+            line = [i, v] + list(pos) + list(fwhm)
+            wtr.writerow(line)
+    return outfn
+
 # ------ GUI
 def statPeaks(ret, pxlsiz=(0.25,0.08,0.08)):
     """
@@ -993,6 +1019,84 @@ def statPeaks(ret, pxlsiz=(0.25,0.08,0.08)):
     sst = N.std(fw, axis=0)
 
     return vme, vst, sme, sst, len(fw)
+
+def showPeaksProj(ret, arr3D, view='xy', vid=None, sec_no=None, color=(1,0,0), label_size=2, kind='Circle', show_intensity=False):
+    """
+    ret: returned answer from findMaxWithGFitAll
+    """
+    # prepare viewer
+    axes = ['Z', 'Y', 'X']
+
+    assert len(view) == 2
+
+    view = view.upper()
+    if ('Z' in view and view.startswith('Z')) or view == 'YX':
+        view = view[::-1]
+
+
+        
+    if vid is None:
+        if view in ('XZ', 'YZ'):
+            arr3D = F.__getattribute__('get%sview' % view)(arr3D)
+        if sec_no is None:
+            azx = U.project(arr3D)
+        else:
+            azx = arr3D[sec_no]
+        Y.view(azx)
+        vid = Y.viewers[-1].id
+
+        if 0:#hasattr(arr3D, 'header'):
+            fact = arr3D.header.pxlsiz[axes.index(view[1])] / arr3D.header.pxlsiz[axes.index(view[0])]
+            Y.vSetAspectRatio(vid, y_over_x=fact)
+
+
+    if view == 'YZ':
+        view = view[::-1]
+        
+    aid = [axes.index(v) for v in view] 
+    
+    print(view, azx.shape, aid)
+        
+    # peak
+    poss = [p for v, p, s in ret]
+    if show_intensity:
+        vs = [v for v, p, s in ret]
+
+    ids = []
+
+    if kind.lower().startswith('ci'): 
+        fffff=Y.vgAddCircles
+    if kind.lower().startswith('cr'): 
+        fffff=Y.vgAddCrosses
+    if kind.lower().startswith('b'): 
+        fffff=Y.vgAddBoxes
+        label_size *=.5
+
+    for j, pos in enumerate(poss):
+        if show_intensity:
+            if abs(vs[j]) > 10:
+                label = str(j) + '(%i)' % vs[j]
+            else:
+                label = str(j) + '(%.2f)' % vs[j]
+        else:
+            label = str(j)
+
+        if view == 'XY':
+            yx = pos[1:]
+        elif view == 'XZ':
+            yx = pos[::2]
+        elif view == 'ZY':
+            yx = pos[:-1][::-1]
+
+        q = fffff(vid, (yx,), r=label_size, color=color, refreshNow=False)
+        ids.append(q)
+
+        yxt = tuple(yx) + (label,)
+        q = Y.vgAddTexts(vid, [yxt], size=label_size/30., color=color, idx=None, refreshNow=False)
+        ids.append(q)
+
+    # it is automatically refreshed??
+    return ids
 
 
 def viewPeaks(ret, vid=-1, color=(1,0,0), label_size=2, kind='Circle', show_intensity=False):

@@ -28,6 +28,7 @@ _broken=""
 #20060719 except:    _broken +=" P"
 try:
     import numpy as N
+    import numpy as np
 except:
     _broken +=" N"
 

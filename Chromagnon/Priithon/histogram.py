@@ -325,7 +325,7 @@ class HistogramCanvas(MyCanvasBase):
       
                 if self.m_imgArr.dtype.type == N.uint8:
                     GL.glTexSubImage1D(GL.GL_TEXTURE_1D,0,  0, self.tex_nx, 
-                                       GL.GL_LUMINANCE,GL.GL_UNSIGNED_BYTE, self.m_imgArr.tostring())
+                                       GL.GL_LUMINANCE,GL.GL_UNSIGNED_BYTE, self.m_imgArr.tobytes()) #tostring())
 
                 self.m_imgChanged = False
 
