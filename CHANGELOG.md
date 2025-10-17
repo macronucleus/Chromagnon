@@ -39,7 +39,11 @@ when `python-bioformats` or `javabridge` are not installed.
     the center of magnification.
 20. (v0.93 20240509) Avoid a double import in `__init__.py`
 21. (v0.94 20250409) Fixed `alignfuncs._compCost` slice problem.
-22. (v0.94 20250409) `imgio` partly supports `nd2`, `czi`, `lif`, `oib`.
+22. (v0.94 20250409) `imgio` partly supports `nd2`, `czi`, `lif`,
+    `oib`.
+	23. (v0.95 20251006) Fixed microscope map dialog. Also modified
+        the output of microscope map and the alignment method.
+	24. (v0.95 20251011) Added metadata in the aligned image files.
 
 v0.8(May. 2019)
 ----

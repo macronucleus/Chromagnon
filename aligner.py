@@ -408,13 +408,17 @@ class Chromagnon(object):
         self.progress()
 
     
-    def setRefImg(self, refyz=None, refyx=None, removeEdge=True):
+    def setRefImg(self, refyz=None, refyx=None, removeEdge=True, applymap=True):
         """
         set self.refyz and self.refyx
         """
         if refyz is None or refyx is None:
             if self.img.nz > 1:
-                ref = self.img.get3DArr(w=self.refwave, t=self.reftime)
+                if self.mapyx is None or not applymap:
+                    ref = self.img.get3DArr(w=self.refwave, t=self.reftime)
+                else:
+                    self.setRegionCutOut()
+                    ref = self.get3DArrayAligned(w=self.refwave, t=self.reftime)
                 ref = af.fixSaturation(ref, self.getSaturation(w=self.refwave, t=self.reftime))
                 
                 if refyx is None:
@@ -436,7 +440,11 @@ class Chromagnon(object):
                     refyz = af.prep2D(ref.T, zs=self.refxs, removeEdge=removeEdge)
                 del ref
             elif refyx is None:
-                refyx = self.img.getArr(w=self.refwave, t=self.reftime, z=0)
+                if self.mapyx is None:
+                    refyx = self.img.getArr(w=self.refwave, t=self.reftime, z=0)
+                else:
+                    self.setRegionCutOut()
+                    refyx = self.get3DArrayAligned(w=self.refwave, t=self.reftime, z=0)
                 refyx = af.fixSaturation(refyx, self.getSaturation(w=self.refwave, t=self.reftime))
 
         self.refyz = refyz
@@ -456,12 +464,17 @@ class Chromagnon(object):
         if init_t is None:
             init_t = t
 
-        ret = self.alignParms[init_t].copy()
+       # ret = self.alignParms[init_t].copy()
+        ret = N.zeros_like(self.alignParms[init_t])
+        ret[...,-3:] = 1
+        print(ret.shape, ret, ret[:,:-3])
         
-        if N.any(ret[:,:-3]):
+        if N.any(ret[:,:-3]) or self.mapyx is not None:
+            # in some reason initial guess does not work when self.mapyx is present
             doXcorr = False
         else:
             doXcorr = True
+        print('doxcorr:', doXcorr)
 
         for w in range(self.img.nw):
             if (doWave and w == self.refwave) or (not doWave and w != self.refwave):
@@ -473,18 +486,27 @@ class Chromagnon(object):
             # vertical alignment
             if self.img.nz > 1 and self.doZ:
                 self.echo('Starting ZY plane alignment')
-                img = self.img.get3DArr(w=w, t=t)
+                if self.mapyx is None:
+                    img = self.img.get3DArr(w=w, t=t)
+                else: # 20251011
+                    self.echo('Applying microscope map for time %i channel %i' % (t, w))
+                    self.setRegionCutOut()
+                    img = self.get3DArrayRemapped(w=w, t=t)
+                    
                 img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
                 
                 # get initial guess if no initial guess was given
                 if doXcorr:
-                    ref = self.img.get3DArr(w=self.refwave, t=t)
+                    if self.mapyx is None:
+                        ref = self.img.get3DArr(w=self.refwave, t=t)
+                    else:
+                        ref = self.get3DArrayAligned(w=self.refwave, t=t)
                     prefyx = N.max(ref, 0)
                     pimgyx = N.max(img, 0)
                     if self.max_shift_pxl:
                         searchRad = self.max_shift_pxl * 2
-                        if searchRad > min((self.img.nx, self.img.ny)):
-                            searchRad = min((self.img.nx, self.img.ny))
+                        if searchRad > min(img.shape[-2:]): #self.img.nx, self.img.ny)):
+                            searchRad = min(img.shape[-2:])#(self.img.nx, self.img.ny))
                     else:
                         searchRad = None
                     yx, c = xcorr.Xcorr(prefyx, pimgyx, phaseContrast=self.phaseContrast, searchRad=searchRad)
@@ -494,8 +516,8 @@ class Chromagnon(object):
                     del ref, c
                 # create 2D projection image
                 xs = N.round(self.refxs-ret[w,2]).astype(int)
-                if xs.max() >= self.img.nx:
-                    xsbool = (xs < self.img.nx)
+                if xs.max() >= img.shape[-1]:#self.img.nx:
+                    xsbool = (xs < img.shape[-1]) #self.img.nx)
                     xsinds = N.nonzero(xsbool)[0]
                     xs = xs[xsinds]
 
@@ -505,8 +527,8 @@ class Chromagnon(object):
                 if doXcorr:
                     if self.max_shift_pxl:
                         searchRad = [searchRad, searchRad * (self.img.pxlsiz[0]/self.img.pxlsiz[1])]
-                        if searchRad[1] > self.img.nz:
-                            searchRad[1] = self.img.nz
+                        if searchRad[1] > img.shape[-3]: #self.img.nz:
+                            searchRad[1] = img.shape[-3] #self.img.nz
                     yz, c = xcorr.Xcorr(self.refyz, imgyz, phaseContrast=self.phaseContrast, searchRad=searchRad)
                     ret[w,0] = yz[1]
                     self.echo('Z shift rough estimate tz:%.3f' % yz[1])
@@ -576,6 +598,7 @@ class Chromagnon(object):
                     initguess = N.zeros((5,), N.float32)
                     initguess[:2] = ret[w,:2][::-1]
                     initguess[3:] = ret[w,4:6][::-1]
+                    print('before itration', initguess, ret)
 
                     if zdif > 3 and self.img.nz > 10 and self.zmagSwitch == ZMAG_CHOICE[1]: # always
                         if_failed = 'simplex'
@@ -672,7 +695,11 @@ class Chromagnon(object):
             for i in range(self.niter_3D):
                 self.echo('', skip_notify=True)
                 self.echo('Measuring 3D phase correlation for time %i channel %i iteration %i' % (t, w, i))
-                img = self.get3DArrayAligned(w=w, t=t)
+                if self.mapyx is None:
+                    img = self.get3DArrayAligned(w=w, t=t)
+                else:
+                    self.echo('Applying microscope map for 3D phase correlation for time %i channel %i iteration %i' % (t, w, i))
+                    img = self.get3DArrayRemapped(w=w, t=t)
                 img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
 
                 try:
@@ -738,8 +765,8 @@ class Chromagnon(object):
                 #img = af.fixSaturation(img, self.getSaturation(w=w, t=t))
 
                 zs = N.round(self.refzs-self.alignParms[t,w,0]).astype(int)
-                if zs.max() >= self.img.nz:
-                    zsbool = (zs < self.img.nz)
+                if zs.max() >= img.shape[-3]:#self.img.nz:
+                    zsbool = (zs < img.shape[-3]) #self.img.nz)
                     zsinds = N.nonzero(zsbool)[0]
                     zs = zs[zsinds]
 
@@ -751,7 +778,11 @@ class Chromagnon(object):
 
             affine = self.alignParms[t,w]
 
+
             imgyx = imgyx.astype(N.float32)
+
+            # reference
+            self.setRefImg(applymap=False, refyz=self.refyz)
             self.refyx = self.refyx.astype(N.float32)
 
             yxs, regions, arr2, win = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)
@@ -1171,6 +1202,16 @@ class Chromagnon(object):
             fn = fntools.nextFN(fn)
             des = imgio.Writer(fn, self.img)
 
+        # add metadata
+        if hasattr(self.creader, 'fn'):
+            des.metadata['reference file'] = os.path.basename(self.creader.fn)
+        elif hasattr(self.creader, 'reader'):
+            des.metadata['reference file'] = os.path.basename(self.creader.reader.fn)
+        if self.mapyx is None:
+            des.metadata['alignment mode'] = 'global'
+        else:
+            des.metadata['alignment mode'] = 'local'
+
         try:
             nx = self.cropSlice[-1].stop - self.cropSlice[-1].start
             ny = self.cropSlice[-2].stop - self.cropSlice[-2].start
@@ -1180,6 +1221,8 @@ class Chromagnon(object):
             if type(des) == imgio.mrcIO.Writer:
                 des.hdr.mst[:] = [s.start for s in self.cropSlice[::-1][:-1]]
                 des.doOnSetDim()
+            else:
+                des.metadata['crop slice XYZ'] = self.cropSlice[::-1]
 
         except TypeError: # start and stop of cropSlice is None
             # in other words, setRegionCutOut was not called.

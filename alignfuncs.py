@@ -308,7 +308,8 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
     ret = N.zeros((5,), N.float32)
     ret[3:] = 1
-    if initguess is None or N.any(initguess[:2] == 0):
+    if initguess is None:# or N.any(initguess[:2] == 0):
+        # CHECK: this very often fail
         yx, c = xcorr.Xcorr(ref, a2d, phaseContrast=phaseContrast)
         ret[:2] = yx
         print('initial guess is:', yx)
@@ -1458,10 +1459,7 @@ def iterWindowNonLinear(arr, ref, minwin=MIN_PXLS_YX, affine=None, initGuess=Non
             else:
                 break
 
-        if currentGuess is None:
-            currentGuess = yxc
-        else:
-            currentGuess += yxc
+        currentGuess = yxc
 
         rmax = regions.max()
         if not rmax:

@@ -237,7 +237,11 @@ class ThreadWithExc(threading.Thread):
                         an.setDoRotate4timeSeries(dorot4time)
                         an.findAlignParamTime(doWave=False)
 
+                    # 20251006
                     fn = an.saveParm()
+                    if microscopemap and not local:
+                        an.mapyx = None
+                        an.saveParm()
 
                     currlist = None
                     #clk1 = time.clock()
@@ -282,6 +286,7 @@ class ThreadWithExc(threading.Thread):
                         self.echo('Using microscope map %s' % microscopemap, skip_notify=True, doprint=True)
                         an.loadParm(microscopemap)
                     an.loadParm(fn)
+
                     #if cutout:
                     an.setRegionCutOut(cutout)
 
@@ -354,6 +359,11 @@ class ThreadWithExc(threading.Thread):
                 if self.notify_obj:
                     print('event view', out)
                     wx.PostEvent(self.notify_obj, MyEvent(EVT_VIEW_ID, [out]))
+
+            #print('is this still that?', fn)
+            if microscopemap and fn.endswith('chromagnon.tif') and microscopemap != fn and not local:
+                print('Removing the reference file %s' % fn)
+                os.remove(fn)
 
             if rmv_ref:
                 #print('remove ref %s' % fns[0])
