@@ -66,8 +66,8 @@ if sys.platform.startswith('win'):
     site=os.path.join(conda, 'Lib', 'site-packages')
     libbin = os.path.join(conda, 'Library', 'bin')
 
-    code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
-    #code=os.path.join('Z:', 'codes', 'py')
+    #code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
+    code=os.path.join('Z:', os.sep, 'codes', 'py')
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
     #print(code)
 
