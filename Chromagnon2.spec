@@ -140,7 +140,7 @@ if True:
     if sys.platform.startswith('win'):
         to_remove = ["_AES", "_ARC4", "_DES", "_DES3", "_SHA256", "_counter"]
         dname = f'%s.cp37-win_amd64.pyd'
-    elif sys.platform == 'darwin':
+    elif sys.platform == 'darwin': # this is used when " WARNING: file already exists but should not", but then the best thing you can do is create new conda environment, rather than removing libraries like this.
         to_remove = []#"_asyncio", "_bisect", "_blake2", "_bz2", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", u'_codecs_iso2022', u'_codecs_jp', u'_codecs_kr', u'_codecs_tw', u'_contextvars', u'_csv', u'_ctypes', u'_datetime', u'_decimal', u'_elementtree', u'_hashlib', u'_heapq', u'_json', u'_lzma', u'_md5', u'_multibytecodec', u'_multiprocessing', u'_opcode', u'_pickle', u'_posixshmem', u'_posixsubprocess', u'_queue', u'_random', u'_scproxy', u'_sha1', u'_sha256', u'_sha3', u'_sha512', u'_socket', u'_ssl', u'_statistics', u'_struct', u'_tkinter', u'_uuid', u'array', u'binascii', u'fcntl', u'grp', u'math', u'mmap', u'pyexpat', u'readline', u'resource', u'select', u'syslog', u'termios', u'unicodedata', u'zlib']
 
         dname = f'%s.cpython-310-darwin.so'
