@@ -440,7 +440,7 @@ class Chromagnon(object):
                     refyz = af.prep2D(ref.T, zs=self.refxs, removeEdge=removeEdge)
                 del ref
             elif refyx is None:
-                if self.mapyx is None:
+                if self.mapyx is None or not applymap:
                     refyx = self.img.getArr(w=self.refwave, t=self.reftime, z=0)
                 else:
                     self.setRegionCutOut()
@@ -782,7 +782,7 @@ class Chromagnon(object):
             imgyx = imgyx.astype(N.float32)
 
             # reference
-            self.setRefImg(applymap=False, refyz=self.refyz)
+            self.setRefImg(removeEdge=False, applymap=False, refyz=self.refyz)
             self.refyx = self.refyx.astype(N.float32)
 
             yxs, regions, arr2, win = af.iterWindowNonLinear(imgyx, self.refyx, npxls, affine=affine, initGuess=self.mapyx[t,w], phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)

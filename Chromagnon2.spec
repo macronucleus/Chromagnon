@@ -60,14 +60,16 @@ name = 'Chromagnon'
 # win
 if sys.platform.startswith('win'):
     if not conda:
-        conda = os.path.join(home, 'Miniconda%i' % pyversion)
+        #conda = os.path.join(home, 'Miniconda%i' % pyversion)
+        conda = os.path.join(home, 'miniforge%i' % pyversion)
     
     site=os.path.join(conda, 'Lib', 'site-packages')
     libbin = os.path.join(conda, 'Library', 'bin')
 
-    code=os.path.abspath(os.path.join('Z:', 'py'))
+    #code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
+    code=os.path.join('Z:', os.sep, 'codes', 'py')
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
-
+    #print(code)
 
     suffix = 'Win' + ex_suffix
 else: # mac + linux
@@ -92,6 +94,7 @@ else: # mac + linux
     
 # ------ chromagnon version
 if sys.platform.startswith(('win', 'darwin')):
+    #print(code)
     with open(os.path.join(code, 'Chromagnon', 'version.py')) as h:
         line = next(h)
         cversion = line.split()[-1][1:-1].replace('.', '')
