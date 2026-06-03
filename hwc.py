@@ -37,7 +37,7 @@ def get_move_amount_from_csv(csvfn, refwave=REFWAVE, t=0, mag=MAG):
             z = par[0]
             zum = z * creader.pxlsiz[0]
 
-            zum = get_shift_amount_at_camera(-zum, mag)
+            zum = get_shift_amount_at_camera(zum, mag)
             ret[w] = zum
     return ret
 
