@@ -85,6 +85,30 @@ def move(dic):
     return dic2
 
 
+def get_positions():
+    """
+    Return current positions of all stages defined in STAGES.
+
+    return {w: zum_at_stage} for each wave index
+    """
+    # Build {module_name: [wave_indices]} to open each stage only once
+    module_waves = {}
+    for w, (module, axis) in STAGES.items():
+        module_waves.setdefault(module, []).append(w)
+
+    ret = {}
+    for module_name, waves in module_waves.items():
+        module = importlib.import_module('mdevices.stage.' + module_name)
+        stage = module.Stage(module.PAR)
+        pos = stage.get_position()  # {axis: µm}
+        stage.close()
+        for w in waves:
+            _, axis = STAGES[w]
+            if axis in pos:
+                ret[w] = pos[axis]
+    return ret
+
+
 def doAll(csvfn, refwave=REFWAVE, t=0, mag=MAG):
     """
     csvfn: output from Chromagnon

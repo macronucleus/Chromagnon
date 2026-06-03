@@ -6,7 +6,6 @@ then drives the motorized camera stages.
 """
 
 import wx
-import wx.lib.scrolledpanel as scrolled
 import threading
 import os
 import sys
@@ -23,7 +22,6 @@ try:
     from . import hwc
     from . import chromformat
 except ImportError:
-    # Running as __main__ — import via package name
     import importlib
     hwc = importlib.import_module(f'{_PKG_NAME}.hwc')
     chromformat = importlib.import_module(f'{_PKG_NAME}.chromformat')
@@ -32,21 +30,20 @@ except ImportError:
 MAG_DEFAULT = hwc.MAG
 REFWAVE_DEFAULT = hwc.REFWAVE
 
-# Human-readable labels for each wave index (keys from hwc.STAGES)
 WAVE_LABELS = {
     0: 'Ch 0 (optosigma S)',
     2: 'Ch 2 (optosigma T)',
     3: 'Ch 3 (thorlabs U)',
 }
 
-# All channel indices defined in STAGES
 CHANNELS = sorted(hwc.STAGES.keys())
+
+_POS_UNKNOWN = '---'
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def read_csv_shifts(csvfn, refwave=REFWAVE_DEFAULT, t=0, mag=MAG_DEFAULT):
-    """Return {wave_index: z_um_at_camera} from a Chromagnon CSV."""
     return hwc.get_move_amount_from_csv(csvfn, refwave=refwave, t=t, mag=mag)
 
 
@@ -54,13 +51,16 @@ def read_csv_shifts(csvfn, refwave=REFWAVE_DEFAULT, t=0, mag=MAG_DEFAULT):
 
 class HwcFrame(wx.Frame):
     def __init__(self):
-        super().__init__(None, title='HWC – Hardware Z Controller', size=(560, 560))
-        self.SetMinSize((480, 480))
+        super().__init__(None, title='HWC – Hardware Z Controller', size=(900, 700))
+        self.SetMinSize((800, 600))
+
+        # cumulative jog offset per channel, in sample-side µm
+        self.jog_offset = {w: 0.0 for w in CHANNELS}
 
         panel = wx.Panel(self)
         outer = wx.BoxSizer(wx.VERTICAL)
 
-        # ── Magnification / refwave row ────────────────────────────────────────
+        # ── Parameters ────────────────────────────────────────────────────────
         param_box = wx.StaticBox(panel, label='Parameters')
         param_sizer = wx.StaticBoxSizer(param_box, wx.HORIZONTAL)
 
@@ -77,7 +77,7 @@ class HwcFrame(wx.Frame):
 
         outer.Add(param_sizer, 0, wx.EXPAND | wx.ALL, 8)
 
-        # ── CSV section ────────────────────────────────────────────────────────
+        # ── CSV ───────────────────────────────────────────────────────────────
         csv_box = wx.StaticBox(panel, label='Load Chromagnon CSV')
         csv_sizer = wx.StaticBoxSizer(csv_box, wx.HORIZONTAL)
 
@@ -94,27 +94,44 @@ class HwcFrame(wx.Frame):
 
         outer.Add(csv_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
-        # ── Manual input table ─────────────────────────────────────────────────
-        manual_box = wx.StaticBox(panel, label='Z shift at camera [µm]  (manual or filled from CSV)')
-        manual_sizer = wx.StaticBoxSizer(manual_box, wx.VERTICAL)
+        # ── Channel table ─────────────────────────────────────────────────────
+        table_box = wx.StaticBox(panel, label='Channels')
+        table_sizer = wx.StaticBoxSizer(table_box, wx.VERTICAL)
 
-        grid = wx.FlexGridSizer(rows=len(CHANNELS) + 1, cols=3, vgap=6, hgap=8)
-        grid.AddGrowableCol(1, 1)
+        # columns: Channel | Current pos | Jog offset (sample) | Z shift | Enable
+        grid = wx.FlexGridSizer(rows=len(CHANNELS) + 1, cols=5, vgap=6, hgap=10)
+        grid.AddGrowableCol(3, 1)
 
-        # Header
-        for h in ('Channel', 'Z shift at camera (µm)', 'Enable'):
+        bold_font = self.GetFont()
+        bold_font.MakeBold()
+        for h in ('Channel', 'Current pos (µm)', 'Jog offset\n(sample µm)', 'Z shift at camera (µm)', 'Enable'):
             lbl = wx.StaticText(panel, label=h)
-            font = lbl.GetFont()
-            font.MakeBold()
-            lbl.SetFont(font)
+            lbl.SetFont(bold_font)
             grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
 
-        self.shift_ctrls = {}   # wave_idx -> TextCtrl
-        self.enable_ctrls = {}  # wave_idx -> CheckBox
+        self.shift_ctrls = {}      # wave_idx -> TextCtrl
+        self.enable_ctrls = {}     # wave_idx -> CheckBox
+        self.pos_labels = {}       # wave_idx -> StaticText (hardware position)
+        self.offset_labels = {}    # wave_idx -> StaticText (cumulative jog offset)
+
+        mono_font = wx.Font(10, wx.FONTFAMILY_TELETYPE,
+                            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
 
         for w in CHANNELS:
             label = WAVE_LABELS.get(w, f'Ch {w}')
             grid.Add(wx.StaticText(panel, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
+
+            pos_lbl = wx.StaticText(panel, label=_POS_UNKNOWN, size=(120, -1),
+                                    style=wx.ST_NO_AUTORESIZE)
+            pos_lbl.SetFont(mono_font)
+            self.pos_labels[w] = pos_lbl
+            grid.Add(pos_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+
+            off_lbl = wx.StaticText(panel, label='0.0000', size=(110, -1),
+                                    style=wx.ST_NO_AUTORESIZE)
+            off_lbl.SetFont(mono_font)
+            self.offset_labels[w] = off_lbl
+            grid.Add(off_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
 
             tc = wx.TextCtrl(panel, value='0.0', size=(120, -1))
             self.shift_ctrls[w] = tc
@@ -125,31 +142,78 @@ class HwcFrame(wx.Frame):
             self.enable_ctrls[w] = cb
             grid.Add(cb, 0, wx.ALIGN_CENTER_VERTICAL)
 
-        manual_sizer.Add(grid, 0, wx.ALL | wx.EXPAND, 8)
-        outer.Add(manual_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        table_sizer.Add(grid, 0, wx.ALL | wx.EXPAND, 8)
+        outer.Add(table_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
-        # ── Action buttons ─────────────────────────────────────────────────────
+        # ── Action buttons ────────────────────────────────────────────────────
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        clear_btn = wx.Button(panel, label='Clear')
+        clear_btn = wx.Button(panel, label='Clear shifts')
         clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)
         btn_sizer.Add(clear_btn, 0, wx.RIGHT, 8)
 
-        move_btn = wx.Button(panel, label='Move stages', size=(130, -1))
-        move_btn.SetBackgroundColour(wx.Colour(60, 140, 60))
-        move_btn.SetForegroundColour(wx.WHITE)
-        move_btn.Bind(wx.EVT_BUTTON, self.on_move)
-        btn_sizer.Add(move_btn, 0)
+        reset_btn = wx.Button(panel, label='Reset jog offsets')
+        reset_btn.SetToolTip('全チャンネルの Jog offset を 0 にリセット')
+        reset_btn.Bind(wx.EVT_BUTTON, self.on_reset_offsets)
+        btn_sizer.Add(reset_btn, 0, wx.RIGHT, 8)
+
+        self.refresh_btn = wx.Button(panel, label='Refresh positions')
+        self.refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        btn_sizer.Add(self.refresh_btn, 0, wx.RIGHT, 20)
+
+        self.move_btn = wx.Button(panel, label='Move stages', size=(130, -1))
+        self.move_btn.SetBackgroundColour(wx.Colour(60, 140, 60))
+        self.move_btn.SetForegroundColour(wx.WHITE)
+        self.move_btn.Bind(wx.EVT_BUTTON, self.on_move)
+        btn_sizer.Add(self.move_btn, 0)
 
         outer.Add(btn_sizer, 0, wx.ALIGN_RIGHT | wx.RIGHT | wx.BOTTOM, 12)
 
-        # ── Log area ──────────────────────────────────────────────────────────
+        # ── Manual jog ───────────────────────────────────────────────────────
+        jog_box = wx.StaticBox(panel, label='Manual jog  (sample-side µm → stage move)')
+        jog_sizer = wx.StaticBoxSizer(jog_box, wx.HORIZONTAL)
+
+        jog_sizer.Add(wx.StaticText(panel, label='Channel:'), 0,
+                      wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 6)
+        self.jog_ch = wx.Choice(panel,
+                                choices=[WAVE_LABELS.get(w, f'Ch {w}') for w in CHANNELS])
+        self.jog_ch.SetSelection(0)
+        jog_sizer.Add(self.jog_ch, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 4)
+
+        jog_sizer.Add(wx.StaticText(panel, label='  Distance (µm, sample):'), 0,
+                      wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 12)
+        self.jog_dist = wx.TextCtrl(panel, value='1.0', size=(80, -1))
+        jog_sizer.Add(self.jog_dist, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 4)
+
+        jog_sizer.Add(wx.StaticText(panel, label='  →  stage:'), 0,
+                      wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 10)
+        self.jog_preview = wx.StaticText(panel, label='---  µm', size=(110, -1))
+        self.jog_preview.SetFont(mono_font)
+        jog_sizer.Add(self.jog_preview, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 4)
+
+        self.jog_dist.Bind(wx.EVT_TEXT, self.on_jog_dist_changed)
+        self.jog_ch.Bind(wx.EVT_CHOICE, self.on_jog_dist_changed)
+
+        jog_sizer.AddStretchSpacer()
+
+        jog_neg_btn = wx.Button(panel, label='− Move', size=(80, -1))
+        jog_neg_btn.Bind(wx.EVT_BUTTON, lambda e: self.on_jog(e, sign=-1))
+        jog_sizer.Add(jog_neg_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
+
+        jog_pos_btn = wx.Button(panel, label='＋ Move', size=(80, -1))
+        jog_pos_btn.SetBackgroundColour(wx.Colour(50, 110, 200))
+        jog_pos_btn.SetForegroundColour(wx.WHITE)
+        jog_pos_btn.Bind(wx.EVT_BUTTON, lambda e: self.on_jog(e, sign=+1))
+        jog_sizer.Add(jog_pos_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 6)
+
+        outer.Add(jog_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        # ── Log ───────────────────────────────────────────────────────────────
         log_box = wx.StaticBox(panel, label='Log')
         log_sizer = wx.StaticBoxSizer(log_box, wx.VERTICAL)
         self.log = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL,
-                               size=(-1, 120))
-        self.log.SetFont(wx.Font(10, wx.FONTFAMILY_TELETYPE,
-                                 wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                               size=(-1, 110))
+        self.log.SetFont(mono_font)
         log_sizer.Add(self.log, 1, wx.EXPAND | wx.ALL, 4)
         outer.Add(log_sizer, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -157,7 +221,7 @@ class HwcFrame(wx.Frame):
         self.Centre()
         self.Show()
 
-    # ── event handlers ─────────────────────────────────────────────────────────
+    # ── event handlers ────────────────────────────────────────────────────────
 
     def on_browse(self, event):
         with wx.FileDialog(self, 'Open Chromagnon CSV',
@@ -184,7 +248,6 @@ class HwcFrame(wx.Frame):
             self.log_line(f'ERROR reading CSV: {e}')
             return
 
-        # Fill text controls with computed values
         for w, zum in shifts.items():
             if w in self.shift_ctrls:
                 self.shift_ctrls[w].SetValue(f'{zum:.4f}')
@@ -192,15 +255,110 @@ class HwcFrame(wx.Frame):
 
         self.log_line(f'Loaded: {os.path.basename(path)}')
         for w, zum in shifts.items():
-            label = WAVE_LABELS.get(w, f'Ch {w}')
-            self.log_line(f'  {label}: {zum:.4f} µm')
+            self.log_line(f'  {WAVE_LABELS.get(w, f"Ch {w}")}: {zum:.4f} µm')
 
     def on_clear(self, event):
         for w in CHANNELS:
             self.shift_ctrls[w].SetValue('0.0')
 
+    def on_reset_offsets(self, event):
+        for w in CHANNELS:
+            self.jog_offset[w] = 0.0
+            self.offset_labels[w].SetLabel('0.0000')
+        self.log_line('Jog offsets reset to 0.')
+
+    # ── jog helpers ───────────────────────────────────────────────────────────
+
+    def _jog_camera_um(self):
+        """Return (wave_idx, camera_um) from current jog inputs, or raise ValueError."""
+        raw = self.jog_dist.GetValue().strip()
+        sample_um = float(raw)
+        mag = float(self.mag_ctrl.GetValue())
+        camera_um = hwc.get_shift_amount_at_camera(sample_um, mag)
+        w = CHANNELS[self.jog_ch.GetSelection()]
+        return w, camera_um
+
+    def on_jog_dist_changed(self, event):
+        try:
+            _, camera_um = self._jog_camera_um()
+            self.jog_preview.SetLabel(f'{camera_um:.4f}  µm')
+        except (ValueError, ZeroDivisionError):
+            self.jog_preview.SetLabel('---  µm')
+
+    def on_jog(self, event, sign):
+        try:
+            w, camera_um = self._jog_camera_um()
+            sample_um = float(self.jog_dist.GetValue().strip())
+        except (ValueError, ZeroDivisionError):
+            wx.MessageBox('Enter a valid numeric distance.', 'Input error', wx.ICON_ERROR)
+            return
+
+        camera_um *= sign
+        sample_um *= sign
+        label = WAVE_LABELS.get(w, f'Ch {w}')
+        direction = '+' if sign > 0 else '−'
+
+        if wx.MessageBox(
+                f'Jog {label} by {direction}{abs(camera_um):.4f} µm at stage\n'
+                f'(= {direction}{abs(sample_um):.4f} µm at sample)?',
+                'Confirm jog', wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
+            return
+
+        self.move_btn.Disable()
+        self.refresh_btn.Disable()
+        self.log_line(f'Jogging {label}: {camera_um:+.4f} µm at stage '
+                      f'({sample_um:+.4f} µm at sample)…')
+        threading.Thread(target=self._jog_thread,
+                         args=({w: camera_um}, w, sample_um), daemon=True).start()
+
+    def _jog_thread(self, dic, w, sample_um):
+        try:
+            hwc.move(dic)
+            wx.CallAfter(self._accumulate_offset, w, sample_um)
+            wx.CallAfter(self.log_line, 'Jog done.')
+            positions = hwc.get_positions()
+            wx.CallAfter(self._apply_positions, positions)
+        except Exception as e:
+            wx.CallAfter(self.log_line, f'ERROR during jog: {e}')
+            wx.CallAfter(wx.MessageBox, f'Jog failed:\n{e}', 'Error', wx.ICON_ERROR)
+        finally:
+            wx.CallAfter(self.move_btn.Enable)
+            wx.CallAfter(self.refresh_btn.Enable)
+
+    def _accumulate_offset(self, w, sample_um):
+        self.jog_offset[w] += sample_um
+        total = self.jog_offset[w]
+        self.offset_labels[w].SetLabel(f'{total:+.4f}')
+        self.log_line(f'  Jog offset {WAVE_LABELS.get(w, f"Ch {w}")}: '
+                      f'{total:+.4f} µm (sample)')
+
+    # ── stage position ────────────────────────────────────────────────────────
+
+    def on_refresh(self, event):
+        self.refresh_btn.Disable()
+        self.log_line('Reading stage positions…')
+        threading.Thread(target=self._refresh_thread, daemon=True).start()
+
+    def _refresh_thread(self):
+        try:
+            positions = hwc.get_positions()
+            wx.CallAfter(self._apply_positions, positions)
+        except Exception as e:
+            wx.CallAfter(self.log_line, f'ERROR reading positions: {e}')
+        finally:
+            wx.CallAfter(self.refresh_btn.Enable)
+
+    def _apply_positions(self, positions):
+        for w, pos in positions.items():
+            if w in self.pos_labels:
+                self.pos_labels[w].SetLabel(f'{pos:.4f}')
+        self.log_line('Positions updated:')
+        for w, pos in positions.items():
+            self.log_line(f'  {WAVE_LABELS.get(w, f"Ch {w}")}: {pos:.4f} µm')
+
+    # ── move all ─────────────────────────────────────────────────────────────
+
     def on_move(self, event):
-        # Collect enabled channels
         dic = {}
         for w in CHANNELS:
             if not self.enable_ctrls[w].GetValue():
@@ -220,27 +378,30 @@ class HwcFrame(wx.Frame):
 
         summary = '\n'.join(f'  {WAVE_LABELS.get(w, f"Ch {w}")}: {z:.4f} µm'
                             for w, z in dic.items())
-        if wx.MessageBox(
-                f'Move the following stages?\n\n{summary}',
-                'Confirm move', wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
+        if wx.MessageBox(f'Move the following stages?\n\n{summary}',
+                         'Confirm move', wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
             return
 
+        self.move_btn.Disable()
         self.log_line('Moving stages…')
-        # Run in thread so the UI stays responsive
         threading.Thread(target=self._move_thread, args=(dic,), daemon=True).start()
 
     def _move_thread(self, dic):
         try:
             result = hwc.move(dic)
-            wx.CallAfter(self.log_line, 'Done. Result:')
+            wx.CallAfter(self.log_line, 'Move done:')
             for module, axes in result.items():
                 for axis, zum in axes.items():
                     wx.CallAfter(self.log_line, f'  {module}/{axis}: {zum:.4f} µm')
+            positions = hwc.get_positions()
+            wx.CallAfter(self._apply_positions, positions)
         except Exception as e:
             wx.CallAfter(self.log_line, f'ERROR during move: {e}')
             wx.CallAfter(wx.MessageBox, f'Stage move failed:\n{e}', 'Error', wx.ICON_ERROR)
+        finally:
+            wx.CallAfter(self.move_btn.Enable)
 
-    # ── utility ────────────────────────────────────────────────────────────────
+    # ── utility ───────────────────────────────────────────────────────────────
 
     def log_line(self, text):
         self.log.AppendText(text + '\n')
