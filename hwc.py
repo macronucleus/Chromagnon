@@ -76,12 +76,20 @@ def move(dic):
 
         dic2.setdefault(module, {}).setdefault(axis, zum)
 
-    for module, dd in dic2.items():
-        module = importlib.import_module('mdevices.stage.' + module)
-        stage = module.Stage(module.PAR)
-        stage.move_relative(dd)
-        stage.close()
+    errors = {}
+    for module_name, dd in dic2.items():
+        try:
+            module = importlib.import_module('mdevices.stage.' + module_name)
+            stage = module.Stage(module.PAR)
+            stage.move_relative(dd)
+            stage.close()
+        except Exception as e:
+            print(f'WARNING: could not move {module_name}: {e}')
+            errors[module_name] = str(e)
 
+    if errors:
+        raise RuntimeError('Some stages failed to move: ' +
+                           '; '.join(f'{m}: {e}' for m, e in errors.items()))
     return dic2
 
 
@@ -98,14 +106,17 @@ def get_positions():
 
     ret = {}
     for module_name, waves in module_waves.items():
-        module = importlib.import_module('mdevices.stage.' + module_name)
-        stage = module.Stage(module.PAR)
-        pos = stage.get_position()  # {axis: µm}
-        stage.close()
-        for w in waves:
-            _, axis = STAGES[w]
-            if axis in pos:
-                ret[w] = pos[axis]
+        try:
+            module = importlib.import_module('mdevices.stage.' + module_name)
+            stage = module.Stage(module.PAR)
+            pos = stage.get_position()  # {axis: µm}
+            stage.close()
+            for w in waves:
+                _, axis = STAGES[w]
+                if axis in pos:
+                    ret[w] = pos[axis]
+        except Exception as e:
+            print(f'WARNING: could not read position from {module_name}: {e}')
     return ret
 
 

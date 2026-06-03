@@ -349,12 +349,18 @@ class HwcFrame(wx.Frame):
             wx.CallAfter(self.refresh_btn.Enable)
 
     def _apply_positions(self, positions):
-        for w, pos in positions.items():
-            if w in self.pos_labels:
-                self.pos_labels[w].SetLabel(f'{pos:.4f}')
+        for w in CHANNELS:
+            if w in positions:
+                self.pos_labels[w].SetLabel(f'{positions[w]:.4f}')
+            else:
+                self.pos_labels[w].SetLabel('N/A')
         self.log_line('Positions updated:')
-        for w, pos in positions.items():
-            self.log_line(f'  {WAVE_LABELS.get(w, f"Ch {w}")}: {pos:.4f} µm')
+        for w in CHANNELS:
+            label = WAVE_LABELS.get(w, f'Ch {w}')
+            if w in positions:
+                self.log_line(f'  {label}: {positions[w]:.4f} µm')
+            else:
+                self.log_line(f'  {label}: not available (stage not connected?)')
 
     # ── move all ─────────────────────────────────────────────────────────────
 
