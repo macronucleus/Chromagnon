@@ -221,6 +221,29 @@ class HwcFrame(wx.Frame):
         self.Centre()
         self.Show()
 
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
+        # Try to open stages in background on startup
+        threading.Thread(target=self._open_stages_thread, daemon=True).start()
+
+    # ── startup / shutdown ────────────────────────────────────────────────────
+
+    def _open_stages_thread(self):
+        opened = hwc.open_stages()
+        wx.CallAfter(self._on_stages_opened, opened)
+
+    def _on_stages_opened(self, opened):
+        if opened:
+            self.log_line('Stages connected: ' + ', '.join(opened.keys()))
+        else:
+            self.log_line('WARNING: No stages could be connected.')
+        # Auto-read positions after connection
+        threading.Thread(target=self._refresh_thread, daemon=True).start()
+
+    def on_close(self, event):
+        hwc.close_stages()
+        event.Skip()  # proceed with normal close
+
     # ── event handlers ────────────────────────────────────────────────────────
 
     def on_browse(self, event):
