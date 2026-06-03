@@ -149,6 +149,16 @@ def getCQthre(npxls, cqothre=CQOTHRE, cqconst=CTHRE):
     
     return cqothre/npxls + cqconst
 
+def stitchImg(cc):
+    ny = cc[0].shape[0] + cc[3].shape[0]
+    nx = cc[0].shape[1] + cc[1].shape[1]
+    canvas = N.empty((ny,nx), cc[0].dtype)
+    canvas[-cc[0].shape[0]:,-cc[0].shape[1]:] = cc[0]
+    canvas[-cc[1].shape[0]:,:cc[1].shape[1]] = cc[1]
+    canvas[:cc[2].shape[0],:cc[2].shape[1]] = cc[2]
+    canvas[:cc[3].shape[0],-cc[3].shape[1]:] = cc[3]
+    return canvas
+
 def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIFT, debug=False):
     """
     return [ty,tx,r,my,mx], offset, check
@@ -158,9 +168,9 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIF
         center = shape // 2
 
     # threshold
-    threfact = 0.03
-    variance = getVar(a2d, ref)
-    threshold = variance * threfact
+  #  threfact = 0.03
+  #  variance = getVar(a2d, ref)
+  #  threshold = variance * threfact
 
 
     # separate quadrisection
@@ -185,7 +195,9 @@ def estimate2D(a2d, ref, center=None, phaseContrast=True, max_shift_pxl=MAX_SHIF
     checks = [(idx, cq) for idx, cq in enumerate(cqvs) if cq < cqthre]
     
     if debug:
-        return [yx for yx, c in yxcs], [c for yx, c in yxcs]
+        yxs, ccs =  [yx for yx, c in yxcs], [c for yx, c in yxcs]
+        ccs = stitchImg(ccs)
+        return yxs, ccs
     del yxcs, ab#, c 
 
     # translation

@@ -150,6 +150,7 @@ class ThreadWithExc(threading.Thread):
         doZ = parms[13]
         rmv_ref, rmv_tgt = parms[14]
         order = parms[15]
+        highPass = parms[16]
         
         saveAlignParam = True
         alignChannels = True
@@ -177,7 +178,7 @@ class ThreadWithExc(threading.Thread):
                         wx.PostEvent(self.notify_obj, MyEvent(EVT_COLOR_ID, ['ref', index, wx.RED]))
 
                     #an = aligner.Chromagnon(fn)
-                    an = self.getAligner(fn, index, what='ref', doZ=doZ)
+                    an = self.getAligner(fn, index, what='ref', doZ=doZ, highPass=highPass)
                     an.setMaxShift(max_shift)
                     if accur:
                         an.setMaxIter3D(accur)
@@ -271,7 +272,7 @@ class ThreadWithExc(threading.Thread):
                     tstf = time.strftime('%Y %b %d %H:%M:%S', time.gmtime())
                     self.log('\n**Applying to %s using %s at %s' % (os.path.basename(target), os.path.basename(fn), tstf))
 
-                    an = self.getAligner(target, index, what='target', doZ=doZ)
+                    an = self.getAligner(target, index, what='target', doZ=doZ, highPass=highPass)
                     an.setDefaultOutPutDir(outdir)
 
                     
@@ -324,7 +325,7 @@ class ThreadWithExc(threading.Thread):
                 else:
                     self.log('\n**Applying to %s at %s' % (os.path.basename(target), tstf))
                 
-                an = self.getAligner(target, index, what='target', doZ=doZ)
+                an = self.getAligner(target, index, what='target', doZ=doZ, highPass=highPass)
                 an.setDefaultOutPutDir(outdir)
 
                 pgen = self.progressValues(target=True, an=an)
@@ -410,7 +411,7 @@ class ThreadWithExc(threading.Thread):
         #for stat in top_stats[:10]:
         #    print(stat)
 
-    def getAligner(self, fn, index, what='ref', doZ=True):
+    def getAligner(self, fn, index, what='ref', doZ=True, highPass=True):
         """
         what: 'ref' or 'tgt'
         """
@@ -420,6 +421,7 @@ class ThreadWithExc(threading.Thread):
             an.setFileFormats(self.img_ext)
             an.setParmSuffix(self.parm_suffix)
             an.setDoZ(doZ)
+            an.setphaseContrast(highPass)
 
         except IOError:
             raise IOError('filename %s, index %i, fns %s' % (fn, index, fns))

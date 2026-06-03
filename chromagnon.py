@@ -148,7 +148,9 @@ class BatchPanel(wx.Panel):
 
         self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix ', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
 
-        self.extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Extra parameters')
+        self.extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Advanced')
+
+        self.highPass = G.makeCheck(self, box, "HighPass", tip='', defChecked=bool(confdic.get('cutout', bool(confdic.get('highPass')))))
         
         # ---- target ------
 
@@ -460,7 +462,7 @@ class BatchPanel(wx.Panel):
         """
         enable or disable buttons that should not be hit while running the program
         """
-        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.parmSuffixLabel, self.parm_suffix_txt, self.extraButton, self.img_suffix_label, self.img_suffix_txt, self.outextch, self.averageCb, self.local_label, self.localListChoice, self.min_pxls_label, self.min_pxls_choice]
+        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.parmSuffixLabel, self.parm_suffix_txt, self.extraButton, self.img_suffix_label, self.img_suffix_txt, self.outextch, self.averageCb, self.local_label, self.localListChoice, self.min_pxls_label, self.min_pxls_choice, self.highPass]
 
         [button.Enable(enable) for button in buttons]
         
@@ -604,7 +606,8 @@ class BatchPanel(wx.Panel):
                          self.extra_parms.get('dorot4time', True),
                          self.extra_parms.get('doZ', True),
                          (ref_is_temp, fns_is_temp),
-                         self.extra_parms.get('order', af.ORDER)] 
+                         self.extra_parms.get('order', af.ORDER),
+                         self.highPass.GetValue()] 
                         
             if not parms[6]:
                 G.openMsg(parent=self, msg='The default suffix will be used', title="The file suffix is missing")
@@ -612,7 +615,7 @@ class BatchPanel(wx.Panel):
                 self.img_suffix_txt.SetValue(parms[6])
 
             # save current settings
-            C.saveConfig(cutout=parms[0], local=parms[2], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9])
+            C.saveConfig(cutout=parms[0], local=parms[2], accur=parms[4], parm_suffix_txt=parms[5], img_suffix_txt=parms[6], format=parms[8], min_pxls_yx=parms[9], highPass=parms[16])
             
             # run program
             gui = threads.GUImanager(self, __name__)
