@@ -600,7 +600,7 @@ class BatchPanel(wx.Panel):
                      int(accur),
                     self.parm_suffix_txt.GetValue(),
                         self.img_suffix_txt.GetValue(),
-                     self.extra_parms.get('tseries4wave', 'time'),
+                     self.extra_parms.get('tseries4wave', 'channel'),
                      form,
                      int(self.min_pxls_choice.GetStringSelection()),
                          #self.extra_parms.get('max_shift', af.MAX_SHIFT),

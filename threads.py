@@ -194,6 +194,18 @@ class ThreadWithExc(threading.Thread):
                     #    an.mapyx = None
                     
                     if (an.nw > 1 and (an.nt == 1 or nts=='channel')):
+                        if an.nt > 1:
+                            out = self.project(an)
+                            an = self.getAligner(out, index, what='ref', doZ=doZ, highPass=highPass)
+                            an.setMaxShift(max_shift)
+                            if accur:
+                                an.setMaxIter3D(accur)
+                            an.setDefaultOutPutDir(outdir)
+                            an.setReferenceWave(refwave)
+
+                            pgen = self.progressValues(target=False, an=an, alignChannels=True, alignTimeFrames=False, local=local)
+                            an.setProgressfunc(pgen)
+                        
                         an.findBestChannel()
 
 
@@ -483,6 +495,22 @@ class ThreadWithExc(threading.Thread):
             return wx.PostEvent(self.notify_obj, MyEvent(EVT_PROGRESS_ID, [val]))
         #print 'pval', val
 
+    def project(self, an):
+        from Priithon.all import U
+        self.echo('Making a projection image of the time series for aligning channels...')
+        base = os.path.splitext(an.img.fn)[0]
+        out = base + '_tproj.dv'
+        hdr = U.imgio.mrcIO.makeHdrFromRdr(an.img)
+        hdr.NumTimes = 1
+        hdr.Num[-1] = an.img.nw * an.img.nz
+        with U.Writer(out, hdr=hdr) as o:
+            for w in range(an.img.nw):
+                aa = [an.get3DArr(t=t, w=w) for t in range(an.img.nt)]
+                aa = U.project(aa, axis=0)
+                o.write3DArr(aa, t=0, w=w)
+
+        return out
+
 if _wx:
     class GUImanager(wx.EvtHandler):
         def __init__(self, panel, name=None):
@@ -622,6 +650,8 @@ if _wx:
 
         def OnProgress(self, evt):
             self.panel.progress.SetValue(int(round(evt.data[0])))
+
+
 
 
 class ThreadFlat(ThreadWithExc):
