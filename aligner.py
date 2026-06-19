@@ -1241,16 +1241,19 @@ class Chromagnon(object):
                 ni = des.extInts.shape[-1]
                 extF = N.empty((des.nt*des.nw*des.nz, ne,), des.extFloats.dtype)
                 extI = N.empty((des.nt*des.nw*des.nz, ni,), des.extInts.dtype)
-                
-                for t in range(self.img.nt):
-                    for w in range(self.img.nw):
-                        for z2, z1 in enumerate(zrange):
-                            i1 = self.img.findFileIdx(t=t, w=w, z=z1)
-                            i2 = des.findFileIdx(t=t, w=w, z=z2)
-                            extF[i2] = des.extFloats[i1]
-                            extI[i2] = des.extInts[i1]
-                des.extFloats[:len(extF)] = extF
-                des.extInts[:len(extI)] = extI
+
+                try:
+                    for t in range(self.img.nt):
+                        for w in range(self.img.nw):
+                            for z2, z1 in enumerate(zrange):
+                                i1 = self.img.findFileIdx(t=t, w=w, z=z1)
+                                i2 = des.findFileIdx(t=t, w=w, z=z2)
+                                extF[i2] = des.extFloats[i1]
+                                extI[i2] = des.extInts[i1]
+                    des.extFloats[:len(extF)] = extF
+                    des.extInts[:len(extI)] = extI
+                except IndexError:
+                    pass
 
                 des.writeHeader()
 

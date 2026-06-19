@@ -146,15 +146,17 @@ class BatchPanel(wx.Panel):
 
         self.refClearButton = G.makeButton(self, box, lambda ev:self.clearSelected(ev, 'ref'), title='Clear selected', tip='', enable=False)
 
-        self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix ', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=100)
+        self.parmSuffixLabel, self.parm_suffix_txt = G.makeTxtBox(self, box, 'Suffix ', defValue=confdic.get('parm_suffix_txt', ''), tip='A suffix for the file extention for the chromagnon file name', sizeX=70)
+
+        self.maxshift_label, self.maxshift_text = G.makeTxtBox(self, box, 'Max Shift (um)', defValue=confdic.get('max_shift', str(af.MAX_SHIFT)), tip='Maximum shift the channels are possibly misaligned', sizeX=30)
+        
+        self.highPass = G.makeCheck(self, box, "HighPass", tip='', defChecked=bool(confdic.get('cutout', bool(confdic.get('highPass')))))
 
         self.extraButton = G.makeButton(self, box, self.OnExtraParamButton, title='Advanced')
 
-        self.highPass = G.makeCheck(self, box, "HighPass", tip='', defChecked=bool(confdic.get('cutout', bool(confdic.get('highPass')))))
-        
-        # ---- target ------
+       # ---- target ------
 
-        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + self.parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + self.extraButton.GetSize()[0]
+        refsize = self.refAddButton.GetSize()[0] + self.refClearButton.GetSize()[0] + self.parmSuffixLabel.GetSize()[0] + self.parm_suffix_txt.GetSize()[0] + self.maxshift_text.GetSize()[0] + self.maxshift_label.GetSize()[0] +  + self.highPass.GetSize()[0] + self.extraButton.GetSize()[0]
         G.newSpaceH(box, LISTSIZE_X+LISTSPACE-refsize)
 
         self.tgtAddButton = G.makeButton(self, box, lambda ev:self.OnChooseImgFiles(ev,'target'), title='Target files', tip='', enable=True)
@@ -420,8 +422,8 @@ class BatchPanel(wx.Panel):
             self.extra_parms['order'] = eval(dlg.orderListChoice.GetStringSelection())
             C.saveConfig(interpolation_order=self.extra_parms['order'])
             
-            self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
-            C.saveConfig(max_shift=self.extra_parms['max_shift'])
+          #  self.extra_parms['max_shift'] = eval(dlg.maxshift_text.GetValue())
+          #  C.saveConfig(max_shift=self.extra_parms['max_shift'])
 
             self.extra_parms['calibfn'] = dlg.calibfn
 
@@ -462,7 +464,7 @@ class BatchPanel(wx.Panel):
         """
         enable or disable buttons that should not be hit while running the program
         """
-        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.parmSuffixLabel, self.parm_suffix_txt, self.extraButton, self.img_suffix_label, self.img_suffix_txt, self.outextch, self.averageCb, self.local_label, self.localListChoice, self.min_pxls_label, self.min_pxls_choice, self.highPass]
+        buttons = [self.refAddButton, self.refClearButton, self.tgtAddButton, self.tgtClearButton, self.cutoutCb, self.parmSuffixLabel, self.parm_suffix_txt, self.extraButton, self.img_suffix_label, self.img_suffix_txt, self.outextch, self.averageCb, self.local_label, self.localListChoice, self.min_pxls_label, self.maxshift_label, self.maxshift_text, self.min_pxls_choice, self.highPass]
 
         [button.Enable(enable) for button in buttons]
         
@@ -601,7 +603,9 @@ class BatchPanel(wx.Panel):
                      self.extra_parms.get('tseries4wave', 'time'),
                      form,
                      int(self.min_pxls_choice.GetStringSelection()),
-                         self.extra_parms.get('max_shift', af.MAX_SHIFT),
+                         #self.extra_parms.get('max_shift', af.MAX_SHIFT),
+                         float(self.maxshift_text.GetValue()),
+          #  C.saveConfig(max_shift=self.extra_parms['max_shift'])
                          self.extra_parms.get('calibfn', ''),
                          self.extra_parms.get('dorot4time', True),
                          self.extra_parms.get('doZ', True),

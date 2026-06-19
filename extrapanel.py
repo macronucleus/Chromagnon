@@ -78,9 +78,9 @@ class ExtraDialog(wx.Dialog):
 
         # -------- max shift -----------
         # \n
-        box = G.newSpaceV(sizer)
-        bb, box = G.newStaticBox(self, box, title='Maximum shift the channels are possibly misaligned', size=wx.DefaultSize)
-        label, self.maxshift_text = G.makeTxtBox(self, box, 'Shift (um)', defValue=confdic.get('max_shift', str(af.MAX_SHIFT)), tip='Maximum shift the channels are possibly misaligned', sizeX=40)
+     #   box = G.newSpaceV(sizer)
+     #   bb, box = G.newStaticBox(self, box, title='Maximum shift the channels are possibly misaligned', size=wx.DefaultSize)
+     #   label, self.maxshift_text = G.makeTxtBox(self, box, 'Shift (um)', defValue=confdic.get('max_shift', str(af.MAX_SHIFT)), tip='Maximum shift the channels are possibly misaligned', sizeX=40)
 
         # -------- interpolation order -----------
         # \n

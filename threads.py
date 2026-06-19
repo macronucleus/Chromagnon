@@ -465,6 +465,7 @@ class ThreadWithExc(threading.Thread):
                 #prange += [round(an.nz/25)] * an.nw * an.nt * ntargets
 
         else:
+            print(an.nw, an.nt)
             prange += [1] * an.nw * an.nt
             
         pratio = 100 / sum(prange)
