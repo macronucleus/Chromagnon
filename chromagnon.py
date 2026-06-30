@@ -725,6 +725,8 @@ def command_line():
                      help='turn off rotation calculation for time series (default=False, i.e. calculate rotation)')
         p.add_argument('--donotZ', '-n', action='store_true',
                      help='turn off Z-axis calculation (default=False, i.e. calculate Z-axis)')
+        p.add_argument('--donotHighPass', '-h', action='store_true',
+                     help='turn off highpass filter (default=False, i.e. use highpass filter (turn off this filter when bright filed images or difficult targets))')
         
         options = p.parse_args(sys.argv[1:])
 
@@ -797,7 +799,8 @@ def command_line():
                 not(options.donotRot4Time), # dorot4time
                 not(options.donotZ),# doZ
                       (ref_is_temp, fns_is_temp),
-                     af.ORDER] 
+                     af.ORDER,
+                     not(options.donotHighPass)] 
 
         th = threads.ThreadWithExc(None, LOCAL_CHOICE, refs, fns, parms)
         th.start()
