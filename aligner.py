@@ -1203,10 +1203,11 @@ class Chromagnon(object):
             des = imgio.Writer(fn, self.img)
 
         # add metadata
-        if hasattr(self.creader, 'fn'):
-            des.metadata['reference file'] = os.path.basename(self.creader.fn)
-        elif hasattr(self.creader, 'reader'):
-            des.metadata['reference file'] = os.path.basename(self.creader.reader.fn)
+        if hasattr(self, 'creader'):
+            if hasattr(self.creader, 'fn'):
+                des.metadata['reference file'] = os.path.basename(self.creader.fn)
+            elif hasattr(self.creader, 'reader'):
+                des.metadata['reference file'] = os.path.basename(self.creader.reader.fn)
         if self.mapyx is None:
             des.metadata['alignment mode'] = 'global'
         else:
