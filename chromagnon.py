@@ -791,7 +791,7 @@ def command_line():
                 options.n3diter,
                 options.parm_suffix,
                 options.img_suffix,
-                nts,
+                'channels', #nts,
                 options.img_format,
                 int(options.localMinWindow),
                 options.maxShift,

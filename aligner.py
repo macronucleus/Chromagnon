@@ -857,7 +857,7 @@ class Chromagnon(object):
                         else:
                             initGuess = None
                     print('Section-wise local alignment -- W: %i, Z: %i' % (w, z))
-                    yxs, regions,arr2 = af.iterWindowNonLinear(arr, ref, initGuess=initGuess, affine=self.alignParms[t,w], threshold=threshold, phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)
+                    yxs, regions, arr2, win = af.iterWindowNonLinear(arr, ref, initGuess=initGuess, affine=self.alignParms[t,w], threshold=threshold, phaseContrast=self.phaseContrast, maxErr=self.maxErrYX, echofunc=self.echofunc)
                     self.mapyx[t,w,z] = yxs
                     if self.regions is None or self.regions.shape[-2:] != regions.shape or self.regions.ndim == 4:
                         self.regions = N.zeros((self.img.nt, self.img.nw, self.img.nz)+regions.shape, N.uint16)
@@ -1104,7 +1104,7 @@ class Chromagnon(object):
         arr = af.remapWithAffine(arr, self.mapyx[t,w], self.alignParms[t,w], interp=order)#order=order)
         #else:
         #    arr = af.remapWithAffine(arr, self.microscopemap[t,w], self.alignParms[t,w])
-        arr = arr[self.cropSlice]
+        arr = arr[tuple(self.cropSlice)]
         
         return arr
 
