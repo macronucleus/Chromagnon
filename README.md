@@ -70,6 +70,7 @@ pip install git+https://github.com/macronucleus/tifffile.git
 pip install git+https://github.com/macronucleus/priithon@master
 pip install git+https://github.com/macronucleus/Chromagnon@master
 ```
+The forked tifffile (macronucleus/tifffile) is required to write ome.tif files.
 Priithon is not available on PyPI, so install it before Chromagnon.
 
 For development, clone both repositories and install them in editable mode:
