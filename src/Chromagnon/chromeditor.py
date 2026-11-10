@@ -4,14 +4,9 @@ import numpy as N
 import wx, wx.lib.mixins.listctrl as listmix
 import wx.lib.agw.aui as wxaui # from wxpython4.0, wx.aui does not work well, use this instead
 
-try:
-    from common import commonfuncs as C, microscopy, guiFuncs as G
-    from ndviewer import main as aui
-    from Priithon import Mrc
-except ImportError:
-    from Chromagnon.common import commonfuncs as C, microscopy, guiFuncs as G
-    from Chromagnon.ndviewer import main as aui
-    from Chromagnon.Priithon import Mrc
+from Priithon import commonfuncs as C, microscopy, guiFuncs as G
+from Priithon.ndviewer import main as aui
+from Priithon import Mrc
 
 if sys.version_info.major == 2:
     import aligner, alignfuncs as af, chromformat
@@ -153,12 +148,8 @@ class ChromagnonPanel(wx.Panel):
         save a '.local' file and opens new image viewer
         """
         import wx, tempfile
-        try:
-            from .. import imgio
-            from ..Priithon.all import Y
-        except (ValueError, ImportError):
-            import imgio
-            from Priithon.all import Y
+        from Priithon import imgio
+        from Priithon.all import Y
 
         if w is None:
             wave = int(self.wavechoice.GetStringSelection())
@@ -668,12 +659,12 @@ class TestViewPanel(wx.Panel):
             self.doc.refwave = twaves.index(refwave)
         elif len(somewaves) >= 1: # the reference wavelength was not found but some found
             self.doc.refwave = somewaves[0]
-            from PriCommon import guiFuncs as G
+            from Priithon import guiFuncs as G
             message = 'The original reference wavelength %i was not found in the target %s' % (refwave, self.doc.file)
             G.openMsg(msg=message, title='WARNING')
 
         else:
-            from PriCommon import guiFuncs as G
+            from Priithon import guiFuncs as G
             message = 'No common wavelength was found in %s and %s' % (os.path.basename(cpanel.fn), self.doc.file)
             G.openMsg(msg=message, title='WARNING')
             return

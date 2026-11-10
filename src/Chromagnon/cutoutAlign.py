@@ -3,10 +3,7 @@ from __future__ import print_function
 __version__ = 0.1
 
 import numpy as N
-try:
-    from Chromagnon.PriCommon import imgGeo
-except ImportError:
-    from PriCommon import imgGeo
+from Priithon import imgGeo
 
 
 import os

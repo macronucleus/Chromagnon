@@ -2,25 +2,10 @@ from __future__ import print_function
 import numpy as N
 import sys, os
 
-try:
-    import imgio
-    from Priithon.all import U, F
-    from PriCommon import xcorr, imgResample, imgGeo,imgFilters
-
-    if sys.version_info.major == 2 and hasattr(sys, 'app'):
-        from common import ppro
-    else:
-        from common import ppro26 as ppro
-        
-except ImportError:
-    from Chromagnon import imgio
-    from Chromagnon.Priithon.all import U, F
-    from Chromagnon.PriCommon import xcorr, imgResample, imgGeo,imgFilters
-    
-    if sys.version_info.major == 2 and hasattr(sys, 'app'):
-        from common import ppro
-    else:
-        from Chromagnon.common import ppro26 as ppro
+from Priithon import imgio
+from Priithon.all import U, F
+from Priithon import xcorr, imgResample, imgGeo, imgFilters
+from Priithon import ppro26 as ppro
 
 if sys.version_info.major == 2:
     import cutoutAlign, chromformat
@@ -1496,7 +1481,7 @@ def xcorNonLinear_para(arr, ref, npxls=32, threshold=None, phaseContrast=True):
 
     return (yx_arr, px_analyzed_arr[bool,var,cqual], result_arr)
     """
-    from PriCommon import ppro26
+    from Priithon import ppro26
     
     try:
         if len(npxls) != len(arr.shape):

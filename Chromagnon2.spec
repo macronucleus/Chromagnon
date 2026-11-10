@@ -8,7 +8,9 @@
 # execute like...
 # $ cd ~/chrom/Chromagnon
 # $ source activate chrom
-# $ pyinstaller --clean ~/codes/py/Chromagnon/Chromagnon.spec
+# $ pyinstaller --clean ~/codes/github/Chromagnon/Chromagnon2.spec
+# (since 2026-11 the sources are taken from src/ next to this spec file;
+#  Priithon must be installed in the active environment)
 # on mac and linux use packChromagnon.sh
 
 # on mac, make disk image
@@ -67,20 +69,13 @@ if sys.platform.startswith('win'):
     libbin = os.path.join(conda, 'Library', 'bin')
 
     #code=os.path.abspath(os.path.join('Z:', 'codes', 'py'))
-    code=os.path.join('Z:', os.sep, 'codes', 'py')
+    code=os.path.join(SPECPATH, 'src')
     #src = os.path.abspath(os.path.join('Z:', 'src', 'Chromagnon', 'Chromagnon'))
     #print(code)
 
     suffix = 'Win' + ex_suffix
 else: # mac + linux
-    if os.path.isdir(os.path.expanduser('~/codes')):
-        CODE='codes'
-    elif os.path.isdir(os.path.expanduser('~/local')):
-        CODE='local'
-    else:
-        raise ValueError('directory for codes not found')
-    
-    code=os.path.join(home, CODE, 'py')
+    code=os.path.join(SPECPATH, 'src')
     #src = os.path.join(home, CODE, 'src', 'Chromagnon', 'Chromagnon')
     
     # mac

@@ -20,12 +20,8 @@ import sys, os
 import six
 import numpy as N
 
-try:
-    from common import commonfuncs as C
-    import imgio
-except (ValueError, ImportError):
-    from Chromagnon.common import commonfuncs as C
-    from Chromagnon import imgio
+from Priithon import commonfuncs as C
+from Priithon import imgio
 
 ## for packaging, here the relative import was impossible to run this script as __main__
 try:
@@ -44,12 +40,8 @@ LOCAL_CHOICE = ['None', 'Projection']#, 'Section-wise']
 # ---------- GUI specific modules and constants
 try:
     import wx
-    try:
-        from common import guiFuncs as G, listbox
-        from ndviewer import main as aui
-    except (ValueError, ImportError):
-        from Chromagnon.common import guiFuncs as G, listbox
-        from Chromagnon.ndviewer import main as aui
+    from Priithon import guiFuncs as G, listbox
+    from Priithon.ndviewer import main as aui
         
     try:
         if sys.version_info.major == 2:

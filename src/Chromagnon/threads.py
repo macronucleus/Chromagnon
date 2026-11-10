@@ -2,12 +2,8 @@ from __future__ import print_function
 
 import os, threading, time, sys
 
-try:
-    from PriCommon import flatConv
-    from Priithon import fftmanager
-except ImportError:
-    from Chromagnon.PriCommon import flatConv
-    from Chromagnon.Priithon import fftmanager
+from Priithon import flatConv
+from Priithon import fftmanager
 
 if sys.version_info.major == 2:
     import alignfuncs, chromformat, aligner, alignfuncs as af, version
@@ -619,10 +615,7 @@ if _wx:
             self.OnDone()
 
         def OnError(self, evt):
-            try:
-                from Priithon import guiExceptionFrame
-            except ImportError:
-                from Chromagnon.Priithon import guiExceptionFrame
+            from Priithon import guiExceptionFrame
             self.panel.label.SetLabel('')
             self.panel.label.SetForegroundColour('black')
             self.stopWithErr = True

@@ -44,6 +44,7 @@ Platforms successfully tested:
 
 Dependencies:
 * `python`
+* `Priithon` (https://github.com/macronucleus/priithon; includes imgio and ndviewer)
 * `numpy`
 * `scipy`
 * `chardet` or `charset-normalizer` (optional for GUI)
@@ -66,8 +67,15 @@ Installation from source
 ```
 conda -c conda-forge install numpy scipy wxpython pyopengl pyfftw
 pip install git+https://github.com/macronucleus/tifffile.git
+pip install git+https://github.com/macronucleus/priithon@master
+pip install git+https://github.com/macronucleus/Chromagnon@master
 ```
-then put Chromagnon, Priithon, imgio, common, PriCommon in your pythonpath.
+Priithon is not available on PyPI, so install it before Chromagnon.
+
+For development, clone both repositories and install them in editable mode:
+```
+pip install -e ./priithon -e ./Chromagnon
+```
 
 How to cite
 ----------

@@ -3,14 +3,9 @@ import os, csv, sys
 import numpy as N
 from scipy import ndimage as nd
 
-try:
-    from Chromagnon import imgio
-    from Chromagnon.Priithon.all import F
-    from Chromagnon.PriCommon import imgGeo
-except ImportError:
-    import imgio
-    from Priithon.all import F
-    from PriCommon import imgGeo
+from Priithon import imgio
+from Priithon.all import F
+from Priithon import imgGeo
 
 
 IDTYPE = '101'
@@ -331,19 +326,13 @@ class ChromagnonReader(object):
             self.holder.refwave = self.twaves.index(self.refwave)
         elif len(somewaves) >= 1: # the reference wavelength was not found but some found
             self.holder.refwave = somewaves[0]
-            try:
-                from ..common import guiFuncs as G
-            except (ValueError, ImportError):
-                from common import guiFuncs as G
+            from Priithon import guiFuncs as G
             message = 'The original reference wavelength %i was not found in the target %s' % (self.refwave, self.holder.img.fn)
             G.openMsg(msg=message, title='WARNING')
 
         else:
             #self.holder.parm = N.zeros((self.rdr.nt, self.rdr.nw, self.num_entry), self.dtype)
-            try:
-                from ..common import guiFuncs as G
-            except (ValueError, ImportError):
-                from common import guiFuncs as G
+            from Priithon import guiFuncs as G
             message = 'No common wavelength was found in %s and %s' % (os.path.basename(self.file), self.rdr.file)
             G.openMsg(msg=message, title='WARNING')
             return

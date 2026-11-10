@@ -1,17 +1,10 @@
 from __future__ import print_function
 import numpy as N
 
-try:
-    from Priithon.all import P, U
-
-    from PriCommon import xcorr, imgGeo
-    import imgio
-    from imgio import Mrc
-except ImportError:
-    from Chromagnon.Priithon.all import P, U
-    from Chromagnon.PriCommon import xcorr, imgGeo
-    from Chromagnon import imgio
-    from Chromagnon.imgio import Mrc
+from Priithon.all import P, U
+from Priithon import xcorr, imgGeo
+from Priithon import imgio
+from Priithon.imgio import Mrc
 
 from . import aligner, alignfuncs, cutoutAlign
 
@@ -165,7 +158,7 @@ def getTheta(asiny, asinx, center=(200,200)):
     
 
 def getRotFromImg(a, b, windowSize=(400,400)):
-    from PriCommon import imgFilters
+    from Priithon import imgFilters
     ac = imgFilters.cutOutCenter(a, windowSize, interpolate=False)
     bc = imgFilters.cutOutCenter(b, windowSize, interpolate=False)
 
@@ -356,8 +349,8 @@ def beads_analyzeBeads(fn, thre_sigma=1., beads_sigma_max=3, refwave=0, nbeads=6
 
     return dic, zyx
     """
-    from PriCommon import imgFilters, imgFit, imgGeo
-    from common import microscopy
+    from Priithon import imgFilters, imgFit, imgGeo
+    from Priithon import microscopy
     from Priithon.all import Y
     h = imgio.Reader(fn)#mrcIO.MrcReader(fn)
     if refwave >= h.nw:
@@ -1432,7 +1425,7 @@ def iteration(a2d, ref, maxErr=0.01, niter=10, phaseContrast=True, initguess=Non
 
 ############
 def intensitySpectrum(fns, out=None):
-    from PriCommon import bioformatsIO as io
+    from Priithon.imgio import bioformatsIO as io
     import csv
     
     if not out:
@@ -1668,7 +1661,7 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
     """
     import csv
     from . import chromformat
-    from PriCommon import imgFilters
+    from Priithon import imgFilters
     # output file
     if not out:
         out = fn + '_summary.csv'
@@ -1707,7 +1700,7 @@ def compareWarp(fn, out=None, div_step=20, div_max=200, use_varianceMap=True):
                 #region = regions[1] > threshold
                 factor = an.img.nx / regions[1].shape[-1]
                 region = imgFilters.zoomFourier(regions[1], factor, use_abs=True, padd=100)
-                from imgio import Mrc
+                from Priithon.imgio import Mrc
                 Mrc.save((region > (threshold * 2.5)).astype(N.uint16), 'region%s_win%i.mrc' % (fn[-1], npxls), ifExists='overwrite')
                 #continue
                 ind = N.nonzero(region > threshold)

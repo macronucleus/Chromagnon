@@ -25,10 +25,7 @@ import sys, os, tempfile, shutil
 import six
 import numpy as N
 
-try:
-    import imgio
-except (ValueError, ImportError):
-    from Chromagnon import imgio
+from Priithon import imgio
 
 ## for packaging, here the relative import was impossible to run this script as __main__
 try:

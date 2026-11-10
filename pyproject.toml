@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Chromagnon"
+dynamic = ["version"]
+description = "Image alignment software for multi-color fluorescence microscopy"
+readme = "README.md"
+authors = [{ name = "Atsushi Matsuda" }]
+requires-python = ">=3.8"
+dependencies = [
+    # Priithon is not on PyPI: install it first from
+    # https://github.com/macronucleus/priithon (or `pip install -e` a local clone).
+    # Do not write it as a direct URL here, otherwise pip replaces an
+    # editable Priithon with the GitHub version.
+    "Priithon",
+    "numpy",
+    "scipy",
+    "tifffile",
+    "six",
+    "charset-normalizer",
+]
+
+[project.optional-dependencies]
+gui = ["wxpython", "pyopengl"]
+
+[project.scripts]
+chromagnon = "Chromagnon.chromagnon:command_line"
+
+[tool.setuptools.dynamic]
+version = { attr = "Chromagnon.version.version" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

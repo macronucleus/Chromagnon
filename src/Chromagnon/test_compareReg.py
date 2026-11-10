@@ -5,8 +5,8 @@ import Chromagnon as ch
 import numpy as N
 
 from Priithon.all import F
-from PriCommon import imgGeo
-from imgio import mrcIO, Mrc
+from Priithon import imgGeo
+from Priithon.imgio import mrcIO, Mrc
 
 
 METHODS=['quadrisection', 'logpolar', 'simplex']

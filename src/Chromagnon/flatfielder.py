@@ -10,16 +10,10 @@ import sys, os
 import six
 import wx
 
-try:
-    from common import guiFuncs as G, commonfuncs as C, listbox
-    import imgio
-    from ndviewer import main as aui
-    from PriCommon import flatConv
-except ImportError:
-    from Chromagnon.common import guiFuncs as G, commonfuncs as C, listbox
-    from Chromagnon import imgio
-    from Chromagnon.ndviewer import main as aui
-    from Chromagnon.PriCommon import flatConv
+from Priithon import guiFuncs as G, commonfuncs as C, listbox
+from Priithon import imgio
+from Priithon.ndviewer import main as aui
+from Priithon import flatConv
 
 
 try:

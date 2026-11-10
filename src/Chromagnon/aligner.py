@@ -3,16 +3,10 @@ import os, sys, six
 import numpy as N
 from scipy import ndimage as nd
 
-try:
-    from common import fntools
-    import imgio
-    from PriCommon import imgGeo, imgFilters, xcorr#, fntools
-    from Priithon.all import U
-except ImportError:
-    from Chromagnon.common import fntools
-    from Chromagnon import imgio
-    from Chromagnon.PriCommon import imgGeo, imgFilters, xcorr#, fntools
-    from Chromagnon.Priithon.all import U
+from Priithon import fntools
+from Priithon import imgio
+from Priithon import imgGeo, imgFilters, xcorr
+from Priithon.all import U
 
 if sys.version_info.major == 2:
     import alignfuncs as af, cutoutAlign, chromformat

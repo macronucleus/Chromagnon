@@ -2,10 +2,10 @@
 
 import Chromagnon as ch
 import os, csv
-import imgio
+from Priithon import imgio
 import numpy as N
 from scipy.spatial import distance
-from PriCommon import imgGeo
+from Priithon import imgGeo
 from Priithon.all import P
 
 MINPXL=60
