@@ -609,7 +609,8 @@ class BatchPanel(wx.Panel):
                          self.extra_parms.get('calibfn', ''),
                          self.extra_parms.get('dorot4time', True),
                          self.extra_parms.get('doZ', True),
-                         (ref_is_temp, fns_is_temp),
+                         #(ref_is_temp, fns_is_temp),
+                         (None, fns_is_temp),
                          self.extra_parms.get('order', af.ORDER),
                          self.highPass.GetValue()] 
                         
