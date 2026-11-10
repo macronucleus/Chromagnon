@@ -1,1 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.py~
+*.so
+build/
+dist/
+*.egg-info/
+
+# Libraries
+*.dll
+*.lib
+
+# Data / temporary
+*.bak
+*.png
+*.tiff
+*.mrc
+*.zip
+.#*
+*~
+
+# OS
 .DS_Store
